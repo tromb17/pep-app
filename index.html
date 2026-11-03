@@ -1259,7 +1259,7 @@ function nativeBox(){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('digest','Утром — задачи на день, в')}<input type="time" data-ncfg="digestAt" value="${esc(c.digestAt)}" style="width:auto"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('habit','Вечером — неотмеченные привычки, в')}<input type="time" data-ncfg="habitAt" value="${esc(c.habitAt)}" style="width:auto"></div></div></div>
     <div class="field"><label>Защита</label><label class="chk"><input type="checkbox" id="lockOn" ${lock?'checked':''}><span>Вход по отпечатку пальца (или PIN телефона)</span></label></div>
-    <div class="field"><label>Приложение</label><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(ver)}</span><span class="sp"></span><button class="btn small" data-act="apkCheck">Проверить обновления</button></div></div>`;
+    <div class="field"><label>Приложение</label><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(ver)}</span><span class="sp"></span>${APK_NEW?`<button class="btn small primary" data-act="apkGet">Скачать 1.${APK_NEW.n}</button>`:'<button class="btn small" data-act="apkCheck">Проверить обновления</button>'}</div></div>`;
 }
 document.addEventListener('change',e=>{ const el=e.target; if(!NATIVE||!el.closest||!el.closest('#sheet')) return;
   if(el.dataset.ncfg){ const c=notifCfg(); c[el.dataset.ncfg]=el.type==='checkbox'?el.checked:el.value;
@@ -1271,15 +1271,18 @@ document.addEventListener('change',e=>{ const el=e.target; if(!NATIVE||!el.close
 });
 
 /* Android: вышла ли новая сборка. Выпуски — в открытом репозитории pep-app (тег apk-<номер сборки>).
-   Пока не обновились, напоминаем при каждом запуске; иначе проверяем раз в 6 часов. */
+   Проверяем при запуске и при возвращении в приложение, не чаще раза в час; пока не обновились —
+   напоминаем каждый раз, а в Настройках висит кнопка «Скачать». */
 const APK_API='https://api.github.com/repos/tromb17/pep-app/releases/latest';
+let APK_NEW=null;
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkApk(); });
 function checkApk(force){
   if(!NATIVE) return; let last=0; try{ last=+localStorage.getItem('moyplan.apkcheck')||0; }catch(e){}
-  if(!force&&Date.now()-last<6*3600e3) return;
+  if(!force&&Date.now()-last<3600e3) return;
   fetch(APK_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
     const n=j?+((/^apk-(\d+)$/.exec(j.tag_name||'')||[])[1]||0):0, have=+NATIVE.build()||0, a=j&&(j.assets||[]).find(x=>/\.apk$/i.test(x.name));
-    if(n>have&&a){ toast('Вышла новая версия приложения: 1.'+n,{label:'Скачать',fn:()=>NATIVE.openUrl(a.browser_download_url)}); return; }
-    try{ localStorage.setItem('moyplan.apkcheck',String(Date.now())); }catch(e){}
+    if(n>have&&a){ APK_NEW={n,url:a.browser_download_url}; toast('Вышла новая версия приложения: 1.'+n,{label:'Скачать',fn:()=>NATIVE.openUrl(a.browser_download_url)}); return; }
+    APK_NEW=null; try{ localStorage.setItem('moyplan.apkcheck',String(Date.now())); }catch(e){}
     if(force) toast(j?'У вас последняя версия':'Не удалось проверить — нет связи с GitHub');
   }).catch(()=>{ if(force) toast('Не удалось проверить — нет связи с GitHub'); });
 }
@@ -4251,6 +4254,7 @@ document.addEventListener('click',e=>{
     if(!confirm('Заменить все текущие данные копией?')) return; S=normalize(d)[0]; closeSheet(); persist(); render(); toast('Загружено'); }
   else if(a==='rcConnect'){ rcConnect(); }
   else if(a==='apkCheck'){ checkApk(true); }
+  else if(a==='apkGet'){ if(APK_NEW) NATIVE.openUrl(APK_NEW.url); }
   else if(a==='rcPull'){ if(isDirty()){ flush(); toast('Сначала отправляю свои правки'); return; } closeSheet(); setSync('pending','Загружаю из таблицы…'); pullRemote().then(()=>toast('Обновлено')); }
   else if(a==='rcLink'){ const link=(NATIVE||!/^https:/.test(location.href)?SITE:location.origin+location.pathname)+'#connect='+btoa(REMOTE.url+'|'+REMOTE.key);
     try{ navigator.clipboard.writeText(link).then(()=>toast('Ссылка скопирована. В ней ключ — отправляйте только себе'),()=>prompt('Ссылка для другого устройства (в ней ключ):',link)); }catch(err){ prompt('Ссылка для другого устройства (в ней ключ):',link); } }
