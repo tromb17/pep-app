@@ -560,6 +560,14 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .tcl-i .tcheck{pointer-events:none}
 .tcl-i.done .tcl-t{text-decoration:line-through;color:var(--muted)}
 .tcl-open{justify-self:start;padding:4px 0;font-size:13.5px}
+@keyframes tabInL{from{opacity:.35;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes tabInR{from{opacity:.35;transform:translateX(-28px)}to{opacity:1;transform:none}}
+#view.tab-in-l{animation:tabInL .18s ease-out}
+#view.tab-in-r{animation:tabInR .18s ease-out}
+@media (prefers-reduced-motion:reduce){#view.tab-in-l,#view.tab-in-r{animation:none}}
+.tcl-foot{display:flex;gap:18px;flex-wrap:wrap}
+.tcl-add{display:flex;gap:8px;align-items:center;margin:4px 0}
+.tcl-add .inline-in{flex:1;min-width:0}
 .pline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-width:0}
 .pname{flex:1 1 100%;min-width:0;background:transparent;border:0;padding:0;text-align:left;font:inherit;overflow-wrap:anywhere}
 .pq{width:84px;flex:none;margin-top:2px;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:3px 6px;font-size:13px;text-align:right}
@@ -2131,7 +2139,9 @@ function taskRow(t,hideProj){
     :`<button class="tcheck p${pr}" data-act="taskToggle" data-id="${t.id}" aria-pressed="${!!t.done}" aria-label="${t.done?'Вернуть':'Выполнить'}: ${esc(t.name)}">${t.done?'✓':''}</button>`;
   return `<div class="trow ${t.done?'done':''}" data-tid="${t.id}">${left}
     <div class="tcol"><button class="tmain" data-act="taskOpen" data-id="${t.id}"><div class="fname">${pr===3?'<span class="flag neg">!!! </span>':pr===2?'<span class="flag" style="color:var(--t4)">!! </span>':''}${esc(t.name||'Без названия')}</div>${parts.length?`<div class="fsub">${parts.join(' · ')}</div>`:''}</button>${multi}
-    ${exp?`<div class="tcl">${cl.map((c,i)=>`<button class="tcl-i ${c.done?'done':''}" data-act="clRowToggle" data-id="${t.id}" data-i="${i}" aria-pressed="${!!c.done}"><span class="tcheck sm">${c.done?'✓':''}</span><span class="tcl-t">${esc(c.text)}</span></button>`).join('')}<button class="more tcl-open" data-act="taskOpen" data-full="1" data-id="${t.id}">Открыть задачу ›</button></div>`:''}</div>${grip}</div>`;
+    ${exp?`<div class="tcl">${cl.map((c,i)=>`<button class="tcl-i ${c.done?'done':''}" data-act="clRowToggle" data-id="${t.id}" data-i="${i}" aria-pressed="${!!c.done}"><span class="tcheck sm">${c.done?'✓':''}</span><span class="tcl-t">${esc(c.text)}</span></button>`).join('')}${UI.tclAdd===t.id
+      ?`<div class="tcl-add"><input class="inline-in" id="tclNew" placeholder="Новый пункт" autocomplete="off" enterkeyhint="done" aria-label="Новый пункт чек-листа"><button class="btn small primary" data-act="tclAdd" data-id="${t.id}" aria-label="Добавить пункт">+</button></div>`
+      :''}<div class="tcl-foot">${UI.tclAdd===t.id?'':`<button class="more tcl-open" data-act="tclPlus" data-id="${t.id}">+ пункт</button>`}<button class="more tcl-open" data-act="taskOpen" data-full="1" data-id="${t.id}">Открыть задачу ›</button></div></div>`:''}</div>${grip}</div>`;
 }
 const sortT=(a,b)=>(inInbox(a)?0:1)-(inInbox(b)?0:1)||(a.due||'9999').localeCompare(b.due||'9999')||(+b.priority||0)-(+a.priority||0);
 function tBlock(title,list,hideProj,extra,drop){ return list.length||extra?`<section class="card"${drop!=null?` data-tdrop="${esc(drop)}"`:''}><div class="ghead">${title}<span class="sum fsub">${list.length||''}</span></div>${list.map(t=>taskRow(t,hideProj)).join('')}${extra||''}</section>`:''; }
@@ -2788,7 +2798,7 @@ function noteTools(){
     ${N_MARKS.map(([c,n])=>b('mark',`<span class="sw" style="background:${c}"></span>`,'Выделить '+n,'',c)).join('')}<span class="sep"></span>
     ${b('insertUnorderedList','•≡','Список')}${b('insertOrderedList','1.','Нумерованный список')}${b('check','☑','Чек-лист')}${b('table','▦','Таблица')}
     ${b('tdelrow','− строка','Удалить строку','tt')}${b('tdelcol','− столбец','Удалить столбец','tt')}<span class="sep"></span>
-    ${b('removeFormat','⌫','Убрать оформление')}</div>`;
+    ${b('removeFormat','<span class="sw-t" style="text-decoration:line-through">A</span>','Убрать оформление: цвет, выделение, жирный (без выделения — вся строка)')}</div>`;
 }
 const selEl=()=>{ const sl=document.getSelection&&document.getSelection(); if(!sl||!sl.anchorNode) return null; const n=sl.anchorNode; return n.nodeType===1?n:n.parentElement; };
 function saveRich(ed){
@@ -2815,8 +2825,21 @@ function noteCmd(cmd,val){
     if(cmd==='tcol') [...tb.rows].forEach(r=>{ const c=document.createElement('td'); c.innerHTML='<br>'; (r.cells[ci]||r.lastElementChild).after(c); });
     if(cmd==='tdelrow'){ if(tb.rows.length>1) tr.remove(); else tb.closest('table').remove(); }
     if(cmd==='tdelcol'){ if(tr.cells.length>1) [...tb.rows].forEach(r=>{ if(r.cells[ci]) r.cells[ci].remove(); }); else tb.closest('table').remove(); } }
+  else if(cmd==='removeFormat') noteClear(ed);
   else document.execCommand(cmd,false,null);
   saveRich(ed);
+}
+function noteClear(ed){
+  const sl=document.getSelection(), whole=sl.isCollapsed;
+  if(whole){ let blk=selEl(); while(blk&&blk!==ed&&!/^(DIV|P|LI|H3|TD|BLOCKQUOTE)$/.test(blk.tagName)) blk=blk.parentElement;
+    if(!blk||!ed.contains(blk)) blk=ed; const r=document.createRange(); r.selectNodeContents(blk); sl.removeAllRanges(); sl.addRange(r); }
+  try{ document.execCommand('styleWithCSS',false,false); }catch(e){}
+  document.execCommand('removeFormat',false,null);
+  // что браузер оставил (цвет текста, выделение фоном) — снимаем сами
+  ed.querySelectorAll('font,span,mark,b,strong,i,em,u,s,strike').forEach(x=>{ if(sl.rangeCount&&sl.containsNode(x,false)) x.replaceWith(...x.childNodes); });
+  ed.querySelectorAll('[style]').forEach(x=>{ if(sl.rangeCount&&sl.containsNode(x,false)){ x.style.removeProperty('color'); x.style.removeProperty('background-color'); x.style.removeProperty('background'); if(!x.getAttribute('style').trim()) x.removeAttribute('style'); } });
+  ed.normalize();
+  if(whole&&sl.rangeCount) sl.collapseToEnd();
 }
 // кнопки панели не забирают фокус и выделение у текста
 ['mousedown','pointerdown'].forEach(t=>document.addEventListener(t,e=>{ if(e.target.closest&&e.target.closest('.note-tools button')) e.preventDefault(); }));
@@ -2876,6 +2899,13 @@ function payDue(){ const tk=TODAY(); return payOcc(dkey(addDays(tk,-62)),dkey(ad
 function payNext(p){ const t=TODAY(), l=payDates(p,dkey(addDays(t,-62)),dkey(addDays(t,400)));
   return l.find(d=>d>=(p.created||'')&&!payPaid(p,d))||l.find(d=>d>=todayK())||null; }
 const payAmt=o=>numOr(o.paid?o.paid.amount:o.p.amount,0);
+// остаток по платежу с датой окончания: все неоплаченные даты с fromK до конца срока (бессрочным — null)
+function payLeft(p,fromK){
+  if(!p.until||p.repeat==='once') return null;
+  const l=payDates(p,fromK,p.until).filter(d=>!payPaid(p,d));
+  return l.length?{n:l.length,sum:l.length*numOr(p.amount,0),last:l[l.length-1]}:null;
+}
+const payLeftText=(p,fromK)=>{ const r=payLeft(p,fromK); return r?'осталось '+rub(r.sum)+' · '+r.n+' '+plural(r.n,'платёж','платежа','платежей'):''; };
 const repText=p=>(PREPEAT.find(x=>x[0]===p.repeat)||PREPEAT[0])[1].toLowerCase();
 function factAdd(item,month,amt){ const f=S.facts.find(x=>x.item===item&&x.month===month), cur=f?String(f.value||'').trim():''; setListFact(S.facts,'item',item,month,cur?cur+'+'+amt:String(amt)); }
 function factRemove(item,month,amt){ const f=S.facts.find(x=>x.item===item&&x.month===month); if(!f) return false; const t=factTerms(f.value); if(!t) return false;
@@ -2894,7 +2924,7 @@ function payRow(o){
   const over=!o.paid&&o.due<todayK()&&o.due>=(o.p.created||''), it=o.p.item&&S.items.find(x=>x.id===o.p.item);
   const when=o.paid?'оплачено '+dRu(o.paid.paidAt):over?`<span class="neg">просрочен · ${dayLabel(o.due)}</span>`:dayLabel(o.due);
   return `<div class="trow ${o.paid?'done':''}"><button class="tcheck" data-act="payMark" data-id="${o.p.id}" data-due="${o.due}" aria-pressed="${!!o.paid}" aria-label="${o.paid?'Снять отметку':'Отметить оплату'}: ${esc(o.p.name)}">${o.paid?'✓':''}</button>
-    <button class="tmain" data-act="payOpen" data-id="${o.p.id}"><div class="row-between"><span class="fname">${esc(o.p.name)}</span><b class="num" style="flex:none">${rub(payAmt(o))}</b></div><div class="fsub">${when}${it?' · '+esc(it.name):''}</div></button></div>`;
+    <button class="tmain" data-act="payOpen" data-id="${o.p.id}"><div class="row-between"><span class="fname">${esc(o.p.name)}</span><b class="num" style="flex:none">${rub(payAmt(o))}</b></div><div class="fsub">${when}${it?' · '+esc(it.name):''}${!o.paid&&payLeft(o.p,o.due)?' · '+payLeftText(o.p,o.due):''}</div></button></div>`;
 }
 const payBlock=(title,l)=>l.length?`<section class="card"><div class="ghead">${title}<span class="sum fsub num">${rub(l.reduce((s,o)=>s+payAmt(o),0))}</span></div>${l.map(payRow).join('')}</section>`:'';
 const payActions=()=>`<div class="actions" style="margin-top:0"><button class="btn primary" data-act="add" data-kind="payment">+ Платёж</button>${payCandidates().length?'<button class="btn" data-act="payImport">Взять из бюджета</button>':''}</div>`;
@@ -2935,7 +2965,7 @@ function payMonth(){
 function payAll(){
   const rows=S.payments.map(p=>({p,n:payNext(p)})).sort((a,b)=>(a.n||'9999').localeCompare(b.n||'9999'));
   const perMonth=S.payments.reduce((s,p)=>s+numOr(p.amount,0)*({monthly:1,weekly:52/12,'2weeks':26/12,quarterly:1/3,yearly:1/12,once:0}[p.repeat]||1),0);
-  return `<div class="kpis">${kpi('В среднем в месяц',perMonth,'по всем регулярным платежам')}</div><section class="card">${rows.map(({p,n})=>`<button class="list-row" data-act="payOpen" data-id="${p.id}"><div class="m"><div class="fname">${esc(p.name)}</div><div class="fsub">${repText(p)}${n?' · следующий '+dayLabel(n).toLowerCase():' · завершён'}</div></div><b class="num">${rub(numOr(p.amount,0))}</b>${CHEV}</button>`).join('')}</section>${payActions()}`;
+  return `<div class="kpis">${kpi('В среднем в месяц',perMonth,'по всем регулярным платежам')}</div><section class="card">${rows.map(({p,n})=>`<button class="list-row" data-act="payOpen" data-id="${p.id}"><div class="m"><div class="fname">${esc(p.name)}</div><div class="fsub">${repText(p)}${n?' · следующий '+dayLabel(n).toLowerCase():' · завершён'}${n&&payLeft(p,n)?' · '+payLeftText(p,n):''}</div></div><b class="num">${rub(numOr(p.amount,0))}</b>${CHEV}</button>`).join('')}</section>${payActions()}`;
 }
 function viewPayPage(p){
   const i=S.payments.indexOf(p), it=p.item&&S.items.find(x=>x.id===p.item), n=payNext(p), t=TODAY();
@@ -2944,6 +2974,7 @@ function viewPayPage(p){
   return `${pageBack('Платежи')}<div class="detail-title"><h2>${esc(p.name)}</h2><button class="btn small" data-act="edit" data-kind="payment" data-i="${i}">Изменить</button></div>
   <p class="hint" style="margin-top:-6px">${rub(numOr(p.amount,0))} · ${repText(p)}${p.until?' · до '+dRu(p.until):''} · напоминание ${(REMINDS.find(r=>r[0]===numOr(p.remind,3))||REMINDS[3])[1].toLowerCase()}</p>
   ${nOcc?`<section class="card"><div class="row-between"><div><div class="fsub">Следующий платёж</div><b style="font-size:18px">${dayLabel(n)}</b>${n<todayK()?' <span class="neg">— просрочен</span>':''}</div><b class="num" style="font-size:18px">${rub(numOr(p.amount,0))}</b></div>
+    ${payLeft(p,n)?(r=>`<div class="row-between" style="margin-top:8px"><span class="fsub">Осталось выплатить, с этим платежом<br>${r.n} ${plural(r.n,'платёж','платежа','платежей')}, последний ${dRu(r.last)}</span><b class="num">${rub(r.sum)}</b></div>`)(payLeft(p,n)):''}
     <button class="btn primary" style="width:100%;margin-top:10px" data-act="payMark" data-id="${p.id}" data-due="${n}">✓ Оплачено</button>
     ${it?`<p class="hint" style="margin:8px 0 0">${p.toFact?'Сумма запишется в факт статьи «'+esc(it.name)+'» за '+monthTitle(mIdx(n)).toLowerCase()+'.':'Связан со статьёй «'+esc(it.name)+'», в факт не пишется.'}</p>`:''}</section>`:emptyCard('','Платежей впереди нет — срок закончился.')}
   ${fut.length?payBlock('Дальше',fut.filter(o=>o.due!==n)):''}
@@ -3631,6 +3662,26 @@ function delSpec(b){
   return null;
 }
 // строка списка и то, что в ней удаляется (свайп может начаться и на галочке строки)
+/* Подразделы (вкладки под заголовком) листаются жестом влево/вправо.
+   Не мешаем: полям ввода, горизонтальной прокрутке, свайпу «удалить» у строк, перетаскиванию, краям экрана. */
+let tabSw=null;
+function hScroll(el){ for(let x=el; x&&x!==document.body; x=x.parentElement){ if(x.scrollWidth>x.clientWidth+2&&/(auto|scroll)/.test(getComputedStyle(x).overflowX)) return true; } return false; }
+document.addEventListener('touchstart',e=>{ tabSw=null;
+  if(e.touches.length!==1||!S||UI.page||UI.detail||!document.getElementById('sheet').hidden||document.getElementById('subnav').hidden) return;
+  const el=e.target, t=e.touches[0];
+  if(!$view.contains(el)||t.clientX<24||t.clientX>innerWidth-24) return;
+  if(el.closest('input,textarea,select,[contenteditable],[data-drag],[data-tdrag],.note-tools')||delTarget(el)||hScroll(el)) return;
+  tabSw={x:t.clientX,y:t.clientY,t:Date.now()};
+},{passive:true});
+document.addEventListener('touchend',e=>{ const s=tabSw; tabSw=null; if(!s||swBlock||document.body.classList.contains('is-dragging')) return;
+  const t=e.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
+  if(Date.now()-s.t>700||Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*2) return;
+  const chips=[...document.querySelectorAll('#subnav .chip')], i=chips.findIndex(c=>c.classList.contains('on')), next=chips[Math.max(0,i)+(dx<0?1:-1)];
+  if(i<0&&dx>0||!next) return;
+  next.click();
+  $view.classList.remove('tab-in-l','tab-in-r'); void $view.offsetWidth; $view.classList.add(dx<0?'tab-in-l':'tab-in-r');
+  const on=document.querySelector('#subnav .chip.on'); if(on) on.scrollIntoView({block:'nearest',inline:'center'});
+},{passive:true});
 function delTarget(el){
   const b=el.closest&&el.closest('[data-act]'), row=el.closest&&el.closest('.trow,.note-row,.drow,.hrow');
   const cands=[b].concat(row?[...row.querySelectorAll('[data-act]')]:[]);
@@ -3814,7 +3865,7 @@ document.addEventListener('keyup',e=>{ if(e.key==='Enter') keepCaretSoon(0); });
 if(window.visualViewport) window.visualViewport.addEventListener('resize',()=>keepCaretSoon(60));
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.isComposing){ if(e.key==='Enter'&&!e.isComposing&&(e.target.id==='pHave'||e.target.id==='pNeed')){ e.preventDefault(); const bt=e.target.closest('.card').querySelector('[data-act="prodAdd"]'); if(bt) bt.click(); return; }
-    const map={ideaNew:'ideaAdd',recUrl:'recipeFetch',secQ:'',saPrice:'secSave',saLots:'secSave',bPrice:'buyAdd',qaTitle:'taskQuick',stepTitle:'stepAdd',gtTitle:'goalTaskAdd',factNew:'factAdd',clNew:'clAdd',hcVal:'hcSave',tcalNew:'tcalAdd',fsubNew:'fsubAdd'}; const act=map[e.target.id];
+    const map={ideaNew:'ideaAdd',recUrl:'recipeFetch',secQ:'',saPrice:'secSave',saLots:'secSave',bPrice:'buyAdd',qaTitle:'taskQuick',stepTitle:'stepAdd',gtTitle:'goalTaskAdd',factNew:'factAdd',clNew:'clAdd',tclNew:'tclAdd',hcVal:'hcSave',tcalNew:'tcalAdd',fsubNew:'fsubAdd'}; const act=map[e.target.id];
     if(act){ e.preventDefault(); const btn=document.querySelector(`[data-act="${act}"]`); if(btn) btn.click(); return; }
     if(e.target.dataset&&e.target.dataset.tf==='name'&&UI.page&&UI.page.isNew){ e.preventDefault(); const btn=document.querySelector('[data-act="taskOk"]'); if(btn) btn.click(); return; } }
   if(e.key==='Enter'&&e.target.matches('input[data-fact],input[data-ifact],input[data-insf],input[data-gfact],input[data-path],input[data-posval],input[data-ws],input[data-weight]')) e.target.blur();
@@ -3961,6 +4012,10 @@ document.addEventListener('click',e=>{
   else if(a==='projSub'){ UI.projParent=b.dataset.id; openEditor('project',null); }
   else if(a==='clAdd'){ const t=curTask(), inp=document.getElementById('clNew'), txt=inp?inp.value.trim():''; if(!t||!txt){ if(inp) inp.focus(); return; }
     t.checklist.push({id:uid(),text:txt,done:false}); persist('tasks'); render(); const n=document.getElementById('clNew'); if(n) n.focus(); }
+  else if(a==='tclPlus'){ UI.tclAdd=b.dataset.id; render(); const n=document.getElementById('tclNew'); if(n) n.focus(); }
+  else if(a==='tclAdd'){ const t=S.tasks.find(x=>x.id===b.dataset.id), inp=document.getElementById('tclNew'), txt=inp?inp.value.trim():'';
+    if(!t||!txt){ if(inp) inp.focus(); return; }
+    t.checklist.push({id:uid(),text:txt,done:false}); persist('tasks'); render(); const n=document.getElementById('tclNew'); if(n) n.focus(); }
   else if(a==='clToggle'){ const t=curTask(); if(!t) return; const c=t.checklist[+b.dataset.i]; c.done=!c.done; persist('tasks'); shopTick(c); render(); }
   else if(a==='clRowToggle'){ const t=S.tasks.find(x=>x.id===b.dataset.id), c=t&&t.checklist[+b.dataset.i]; if(!c) return; c.done=!c.done; persist('tasks'); shopTick(c); render(); }
   else if(a==='clDel'){ const t=curTask(); if(!t) return; t.checklist.splice(+b.dataset.i,1); persist('tasks'); render(); }
