@@ -1088,7 +1088,7 @@ function normalize(d){
     if(!o.payLog.some(x=>x!==l&&x.pay===l.pay&&x.due===best)){ l.due=best; migrated=true; } });
   o.items.forEach(it=>{ if(!it.owner) it.owner='me'; if(it.fund==null) it.fund=''; if(it.subs==null) it.subs=''; });
   o.facts.forEach(f=>{ if(f.tags==null) f.tags=''; });
-  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
+  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
   o.goals.forEach(g=>{ for(const k of ['specific','measure','achievable']) if(g[k]==null) g[k]=''; });
   o.habits.forEach(h=>{ if(!h.type) h.type='check'; });
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
@@ -1193,24 +1193,82 @@ function noteTitleFrom(text){
 function applyInbox(){
   if(!S||!NATIVE||!canSave||!document.getElementById('sheet').hidden) return;
   const items=inboxItems(); if(!items.length) return;
-  const keys=new Set(), seen=[], isDay=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||''); let nt=0, nn=0;
-  items.forEach(it=>{ if(!it||!it.id) return; seen.push(it.id); const text=String(it.text||'').trim(); if(!text) return;
+  const keys=new Set(), seen=[], isDay=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||''); let nt=0, nn=0, nd=0;
+  items.forEach(it=>{ if(!it||!it.id) return; seen.push(it.id); const text=String(it.text||'').trim(); if(!text&&it.type!=='done') return;
     if(it.type==='note'){ if(S.notes.some(n=>n.id===it.id)) return;
       let f=S.noteFolders.find(x=>x.name===QUICK_FOLDER); if(!f){ f={id:uid(),name:QUICK_FOLDER}; S.noteFolders.push(f); keys.add('noteFolders'); }
       S.notes.push({id:it.id,name:noteTitleFrom(text),body:esc(text).replace(/\n/g,'<br>'),pinned:false,updated:new Date(+it.at||Date.now()).toISOString(),folder:f.id,book:''});
       keys.add('notes'); nn++; }
+    else if(it.type==='done'){ const t=S.tasks.find(x=>x.id===it.task); if(!t||t.done) return;
+      const n=t.times||1, k=it.k==null?n:Math.max(0,Math.min(n,+it.k));
+      if(k<n){ if(k>(t.timesDone||0)){ t.timesDone=k; keys.add('tasks'); } return; }
+      t.done=true; t.doneAt=isDay(it.day)?it.day:todayK(); t.timesDone=n;
+      if(t.repeat&&t.repeat!=='none') S.tasks.push(Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nextDue(t.due,t.repeat,t.repeatDays),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))}));
+      keys.add('tasks'); nd++; }
     else { if(S.tasks.some(t=>t.id===it.id)) return;
-      const t=newTask(text); t.id=it.id; t.due=isDay(it.due)?it.due:''; if(isDay(it.created)) t.created=it.created;
+      const day=isDay(it.created)?it.created:todayK(), pt=parseTaskText(text,day), t=newTask(pt.name); t.id=it.id;
+      t.due=pt.due||(isDay(it.due)?it.due:(pt.time?day:'')); t.time=pt.time; t.created=day; t.project=it.project&&projById(it.project)?it.project:'';
       S.tasks.push(t); keys.add('tasks'); nt++; } });
   if(keys.size){ persist(...keys); if(REMOTE) keepLocal(); render(); }
   try{ NATIVE.ack(JSON.stringify(seen)); }catch(e){}
-  if(nt||nn) toast('Из виджета: '+[nt?nt+' '+plural(nt,'задача','задачи','задач'):'',nn?nn+' '+plural(nn,'заметка','заметки','заметок'):''].filter(Boolean).join(', '));
+  if(nt||nn||nd) toast('Из виджета: '+[nt?nt+' '+plural(nt,'задача','задачи','задач'):'',nn?nn+' '+plural(nn,'заметка','заметки','заметок'):'',nd?'выполнено '+nd:''].filter(Boolean).join(', '));
 }
 // вернулись в приложение, а в окошке добавили что-то новое — сперва свежие данные, потом запись
 document.addEventListener('visibilitychange',()=>{ if(document.hidden||!NATIVE||!inboxItems().length) return;
   if(REMOTE&&!isDirty()&&!saving){ if(Date.now()-lastPull<=120000) pullRemote(); } else applyInbox(); });
 // ярлык «Трата» / «Привычки», когда приложение уже открыто
 window.moyplanAction=()=>{ let a=null; try{ a=NATIVE&&NATIVE.takeAction(); }catch(e){} if(a&&S) launch(a); };
+
+/* Android: уведомления. Расписание на 2 недели вперёд считает приложение при каждой правке и отдаёт телефону;
+   телефон показывает их сам, даже если приложение закрыто. Настройки — на этом устройстве. */
+const NOTIF_KEY='moyplan.notif.v1';
+const NOTIF_DEF={on:true,pay:true,bd:true,task:true,digest:true,digestAt:'09:00',habit:true,habitAt:'21:00'};
+function notifCfg(){ let c={}; try{ c=JSON.parse(localStorage.getItem(NOTIF_KEY)||'{}')||{}; }catch(e){} return Object.assign({},NOTIF_DEF,c); }
+function notifPlan(){
+  const c=notifCfg(), out=[]; if(!c.on||!S) return out;
+  const now=Date.now(), t=TODAY(), H=14, yrs=n=>n+' '+plural(n,'год','года','лет'), dd=n=>n+' '+plural(n,'день','дня','дней');
+  const at=(k,hm)=>{ const d=parseD(k), [h,m]=String(hm||'09:00').split(':').map(Number); return new Date(d.getFullYear(),d.getMonth(),d.getDate(),h||0,m||0).getTime(); };
+  const push=(id,ts,title,text,action)=>{ if(ts>now&&ts<now+(H+1)*864e5) out.push({id,at:ts,title,text,action}); };
+  if(c.pay) payOcc(todayK(),dkey(addDays(t,H+8))).forEach(o=>{ if(o.paid) return; const r=numOr(o.p.remind,3), amt=rub(numOr(o.p.amount,0));
+    if(r>0) push('pay|'+o.p.id+'|'+o.due+'|r',at(dkey(addDays(parseD(o.due),-r)),'10:00'),'Платёж через '+dd(r)+': '+o.p.name,amt+' · '+dayLabel(o.due).toLowerCase(),'pay');
+    push('pay|'+o.p.id+'|'+o.due,at(o.due,'10:00'),'Сегодня платёж: '+o.p.name,amt,'pay'); });
+  if(c.bd) S.gifts.forEach(g=>{ const n=bdNext(g); if(!n) return; const k=dkey(n), r=numOr(g.remind,3), age=g.byear?n.getFullYear()-g.byear:0;
+    if(r>0) push('bd|'+g.id+'|'+k+'|r',at(dkey(addDays(n,-r)),'10:00'),'Через '+dd(r)+' день рождения: '+g.name,dayLabel(k)+(age?' · '+yrs(age):''),'bdays');
+    push('bd|'+g.id+'|'+k,at(k,'09:00'),'Сегодня день рождения: '+g.name,age?yrs(age):'Не забудьте поздравить','bdays'); });
+  if(c.task) S.tasks.forEach(x=>{ if(!x.done&&x.due&&x.time) push('task|'+x.id+'|'+x.due+'|'+x.time,at(x.due,x.time),x.name,'Задача на '+x.time,'task'); });
+  if(c.digest) for(let i=0;i<=H;i++){ const k=dkey(addDays(t,i)), l=S.tasks.filter(x=>!x.done&&x.due&&(i===0?x.due<=k:x.due===k));
+    if(l.length) push('digest|'+k,at(k,c.digestAt),'На сегодня '+l.length+' '+plural(l.length,'задача','задачи','задач'),l.slice(0,4).map(x=>x.name).join(', ')+(l.length>4?'…':''),'task'); }
+  if(c.habit) for(let i=0;i<=H;i++){ const d=addDays(t,i), k=dkey(d), l=S.habits.filter(h=>h.days[wd(d)]==='1'&&(h.created||'')<=k&&!(HL[h.id]&&HL[h.id].has(k)));
+    if(l.length) push('habit|'+k,at(k,c.habitAt),'Не отмечены привычки',l.slice(0,4).map(h=>h.name).join(', ')+(l.length>4?'…':''),'habit'); }
+  return out.sort((a,b)=>a.at-b.at).slice(0,200);
+}
+// после каждой отрисовки (с задержкой): уведомления, задачи для виджета, ссылка на таблицу для виджета
+let nativeT=null;
+function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=setTimeout(()=>{ try{
+  NATIVE.schedule(JSON.stringify(notifPlan()));
+  const wk=dkey(addDays(TODAY(),7));
+  NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&x.due&&x.due<=wk).map(x=>({id:x.id,name:x.name,due:x.due,time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
+    projects:S.projects.map(p=>({id:p.id,name:p.name,parent:p.parent||''}))}));
+  NATIVE.setRemote(REMOTE?REMOTE.url:'',REMOTE?REMOTE.key:'');
+}catch(e){} },800); }
+function nativeBox(){
+  if(!NATIVE) return ''; const c=notifCfg(), ck=(k,l)=>`<label class="chk"><input type="checkbox" data-ncfg="${k}" ${c[k]?'checked':''}><span>${l}</span></label>`;
+  let lock=false, ver=''; try{ lock=!!NATIVE.lockOn(); ver=String(NATIVE.build()); }catch(e){}
+  return `<div class="field"><label>Уведомления</label>${ck('on','Присылать уведомления')}
+    <div style="padding-left:26px;display:grid;gap:2px">${ck('pay','Платежи — заранее (как указано в платеже) и в день оплаты')}${ck('bd','Дни рождения')}${ck('task','Задачи, у которых указано время')}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('digest','Утром — задачи на день, в')}<input type="time" data-ncfg="digestAt" value="${esc(c.digestAt)}" style="width:auto"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('habit','Вечером — неотмеченные привычки, в')}<input type="time" data-ncfg="habitAt" value="${esc(c.habitAt)}" style="width:auto"></div></div></div>
+    <div class="field"><label>Защита</label><label class="chk"><input type="checkbox" id="lockOn" ${lock?'checked':''}><span>Вход по отпечатку пальца (или PIN телефона)</span></label></div>
+    <div class="field"><label>Приложение</label><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(ver)}</span><span class="sp"></span><button class="btn small" data-act="apkCheck">Проверить обновления</button></div></div>`;
+}
+document.addEventListener('change',e=>{ const el=e.target; if(!NATIVE||!el.closest||!el.closest('#sheet')) return;
+  if(el.dataset.ncfg){ const c=notifCfg(); c[el.dataset.ncfg]=el.type==='checkbox'?el.checked:el.value;
+    try{ localStorage.setItem(NOTIF_KEY,JSON.stringify(c)); }catch(x){}
+    if(el.type==='checkbox'&&el.checked) try{ NATIVE.askNotify(); }catch(x){}
+    nativeSync(); }
+  else if(el.id==='lockOn'){ let r='ok'; try{ r=NATIVE.setLock(el.checked)||'ok'; }catch(x){ r='Не получилось'; }
+    if(r!=='ok'){ el.checked=!el.checked; toast(r); } else toast(el.checked?'Вход по отпечатку включён':'Вход по отпечатку выключен'); }
+});
 
 /* Android: вышла ли новая сборка. Выпуски — в открытом репозитории pep-app (тег apk-<номер сборки>).
    Пока не обновились, напоминаем при каждом запуске; иначе проверяем раз в 6 часов. */
@@ -1276,6 +1334,9 @@ function launch(a){
   else if(a==='expense'){ UI.section='fin'; UI.tab='month'; UI.month=null; render(); }
   else if(a==='habit'){ UI.section='habits'; UI.hview='today'; render(); }
   else if(a==='note'){ UI.section='notes'; UI.noteFolder=''; render(); press('noteNew'); }
+  else if(a==='pay'){ UI.section='pay'; UI.sub.pay='upcoming'; render(); }
+  else if(a==='bdays'){ UI.section='bdays'; render(); }
+  else if(a==='today'){ UI.section='tasks'; UI.sub.tasks='today'; render(); }
   saveUI();
 }
 
@@ -1294,7 +1355,7 @@ function prepare(){
 }
 function render(){
   if(LAUNCH){ const a=LAUNCH; LAUNCH=null; setTimeout(()=>launch(a),0); }
-  prepare();
+  prepare(); nativeSync();
   const sec=SECTIONS.find(s=>s.id===UI.section)||SECTIONS[0];
   document.getElementById('title').textContent=sec.title;
   document.getElementById('bottom').innerHTML=SECTIONS.filter(s=>s.nav).map(s=>`<button class="${s.id===UI.section||(s.id==='more'&&!sec.nav)?'on':''}" data-act="section" data-id="${s.id}">${icon(s.id)}<span>${s.title}</span></button>`).join('');
@@ -2123,7 +2184,7 @@ const inInbox=t=>!t.project||!projById(t.project);
 function taskRow(t,hideProj){
   const tk=todayK(), over=!t.done&&t.due&&t.due<tk, g=t.goal&&S.goals.find(x=>x.id===t.goal), pr=+t.priority||0, cl=t.checklist||[];
   const parts=[];
-  if(t.due) parts.push(`<span class="${over?'neg':''}">${over?'просрочено · ':''}${dayLabel(t.due)}</span>`);
+  if(t.due) parts.push(`<span class="${over?'neg':''}">${over?'просрочено · ':''}${dayLabel(t.due)}${t.time?' '+esc(t.time):''}</span>`);
   if(t.repeat&&t.repeat!=='none') parts.push('↻ '+repeatText(t));
   if(!hideProj&&t.project&&projById(t.project)) parts.push(`<span class="ptag"><span class="dot" style="--c:var(${projColor(t.project)});display:inline-block;width:7px;height:7px"></span> ${esc(projName(t.project))}</span>`);
   if(g) parts.push('цель: '+esc(g.name));
@@ -2256,6 +2317,7 @@ function viewTaskPage(t){
     <input class="note-title" data-tf="name" value="${esc(t.name)}" placeholder="Что сделать" aria-label="Название задачи"></div>
     <div class="tfields" style="margin-top:10px">
       <div><label>Срок</label><input type="date" data-tf="due" value="${esc(t.due||'')}"></div>
+      <div><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
       <div><label>Приоритет</label>${sel('priority',PRIOS,t.priority||'0')}</div>
       <div><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
       <div><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
@@ -2277,6 +2339,62 @@ function viewTaskPage(t){
 }
 // новая задача из «Подробнее…» живёт черновиком, пока не нажали «ОК»
 const curTask=()=>!(UI.page&&UI.page.kind==='task')?null:UI.page.isNew?(UI.draft&&UI.draft.id===UI.page.id?UI.draft:null):S.tasks.find(x=>x.id===UI.page.id);
+/* <<parseTask — одинаковая копия в web/index.html и gas/Code.gs (проверка: tests/parse_task.js) */
+// Срок словами: «позвонить маме завтра в 18» → {name:'позвонить маме', due:'ГГГГ-ММ-ДД', time:'18:00'}.
+// Понимает: сегодня, завтра, послезавтра, в пятницу (во вт…), через 3 дня / неделю / месяц, на выходных,
+// 15.11 (15.11.2027), 5 января; время — «в 18», «в 18:30», «к 9:15», «в 7 вечера», «в 9 утра».
+// today — 'ГГГГ-ММ-ДД' (день на устройстве). Чего не понял — остаётся в названии.
+function parseTaskText(text, today) {
+  var src = String(text || '').replace(/\s+/g, ' ').trim(), s = ' ' + src + ' ', due = '', time = '';
+  var END = '(?=[\\s,.!?;]|$)';
+  var t0 = new Date(today + 'T00:00:00Z'), wd0 = (t0.getUTCDay() + 6) % 7;
+  var key = function (d) { return d.toISOString().slice(0, 10); };
+  var plus = function (n) { return key(new Date(t0.getTime() + n * 864e5)); };
+  var plusMonths = function (n) { var y = t0.getUTCFullYear(), m = t0.getUTCMonth() + n, last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    return key(new Date(Date.UTC(y, m, Math.min(t0.getUTCDate(), last)))); };
+  var ymd = function (y, m, d) { var x = new Date(Date.UTC(y, m, d)); return x.getUTCMonth() === m && x.getUTCDate() === d ? key(x) : ''; };
+  var dayMonth = function (d, m, y) { var k = ymd(y || t0.getUTCFullYear(), m, d); if (k && !y && k < today) k = ymd(t0.getUTCFullYear() + 1, m, d); return k; };
+  var cut = function (re, fn) { var m = new RegExp(re, 'i').exec(s); if (!m) return; var r = fn(m); if (!r) return;
+    s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length); return r; };
+  var MON = ['янв', 'фев', 'мар', 'апр', 'ма', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  var WD = ['пн|понедельник', 'вт|вторник', 'ср|среду|среда', 'чт|четверг', 'пт|пятницу|пятница', 'сб|субботу|суббота', 'вс|воскресенье'];
+
+  // даты
+  if (!due) due = cut('\\s(?:на\\s|до\\s|к\\s)?(\\d{1,2})\\.(\\d{1,2})(?:\\.(\\d{4}|\\d{2}))?' + END, function (m) {
+    var y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : 0; return dayMonth(+m[1], +m[2] - 1, y); }) || '';
+  if (!due) due = cut('\\s(?:на\\s|до\\s|к\\s)?(\\d{1,2})\\s(январ[яь]|янв|феврал[яь]|фев|марта?|мар|апрел[яь]|апр|ма[яй]|июн[яь]|июн|июл[яь]|июл|августа?|авг|сентябр[яь]|сент?|октябр[яь]|окт|ноябр[яь]|нояб?|декабр[яь]|дек)\\.?(?:\\s(\\d{4}))?' + END, function (m) {
+    var w = m[2].toLowerCase(), mi = -1;
+    for (var i = 0; i < MON.length; i++) if (w.indexOf(MON[i]) === 0 && !(MON[i] === 'ма' && w.indexOf('мар') === 0)) { mi = i; break; }
+    return mi < 0 ? '' : dayMonth(+m[1], mi, m[3] ? +m[3] : 0); }) || '';
+  if (!due) due = cut('\\s(?:на\\s)?послезавтра' + END, function () { return plus(2); }) || '';
+  if (!due) due = cut('\\s(?:на\\s)?завтра' + END, function () { return plus(1); }) || '';
+  if (!due) due = cut('\\s(?:на\\s)?сегодня' + END, function () { return plus(0); }) || '';
+  if (!due) due = cut('\\sчерез\\s(?:(\\d+)\\s)?(день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев)' + END, function (m) {
+    var n = m[1] ? +m[1] : 1, u = m[2].toLowerCase();
+    return /^д/.test(u) ? plus(n) : /^н/.test(u) ? plus(7 * n) : plusMonths(n); }) || '';
+  if (!due) due = cut('\\s(?:на|в)\\sвыходны[хе]' + END, function () { return plus(wd0 >= 5 ? 0 : 5 - wd0); }) || '';
+  if (!due) due = cut('\\s(?:в|во|до|к)\\s(' + WD.join('|') + ')' + END, function (m) {
+    var w = m[1].toLowerCase(), i = 0;
+    for (; i < WD.length; i++) if (('|' + WD[i] + '|').indexOf('|' + w + '|') >= 0) break;
+    var n = (i - wd0 + 7) % 7; return plus(n || 7); }) || '';
+
+  // время
+  time = cut('\\s(?:в|к)\\s(\\d{1,2})(?::(\\d{2}))?(\\s?(?:ч|час|часа|часов))?(?:\\s(утра|дня|вечера|ночи))?' + END, function (m) {
+    var h = +m[1], mi = m[2] ? +m[2] : 0, p = (m[4] || '').toLowerCase();
+    if (!m[2] && !m[3] && !p) { // «в 2 этапа» — не время: после числа идёт обычное слово
+      var rest = s.slice(m.index + m[0].length).trim();
+      if (rest && !/^[,.!?;]/.test(rest)) return '';
+    }
+    if (p === 'утра' && h === 12) h = 0;
+    if ((p === 'дня' || p === 'вечера') && h < 12) h += 12;
+    if (p === 'ночи' && h === 12) h = 0;
+    if (h > 23 || mi > 59) return '';
+    return ('0' + h).slice(-2) + ':' + ('0' + mi).slice(-2); }) || '';
+
+  var name = s.replace(/\s+/g, ' ').trim().replace(/[\s,;:—–-]+$/, '').replace(/^[\s,;:—–-]+/, '');
+  return { name: name || src, due: due, time: time };
+}
+/* parseTask>> */
 function newTask(name,goal,project){
   const due=goal?'':UI.qaDue==='today'?todayK():UI.qaDue==='tomorrow'?dkey(addDays(TODAY(),1)):'';
   return {id:uid(),name,note:'',due,priority:'0',repeat:'none',repeatDays:'',times:1,timesDone:0,goal:goal||'',project:project||'',checklist:[],done:false,doneAt:'',created:todayK(),part:''};
@@ -3571,7 +3689,7 @@ function openSettings(){
     ${storageBox()}
     <div class="field"><label>Резервная копия (JSON)</label><textarea id="jsonBox" spellcheck="false" placeholder="Нажмите «Выгрузить» или вставьте сюда копию и нажмите «Загрузить»"></textarea></div>
     <div class="actions" style="margin-top:0"><button class="btn small" data-act="export">Выгрузить</button><button class="btn small" data-act="copy">Скопировать</button><button class="btn small" data-act="import">Загрузить</button></div>
-    ${NATIVE?`<div class="field"><label>Приложение</label><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(String(NATIVE.build()))}</span><span class="sp"></span><button class="btn small" data-act="apkCheck">Проверить обновления</button></div></div>`:''}
+    ${nativeBox()}
     <div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
     </div><div class="actions"><span class="sp"></span><button class="btn primary" data-act="sheetClose">Готово</button></div>`);
 }
@@ -3970,7 +4088,10 @@ document.addEventListener('click',e=>{
   else if(a==='qaDue'){ UI.qaDue=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='taskQuick'){ const inp=document.getElementById('qaTitle'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
     const v=UI.sub.tasks||'', proj=v.startsWith('p:')?v.slice(2):'';
-    const nt=addTask(name,'',proj); if(UI.qaDue!=='none'&&UI.qaPart){ nt.part=UI.qaPart; persist('tasks'); } render(); toast((UI.qaDue==='none'?'Добавлено без срока':'Добавлено на '+(UI.qaDue==='today'?'сегодня':'завтра'))+' · '+(proj?projName(proj):'без проекта')); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
+    const pt=parseTaskText(name,todayK()), nt=addTask(pt.name,'',proj);
+    if(pt.due) nt.due=pt.due; else if(pt.time&&!nt.due) nt.due=todayK(); if(pt.time) nt.time=pt.time;
+    if(UI.qaDue!=='none'&&UI.qaPart){ nt.part=UI.qaPart; } persist('tasks'); render();
+    toast((pt.due||pt.time?'Добавлено на '+dayLabel(nt.due).toLowerCase()+(pt.time?', '+pt.time:''):UI.qaDue==='none'?'Добавлено без срока':'Добавлено на '+(UI.qaDue==='today'?'сегодня':'завтра'))+' · '+(proj?projName(proj):'без проекта')); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='taskToggle') toggleTask(b.dataset.id);
   // заметки, платежи, напоминания
   else if(a==='nfmt') noteCmd(b.dataset.cmd,b.dataset.val);
@@ -4146,6 +4267,7 @@ try{ const t=localStorage.getItem('moyplan.theme'); if(t) document.documentEleme
 
 boot();
 if(!IS_GAS&&!NATIVE&&'serviceWorker' in navigator&&/^(https:|http:\/\/localhost)/.test(location.href)) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if(NATIVE&&notifCfg().on) try{ NATIVE.askNotify(); }catch(e){}
 if(NATIVE){ if('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); setTimeout(()=>checkApk(),4000); }
 </script>
 </body>
