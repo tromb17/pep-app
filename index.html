@@ -592,6 +592,13 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .fund-in{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
 .fgrid{display:grid;grid-template-columns:minmax(0,1fr) 70px 120px 28px;gap:6px;align-items:center;margin-top:6px}
 .fgrid.h{font-size:11.5px;color:var(--muted)}
+.bank-list{display:grid;margin:10px 0 4px;max-height:52vh;overflow:auto;border-top:1px solid var(--line)}
+.bank-op{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:start;padding:9px 2px;border-bottom:1px solid var(--line)}
+.bank-op input[type=checkbox]{width:20px;height:20px;margin:2px 0 0}
+.bank-op .fname{overflow-wrap:anywhere}
+.bank-op select{width:100%;margin-top:6px}
+.bank-op.off .fname,.bank-op.off>.num{opacity:.5}
+.bank-sum{margin:4px 0}
 </style>
 </head>
 <body>
@@ -761,12 +768,19 @@ function compute(st,now){
     const ex=!!p.secid, q=ex?p.q:null;
     const qtyAt=k=>cl.reduce((s,x)=>s+(String(x.c.date)<=k?numOr(x.c.qty,0):0),0), qty=ex?qtyAt(nowK):0;
     const exInc=ex?exIncome(p,q,qtyAt,qty,nowK):[];
+    // ПДС: государство доплачивает по соотношению (1:1, 1:2, 1:4), не больше 36 000 ₽ за год, 10 лет с первого взноса,
+    // если за год внесли от 2 000 ₽; приходит в следующем году (в расчёте — в январе).
+    // Налоговый вычет — 13% с пополнений до 400 000 ₽ за год; возвращается вам, в балансе — доход в мае следующего года.
+    const ratio=numOr(p.pdsRatio,0)>0?1/numOr(p.pdsRatio,0):0, y0=cl.length?Math.floor(cl[0].m/12):(sE!=null?Math.floor(sE/12):null);
+    const cYear=y=>{ let s=0; for(let m=y*12;m<y*12+12;m++) s+=contribIn(m); return s; };
+    const coFinY=y=>(ratio>0&&y0!=null&&y>=y0&&y<y0+10&&cYear(y)>=2000)?Math.min(36000,cYear(y)*ratio):0;
+    const taxY=y=>p.taxBack?Math.round(Math.min(400000,cYear(y))*0.13):0;
     let acc=cl.filter(x=>x.m<months[0]).reduce((s,x)=>s+x.v,0);
     const plan=[],capital=[],flowIn=[],flowOut=[];
-    months.forEach(m=>{ const add=contribIn(m); acc+=add;
+    months.forEach(m=>{ const add=contribIn(m); acc+=add; if(ratio>0&&m%12===0) acc+=coFinY(Math.floor(m/12)-1);
       plan.push(ex?exInc.reduce((s,x)=>s+(x.m===m?x.v:0),0):(open(m)&&!p.reinvest)?acc*r/12:0);
       flowIn.push(p.flow?add:0);
-      flowOut.push((p.flow&&sF!=null&&m===sF)?acc:0);
+      flowOut.push(((p.flow&&sF!=null&&m===sF)?acc:0)+((p.taxBack&&m%12===4)?taxY(Math.floor(m/12)-1):0));
       capital.push((sF!=null&&m>=sF)?0:acc); });
     const fact=keys.map(k=>k in fm?fm[k]:null);
     const used=plan.map((v,j)=>fact[j]!=null?fact[j]:v);
@@ -774,7 +788,7 @@ function compute(st,now){
     const invested=cl.filter(x=>x.m<=curM).reduce((s,x)=>s+x.v,0);
     // оценка стоимости, если руками не вписана: при капитализации — наращиваем по ставке, иначе = внесено
     let est=invested;
-    if(p.reinvest&&r&&cl.length){ let V=0; for(let m=cl[0].m; m<=curM; m++){ if(m>cl[0].m) V*=1+r/12; V+=manual(m); } est=V; }
+    if(p.reinvest&&cl.length){ let V=0; for(let m=cl[0].m; m<=curM; m++){ if(m>cl[0].m) V*=1+r/12; V+=manual(m); if(ratio>0&&m%12===0&&m>cl[0].m) V+=coFinY(Math.floor(m/12)-1); } est=V; }
     const vMan=numOr(p.value,null), closed=sF!=null&&curM>sF;
     const exVal=(q&&q.price!=null)?qty*q.price:null;
     const valueNow=closed?0:exVal!=null?exVal:(vMan!=null?vMan:est);
@@ -787,7 +801,8 @@ function compute(st,now){
       for(let m=curM+1; m<=sF; m++){
         if(p.reinvest) V*=1+r/12; else pay+=V*r/12;
         const add=contribIn(m); V+=add; fc+=add;
-        if(cf&&sE!=null&&m%12===sE%12){ V+=cf; fs+=cf; }
+        if(ratio>0){ if(m%12===0){ const g=coFinY(Math.floor(m/12)-1); V+=g; fs+=g; } }
+        else if(cf&&sE!=null&&m%12===sE%12){ V+=cf; fs+=cf; }
         pm.push(m); pv.push(V);
       }
       proj={months:pm,values:pv,vEnd:V,payouts:pay,futureContrib:fc,futureState:fs,total:V+pay,income:V+pay+received-invested-fc-fs};
@@ -797,7 +812,8 @@ function compute(st,now){
       ex,qty,avg:(ex&&qty>0)?invested/qty:null,quote:q,exInc,nkd:(q&&q.nkd&&!closed)?qty*q.nkd:0,
       dayChg:(exVal!=null&&q.chg!=null&&!closed)?exVal-exVal/(1+q.chg/100):0,
       result:closed?0:valueNow-invested,resultPct:(!closed&&invested)?(valueNow-invested)/invested:null,monNow,proj,progress,
-      contribs:cl,monthsLeft:sF!=null?sF-curM:null,closed};
+      contribs:cl,monthsLeft:sF!=null?sF-curM:null,closed,
+      pdsRows:(ratio>0||p.taxBack)&&y0!=null?Array.from({length:Math.max(0,Math.min(y0+9,Math.floor(curM/12)+1)-y0+1)},(_,i)=>({y:y0+i,c:cYear(y0+i),g:coFinY(y0+i),t:taxY(y0+i)})):[]};
   });
   const sumOpen=(ps,k)=>ps.reduce((s,r)=>s+(r.closed?0:r[k]),0);
   const groups=st.invGroups.map(g=>{ const ps=pos.filter(r=>r.p.group===g.id);
@@ -884,6 +900,7 @@ const TYPE_COLOR={'Доход':'--t1','Разовый доход':'--t2','Обя
 const TYPE_PLURAL={'Доход':'Доходы','Разовый доход':'Разовые доходы','Обязательный расход':'Обязательные расходы','Необязательный расход':'Необязательные расходы','Кредит':'Кредиты','Разовая покупка':'Разовые покупки','Накопление':'Накопления'};
 const KINDS=['Вклад','Облигации','Акции','Фонды','ПДС','Другое'];
 const NOEX=r=>!r.secid, SHARE=r=>!!r.secid&&r.market!=='bonds';
+const PDS_RATIOS=[['','нет (это не ПДС)'],['1','1:1 — доход до 80 тыс. ₽ в месяц'],['2','1:2 — доход 80–150 тыс. ₽ в месяц'],['4','1:4 — доход больше 150 тыс. ₽ в месяц']];
 const KIND_INCOME={'Вклад':'Проценты','Облигации':'Купоны','Акции':'Дивиденды','Фонды':'Выплаты','ПДС':'Доход','Другое':'Доход'};
 const defaultAlloc=()=>{ const n=new Date(); return {start:mKey(n.getFullYear()*12+n.getMonth()+1),base:'regular',funds:[
   {id:'inv',name:'Инвестиции',pct:10,who:'all',kind:'save'},{id:'wants',name:'Хотелки',pct:5,who:'me',kind:'spend'},{id:'gifts',name:'Подарки',pct:2.5,who:'me',kind:'spend',gifts:true}]}; };
@@ -1000,7 +1017,7 @@ function normalize(d){
     foodLog:d.foodLog||[], waterLog:d.waterLog||[], weightLog:d.weightLog||[],
     exercises:d.exercises||[], routines:d.routines||[], workouts:d.workouts||[], trainActive:d.trainActive||null,
     projects:d.projects||[], fundSpend:d.fundSpend||[], payments:d.payments||[], payLog:d.payLog||[],
-    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[]};
+    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[], bankOps:d.bankOps||[]};
   let migrated=false;
   if(o.version<2){
     migrated=true;
@@ -1104,7 +1121,7 @@ function normalize(d){
   o.invPositions.forEach(p=>{ p.flow=!!p.flow; p.long=!!p.long; p.reinvest=!!p.reinvest; delete p.amount;
     for(const k of ['rate','contribAmount','contribPeriod','coFin','value']) if(p[k]===undefined) p[k]=null;
     for(const k of ['start','end','valueDate','secid','board','market','divDate']) if(p[k]==null) p[k]='';
-    if(p.divPs===undefined) p.divPs=null; p.q=jsonOr(p.q); });
+    if(p.divPs===undefined) p.divPs=null; p.q=jsonOr(p.q); p.pdsRatio=p.pdsRatio==null?'':String(p.pdsRatio); p.taxBack=!!p.taxBack; });
   o.invContribs.forEach(c=>{ if(c.qty===undefined) c.qty=null; if(c.price===undefined) c.price=null; });
   o.notes.forEach(n=>{ if(n.folder==null) n.folder=''; if(n.book==null) n.book=''; });
   o.noteFolders.forEach(f=>{ if(!f.id) f.id=uid(); if(f.name==null) f.name=''; });
@@ -1155,6 +1172,7 @@ function payload(keys){
   p.tasks.forEach(t=>{ t.projectName=t.project?projName(t.project):''; });
   p.notes.forEach(n=>{ n.text=noteText(n.body); n.folderName=(S.noteFolders.find(f=>f.id===n.folder)||{}).name||''; });
   p.payments.forEach(x=>{ x.itemName=items[x.item]||''; });
+  p.bankOps.forEach(x=>{ x.itemName=items[x.item]||''; });
   const pays=names(S.payments); p.payLog.forEach(l=>{ l.payName=pays[l.pay]||''; });
   const exn=names(S.exercises);
   p.workouts.forEach(w=>{ w.summary=(w.items||[]).map(it=>(exn[it.ex]||it.exName||'')+' '+it.sets.length+'×').join('; '); });
@@ -1479,7 +1497,8 @@ function viewMonth(){
   `<div class="kpis k4" data-live="mkpi">${kpi('Доходы',B.inc[j])}${kpi('Расходы',B.exp[j],'с резервами')}${kpi('Накопления',B.sav[j])}${kpi('Свободно',B.free[j],'итого с начала: '+rub(B.cum[j]))}</div>
   ${C.al&&m>=C.al.start?`<section class="card"><div class="row-between"><h3>Распределение дохода</h3><button class="more" style="padding:0" data-act="tab" data-id="funds">Фонды ›</button></div>
     <div data-live="mfunds">${C.funds.map(x=>`<div class="ro"><span>${esc(x.f.name)} · ${String(x.f.pct).replace('.',',')}% ${x.f.who==='all'?'от общего':'от моего'}</span><b class="num">${rub(x.amt[j])}</b></div>`).join('')}</div></section>`:''}
-  <p class="hint">Нажмите на сумму статьи — откроется список записей: видно, что уже внесено, можно добавить чек или удалить ошибочный.</p>`;
+  <p class="hint">Нажмите на сумму статьи — откроется список записей: видно, что уже внесено, можно добавить чек или удалить ошибочный.</p>
+  <div class="actions" style="margin:-4px 0 12px"><button class="btn small" data-act="bankOpen">Загрузить выписку из банка</button></div>`;
   const hidden=[];
   for(const t of TYPES){
     const rs=C.rows.filter(r=>r.it.type===t);
@@ -1554,6 +1573,181 @@ function drawFact(focus){
     <div class="actions">${raw?'<button class="btn small danger" data-act="factClear">Очистить</button>':''}<span class="sp"></span><button class="btn primary" data-act="sheetClose">Готово</button></div>`);
   if(focus) setTimeout(()=>{ const n=document.getElementById('factNew'); if(n) n.focus(); },30);
 }
+/* ---- Выписка из банка (CSV или Excel) → записи факта по статьям. Каждая загрузка — отдельная пачка в bankOps:
+   её можно убрать целиком — снимутся ровно добавленные ею записи, вписанное вручную останется.
+   Разнесение запоминается: та же операция (описание) или категория банка в следующий раз уйдёт в ту же статью. ---- */
+const BANK_KW=[
+  [/супермаркет|продукт|магнит|пят[её]рочк|перекр[её]ст|лента|ашан|вкусвилл|дикси|окей|metro|самокат|азбука вкуса|глобус|fix price|светофор|бристол|красное.?белое/i,/продукт|еда|питани/i],
+  [/ресторан|кафе|фастфуд|кофе|coffee|бургер|kfc|вкусно.{0,4}точка|додо|яндекс.?еда|delivery|шоколадниц/i,/кафе|ресторан|вне дома|обед/i],
+  [/такси|taxi|метро|транспорт|автобус|ржд|аэрофлот|авиа/i,/транспорт|такси|проезд|поездк/i],
+  [/азс|топлив|бензин|лукойл|газпромнефть|роснефть|татнефть|парковк|каршеринг|автомо|шиномонтаж|автосервис/i,/машин|авто|бензин|топлив/i],
+  [/аптек|медицин|клиник|стоматолог|здоров|анализ|инвитро|гемотест/i,/здоров|аптек|медицин|лекарств|врач/i],
+  [/связь|мобильн|интернет|мтс|билайн|мегафон|теле2|tele2|ростелеком|yota/i,/связь|телефон|интернет|мобильн/i],
+  [/жкх|коммунал|квартплат|электроэнерг|газоснаб|водоканал|управляющ/i,/жкх|коммун|квартплат|квартир/i],
+  [/одежд|обувь|lamoda|спортмастер/i,/одежд|обув/i],
+  [/wildberries|вайлдберриз|ozon|озон|яндекс.?маркет|aliexpress|маркетплейс/i,/маркетплейс|покупк|разное|прочее/i],
+  [/кино|театр|развлечен|концерт|музе|steam|подписк|кинопоиск|okko|яндекс.?плюс|spotify/i,/развлеч|досуг|подписк|кино|хобби/i],
+  [/дом и ремонт|леруа|lemana|hoff|икеа|ikea|строй|ремонт|хозтовар/i,/дом|ремонт|быт|хоз/i],
+  [/зоо|ветеринар|животн|четыре лапы/i,/питом|животн|кот|собак/i],
+  [/красот|салон|парикмах|космет|барбер|золотое яблоко|летуаль|рив гош/i,/красот|уход|космет/i],
+  [/образован|курс|обучен|школ|книг|литрес/i,/образован|обучен|курс|книг|учеб/i],
+  [/спорт|фитнес|бассейн/i,/спорт|фитнес|трениров/i]];
+const BANK_SKIP=/перевод|пополнени|снятие|наличн|между счетами|своих счетов|кэшбэк|cashback|проценты на остаток/i;
+const bankKey=s=>String(s||'').toLowerCase().replace(/[0-9*#№_]+/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
+const bankSig=o=>o.date+'|'+r2(Math.abs(o.amount))+'|'+(o.amount<0?'-':'+')+'|'+bankKey(o.desc);
+async function bankRead(file){
+  const buf=new Uint8Array(await file.arrayBuffer());
+  if(buf[0]===0x50&&buf[1]===0x4b) return await xlsxRows(buf);
+  if(buf[0]===0x25&&buf[1]===0x50) throw new Error('Это PDF — его прочитать не получится. Скачайте выписку в CSV или Excel.');
+  let t; try{ t=new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ t=new TextDecoder('windows-1251').decode(buf); }
+  return csvRows(t.replace(/^﻿/,''));
+}
+function csvRows(t){
+  const head=t.split(/\r?\n/).slice(0,8).join('\n'), cnt=c=>head.split(c).length, sep=[';','\t',','].sort((a,b)=>cnt(b)-cnt(a))[0];
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<t.length;i++){ const ch=t[i];
+    if(q){ if(ch==='"'){ if(t[i+1]==='"'){ cell+='"'; i++; } else q=false; } else cell+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===sep){ row.push(cell); cell=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&t[i+1]==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=''; }
+    else cell+=ch; }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(c=>String(c).trim()));
+}
+// Excel (.xlsx) без библиотек: это zip, внутри — XML первого листа и общие строки
+async function xlsxRows(buf){
+  if(typeof DecompressionStream!=='function') throw new Error('Этот браузер не открывает Excel — сохраните выписку как CSV');
+  const dv=new DataView(buf.buffer,buf.byteOffset,buf.byteLength); let e=buf.length-22;
+  while(e>=0&&dv.getUint32(e,true)!==0x06054b50) e--; if(e<0) throw new Error('Файл Excel повреждён');
+  const n=dv.getUint16(e+10,true), files={}; let p=dv.getUint32(e+16,true);
+  for(let i=0;i<n;i++){ const nl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true);
+    files[new TextDecoder().decode(buf.subarray(p+46,p+46+nl))]={method:dv.getUint16(p+10,true),size:dv.getUint32(p+20,true),off:dv.getUint32(p+42,true)}; p+=46+nl+xl+cl; }
+  const get=async name=>{ const f=files[name]; if(!f) return null; const st=f.off+30+dv.getUint16(f.off+26,true)+dv.getUint16(f.off+28,true), data=buf.subarray(st,st+f.size);
+    if(f.method===0) return new TextDecoder().decode(data);
+    return await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text(); };
+  const xml=x=>new DOMParser().parseFromString(x,'application/xml');
+  const sx=await get('xl/sharedStrings.xml'), strs=sx?[...xml(sx).getElementsByTagName('si')].map(si=>[...si.getElementsByTagName('t')].map(t=>t.textContent).join('')):[];
+  const sheet=Object.keys(files).filter(k=>/^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort((a,b)=>parseInt(a.replace(/\D/g,''))-parseInt(b.replace(/\D/g,'')))[0];
+  if(!sheet) throw new Error('В файле Excel нет листов');
+  const col=ref=>{ let c=0; for(const ch of ref.replace(/\d+/g,'')) c=c*26+ch.charCodeAt(0)-64; return c-1; }, rows=[];
+  for(const r of xml(await get(sheet)).getElementsByTagName('row')){ const out=[];
+    for(const c of r.getElementsByTagName('c')){ const t=c.getAttribute('t'), v=c.getElementsByTagName('v')[0], is=c.getElementsByTagName('is')[0];
+      out[col(c.getAttribute('r')||'A')]=t==='s'?(strs[+(v&&v.textContent)]||''):t==='inlineStr'?(is?is.textContent:''):(v?v.textContent:''); }
+    rows.push(Array.from(out,x=>x==null?'':String(x))); }
+  return rows.filter(r=>r.some(c=>String(c).trim()));
+}
+function bankDate(v){ const s=String(v||'').trim(); let m=/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})/.exec(s);
+  if(m){ const y=+m[3]<100?2000+ +m[3]:+m[3]; return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); }
+  m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  if(/^\d{5}(\.\d+)?$/.test(s)) return new Date(Math.round((+s-25569)*864e5)).toISOString().slice(0,10); // дата Excel числом
+  return ''; }
+function bankParse(rows){
+  let h=-1; for(let i=0;i<Math.min(rows.length,40);i++){ const l=rows[i].map(c=>String(c).toLowerCase()); if(l.some(c=>/дата/.test(c))&&l.some(c=>/сумм|расход|приход|списан|зачислен|дебет/.test(c))){ h=i; break; } }
+  if(h<0) throw new Error('Не нашёл в файле строку с заголовками «Дата» и «Сумма»');
+  const H=rows[h].map(c=>String(c).toLowerCase().trim()), find=(...res)=>{ for(const re of res){ const i=H.findIndex(c=>re.test(c)); if(i>=0) return i; } return -1; };
+  const cD=find(/^дата операции/,/дата/), cA=find(/^сумма операции$/,/^сумма операции/,/^сумма в валюте сч|^сумма в рубл/,/^сумма$/,/сумма/),
+    cOut=find(/расход|списани|дебет/), cIn=find(/приход|зачислени|поступлени/),
+    cDesc=find(/^описание/,/описание/,/назначение/,/контрагент|получатель|место|merchant/,/комментар|детал/),
+    cCat=find(/категори/), cMcc=find(/^mcc/), cSt=find(/статус/);
+  if(cD<0||(cA<0&&cOut<0)) throw new Error('Не нашёл колонки «Дата» и «Сумма»');
+  const num=v=>{ const t=String(v||'').replace(/[\s ₽]/g,'').replace(/−/g,'-').replace(',','.'); return t===''?null:+t; };
+  const split=cOut>=0&&cOut!==cA, ops=[];
+  rows.slice(h+1).forEach(r=>{ const d=bankDate(r[cD]); if(!d) return;
+    if(cSt>=0&&/fail|отклон|отмен/i.test(r[cSt]||'')) return;
+    const a=split?(num(r[cIn])||0)-Math.abs(num(r[cOut])||0):num(r[cA]);
+    if(a==null||isNaN(a)||!a) return;
+    ops.push({date:d,amount:a,desc:String(cDesc>=0?r[cDesc]||'':'').trim(),cat:String(cCat>=0?r[cCat]||'':'').trim()}); });
+  // в одной колонке только положительные суммы — значит, это списания
+  if(!split&&ops.length&&ops.every(o=>o.amount>0)) ops.forEach(o=>{ o.amount=-o.amount; });
+  return ops;
+}
+function bankGuess(o){
+  const k=bankKey(o.desc), txt=o.cat+' '+o.desc, hist=S.bankOps.filter(x=>x.state==='in'&&x.item&&S.items.some(i=>i.id===x.item));
+  let h=null; if(k) for(let i=hist.length-1;i>=0;i--) if(bankKey(hist[i].desc)===k){ h=hist[i]; break; }
+  if(!h&&o.cat){ const cnt={}; hist.forEach(x=>{ if(x.cat===o.cat){ const z=x.item+'|'+(x.sub||''); cnt[z]=(cnt[z]||0)+1; } });
+    const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; if(best){ const [item,sub]=best[0].split('|'); h={item,sub}; } }
+  if(h) return {item:h.item,sub:h.sub||'',on:true};
+  if(o.amount>0||BANK_SKIP.test(txt)) return {item:'',sub:'',on:false};
+  const exp=S.items.filter(it=>TYPE_CAT[it.type]==='exp');
+  for(const [re,itRe] of BANK_KW){ if(!re.test(txt)) continue;
+    for(const it of exp){ const subs=itemSubs(it), sb=subs.find(x=>itRe.test(x)||re.test(x));
+      if(itRe.test(it.name||'')||sb) return {item:it.id,sub:sb||'',on:true}; } }
+  return {item:'',sub:'',on:false};
+}
+// сумма записи в факте: трата в расходной статье — плюс, возврат — минус; в доходной — наоборот
+const bankTerm=o=>{ const it=S.items.find(i=>i.id===o.item); return r2(it&&TYPE_CAT[it.type]==='inc'?o.amount:-o.amount); };
+function bankAddTerm(item,month,v,sub){
+  const f=S.facts.find(x=>x.item===item&&x.month===month), raw=f?String(f.value||'').trim():'', t=factTerms(raw), tg=t?factTagList(f,t.length):null;
+  setListFact(S.facts,'item',item,month,raw?raw+'+'+v:String(v));
+  const g=S.facts.find(x=>x.item===item&&x.month===month); if(g&&tg){ tg.push(sub||''); g.tags=tg.join('|').replace(/\|+$/,''); }
+}
+function bankBatches(){ const m=new Map();
+  S.bankOps.forEach(o=>{ let b=m.get(o.batch); if(!b){ b={id:o.batch,file:o.file||'',n:0,sum:0,from:o.date,to:o.date}; m.set(o.batch,b); }
+    if(o.state==='in'){ b.n++; b.sum+=Math.abs(o.amount); } if(o.date<b.from) b.from=o.date; if(o.date>b.to) b.to=o.date; });
+  return [...m.values()].reverse(); }
+function openBank(){ UI.bank={step:'pick'}; drawBank(); }
+function bankLive(){ const B=UI.bank; return B&&B.ops?B.ops.filter(o=>!o.dup&&!o.out):[]; }
+function bankSumHtml(){ const by={}; bankLive().forEach(o=>{ if(o.on&&o.item) by[o.item]=(by[o.item]||0)+bankTerm(o); });
+  return Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,v])=>`<div class="ro"><span>${esc((S.items.find(i=>i.id===id)||{}).name||'')}</span><b class="num">${rub(v)}</b></div>`).join('')||'<p class="hint" style="margin:0">Пока ничего не выбрано.</p>'; }
+function bankBtnText(){ const on=bankLive().filter(o=>o.on&&o.item); return 'Разнести '+on.length+' '+plural(on.length,'запись','записи','записей'); }
+function drawBank(){
+  const B=UI.bank; if(!B) return;
+  if(B.step==='pick'){ const bs=bankBatches();
+    openSheet(`<h2>Выписка из банка</h2>
+      <p class="hint">Файл CSV или Excel (.xlsx) из приложения банка. Траты разнесутся по статьям в факт месяца — перед этим всё можно проверить и поправить. Ваш выбор запоминается: в следующий раз такие же операции разнесутся сами.</p>
+      <label class="btn primary" style="display:inline-flex;cursor:pointer">Выбрать файл<input type="file" id="bankFile" accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+      ${B.err?`<p class="hint neg" style="margin-top:8px">${esc(B.err)}</p>`:''}
+      <h3 style="margin-top:18px">Загруженные выписки</h3>
+      ${bs.length?bs.map(b=>`<div class="ro"><span>${esc(b.file||'Выписка')}<span class="fsub"> · ${dRu(b.from).slice(0,5)}–${dRu(b.to)} · ${b.n} ${plural(b.n,'запись','записи','записей')} · ${rub(b.sum)}</span></span><button class="btn small danger" data-act="bankUndo" data-id="${b.id}">Убрать</button></div>`).join('')
+        :'<p class="hint">Пока ничего не загружали.</p>'}
+      <p class="hint" style="margin-top:8px">«Убрать» снимает из факта ровно то, что добавила эта выписка. Вписанное вручную остаётся.</p>
+      <div class="actions"><span class="sp"></span><button class="btn" data-act="sheetClose">Закрыть</button></div>`); return; }
+  const L=bankLive(), opts=sel=>'<option value="">— не разносить —</option>'+TYPES.filter(t=>t!=='Накопление').map(t=>{ const its=S.items.filter(i=>i.type===t);
+    return its.length?`<optgroup label="${esc(t)}">${its.map(i=>`<option value="${i.id}" ${i.id===sel?'selected':''}>${esc(i.name)}</option>`).join('')}</optgroup>`:''; }).join('');
+  openSheet(`<h2>Проверьте разнесение</h2>
+    <p class="hint">${esc(B.file)} · ${L.length} ${plural(L.length,'операция','операции','операций')}${B.dup?' · уже были в прошлых выписках: '+B.dup:''}${B.out?' · вне периода плана: '+B.out:''}. Переводы, пополнения и поступления по умолчанию не разносятся — отметьте, если нужно.</p>
+    <h3>Итого по статьям</h3><div class="bank-sum">${bankSumHtml()}</div>
+    <div class="bank-list">${L.map(o=>`<div class="bank-op${o.on&&o.item?'':' off'}" data-bank-row="${o.k}"><input type="checkbox" data-bank-on="${o.k}" ${o.on&&o.item?'checked':''} aria-label="Разнести">
+      <div class="m"><div class="fname">${esc(o.desc||o.cat||'Операция')}</div><div class="fsub">${dRu(o.date).slice(0,5)}${o.cat?' · '+esc(o.cat):''}${o.sub?' · '+esc(o.sub):''}</div>
+      <select data-bank-item="${o.k}" aria-label="Статья">${opts(o.item)}</select></div>
+      <b class="num ${o.amount>0?'pos':''}">${o.amount>0?'+':'−'}${fmt(Math.abs(o.amount))}</b></div>`).join('')}</div>
+    <div class="actions"><button class="btn" data-act="bankBack">‹ Назад</button><span class="sp"></span><button class="btn primary" data-act="bankApply">${bankBtnText()}</button></div>`);
+}
+async function bankLoad(file){ const B=UI.bank; if(!file||!B) return;
+  try{ const ops=bankParse(await bankRead(file)); if(!ops.length) throw new Error('В файле не нашлось операций');
+    const seen=new Set(S.bankOps.map(bankSig)); let dup=0, out=0;
+    B.ops=ops.map((o,k)=>{ const d=seen.has(bankSig(o)), ot=!d&&!C.keys.includes(o.date.slice(0,7)); if(d) dup++; if(ot) out++;
+      return Object.assign(o,{k,dup:d,out:ot},bankGuess(o)); });
+    B.file=file.name; B.dup=dup; B.out=out; B.err=''; B.step=bankLive().length?'check':'pick';
+    if(!bankLive().length) B.err=dup?'Все операции из этого файла уже загружены раньше.':'Операции из файла не попадают в период плана.';
+  }catch(e){ B.err=(e&&e.message)||'Не получилось прочитать файл'; }
+  drawBank(); }
+function bankUpd(o){ const sh=document.getElementById('sheet'); if(!sh) return;
+  const row=sh.querySelector(`[data-bank-row="${o.k}"]`); if(row){ row.classList.toggle('off',!(o.on&&o.item)); const cb=row.querySelector('input[type=checkbox]'); if(cb) cb.checked=!!(o.on&&o.item); }
+  const s=sh.querySelector('.bank-sum'); if(s) s.innerHTML=bankSumHtml();
+  const b=sh.querySelector('[data-act="bankApply"]'); if(b) b.textContent=bankBtnText(); }
+document.addEventListener('change',e=>{ const el=e.target, B=UI.bank; if(!B||!el.closest||!el.closest('#sheet')) return;
+  if(el.id==='bankFile'){ bankLoad(el.files&&el.files[0]); return; }
+  const k=el.dataset.bankOn??el.dataset.bankItem; if(k==null||!B.ops) return; const o=B.ops[+k]; if(!o) return;
+  if(el.dataset.bankItem!=null){ o.item=el.value; o.on=!!el.value; const g=o.item&&bankGuess(o); o.sub=g&&g.item===o.item?g.sub:''; }
+  else { if(el.checked&&!o.item){ el.checked=false; toast('Сначала выберите статью'); return; } o.on=el.checked; }
+  bankUpd(o); });
+function bankApply(){ const B=UI.bank; if(!B||!B.ops) return; const batch=uid(), added=todayK(); let n=0;
+  bankLive().forEach(o=>{ const use=!!(o.on&&o.item&&S.items.some(i=>i.id===o.item));
+    S.bankOps.push({id:uid(),batch,file:B.file,added,date:o.date,amount:r2(o.amount),desc:o.desc,cat:o.cat,item:use?o.item:'',sub:use?o.sub||'':'',state:use?'in':'skip'});
+    if(use){ bankAddTerm(o.item,o.date.slice(0,7),bankTerm(o),o.sub); n++; } });
+  if(!n&&!bankLive().length) return;
+  persist('facts','bankOps'); closeSheet(); UI.bank=null; render();
+  toast('Разнесено '+n+' '+plural(n,'запись','записи','записей'),{label:'Отменить',fn:()=>bankUndo(batch)}); }
+function bankUndo(batch){ const ops=S.bankOps.filter(o=>o.batch===batch); if(!ops.length) return; let n=0;
+  ops.filter(o=>o.state==='in').forEach(o=>{ const month=o.date.slice(0,7), f=S.facts.find(x=>x.item===o.item&&x.month===month); if(!f) return;
+    const t=factTerms(f.value); if(!t) return; const tg=factTagList(f,t.length), v=bankTerm(o); let k=-1;
+    for(let i=t.length-1;i>=0;i--) if(Math.abs(t[i]-v)<0.005&&tg[i]===(o.sub||'')){ k=i; break; }
+    if(k<0) for(let i=t.length-1;i>=0;i--) if(Math.abs(t[i]-v)<0.005){ k=i; break; }
+    if(k<0) return; t.splice(k,1); tg.splice(k,1); setListFact(S.facts,'item',o.item,month,t.join('+'));
+    const g=S.facts.find(x=>x.item===o.item&&x.month===month); if(g) g.tags=tg.join('|').replace(/\|+$/,''); n++; });
+  S.bankOps=S.bankOps.filter(o=>o.batch!==batch); persist('facts','bankOps'); render(); if(UI.bank) drawBank();
+  toast('Выписка убрана: снято '+n+' '+plural(n,'запись','записи','записей')); }
 function setFactRaw(val,tags){
   const [id,month]=UI.factKey.split('|'); setListFact(S.facts,'item',id,month,val);
   const f=S.facts.find(x=>x.item===id&&x.month===month);
@@ -1778,7 +1972,7 @@ function qBar(){
 function parsePrice(txt,q){ const t=String(txt||'').trim(); if(!t) return null; const isPct=/%\s*$/.test(t), v=evalExpr(t.replace(/%\s*$/,''));
   if(v==null||isNaN(v)) return NaN; if(!isPct) return v; return (q&&q.raw>0&&q.price>0)?v*q.price/q.raw:NaN; }
 const r2=v=>Math.round(v*100)/100;
-const posSub=r=>r.ex?`${fmtQ(r.qty)} шт.${r.quote&&r.quote.price!=null?' × '+fmtP(r.quote.price)+' '+chgHtml(r.quote.chg):''} · средняя ${fmtP(r.avg)}${r.quote&&r.quote.price!=null?'':' · цена не загружена'}`
+const posSub=r=>r.ex?`${fmtQ(r.qty)} шт.${r.quote&&r.quote.price!=null?' × '+fmtP(r.quote.price)+' '+chgHtml(r.quote.chg):''} · средняя ${fmtP(r.avg)}${r.quote&&r.quote.price!=null?'':' · цена не загружена'}${r.p.market==='bonds'&&!r.closed&&ytmShort(r.quote)?' · '+ytmShort(r.quote):''}`
   :`внесено ${fmt(r.invested)} · стоит ${fmt(r.valueNow)}${r.valueManual||r.closed?'':' (оценка)'}${numOr(r.p.rate,0)?' · '+String(r.p.rate).replace('.',',')+'%':''}`;
 
 /* поиск бумаги и добавление: «У меня есть» (количество и средняя цена) или «Хочу купить» (лоты) */
@@ -1810,7 +2004,7 @@ function secQuery(v){ const s=UI.sec; if(!s) return; s.q=v; clearTimeout(secT);
 async function secPick(i){ const s=UI.sec, r=s&&s.res[i]; if(!r) return;
   const rec={secid:r.secid,board:r.board,market:r.market,kind:r.kind,name:r.name,q:null};
   openSheet(`<h2>${esc(r.name)}</h2><p class="hint">Загружаю цену с биржи…</p>`);
-  try{ await applyQuotes([rec],s.mode==='own'); }catch(e){}
+  try{ await applyQuotes([rec],s.mode==='own'||r.market==='bonds'); }catch(e){}
   if(UI.sec!==s) return; UI.secRec=rec; UI.secPre=null; drawSecAdd();
 }
 function drawSecAdd(){
@@ -1819,7 +2013,7 @@ function drawSecAdd(){
   const grps=S.invGroups.filter(g=>g.kind===r.kind), others=S.invGroups.filter(g=>g.kind!==r.kind);
   const gsel=`<div class="field"><label>Группа</label><select id="saGroup">${grps.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}${grps.length?'':`<option value="__new">Новая группа «${esc(r.kind)}»</option>`}${others.map(g=>`<option value="${g.id}">${esc(g.name)} · ${esc(g.kind)}</option>`).join('')}</select></div>`;
   const price=q&&q.price!=null?`<div class="sa-price"><b class="num">${fmtP(q.price)}</b>${bond?` <span class="fsub num">${NF2.format(q.raw)}% от номинала</span>`:''} ${chgHtml(q.chg)}
-      <div class="fsub num">лот ${lot} шт. = ${fmtP(q.price*lot)}${bond&&q.nkd?' · НКД '+fmtP(q.nkd):''}${bond&&q.mat?' · погашение '+dRu(q.mat):''}</div></div>`
+      <div class="fsub num">лот ${lot} шт. = ${fmtP(q.price*lot)}${bond&&q.nkd?' · НКД '+fmtP(q.nkd):''}${bond&&q.mat?' · погашение '+dRu(q.mat):''}</div>${bond&&bondYield(q)?`<div class="fsub num">доходность ${ytmShort(q)}: купоны ${pctY(bondYield(q).cpn)} + цена ${pctY(bondYield(q).grow)}</div>`:''}</div>`
     :'<p class="hint">Цену с биржи получить не удалось — подтянется позже.</p>';
   const body=mode==='wish'
     ?`<div class="field"><label>Сколько лотов хочу купить${lot>1?' (лот '+lot+' шт.)':''}</label><input class="num" id="saLots" inputmode="numeric" value="1"></div>
@@ -1882,7 +2076,7 @@ function wishHtml(){
   const total=W.reduce((s,w)=>s+(lc(w)||0)*w.lots,0);
   const rows=W.map(w=>{ const q=w.q, c=lc(w);
     return `<div class="drow wrow"><button class="list-row" data-act="wishOpen" data-id="${w.id}"><div class="m"><div class="fname"><b>${esc(w.name)}</b> <span class="tag">${esc(w.kind||'')}</span></div>
-      <div class="fsub num">${c!=null?fmtP(q.price)+' '+chgHtml(q.chg)+' · лот '+(q.lot||1)+' шт. = '+fmtP(c):'цена не загружена'}${w.note?' · '+esc(w.note):''}</div></div></button>
+      <div class="fsub num">${c!=null?fmtP(q.price)+' '+chgHtml(q.chg)+' · лот '+(q.lot||1)+' шт. = '+fmtP(c)+(w.market==='bonds'&&ytmShort(q)?' · '+ytmShort(q):''):'цена не загружена'}${w.note?' · '+esc(w.note):''}</div></div></button>
       <div class="wctl"><button class="step" data-act="wishLot" data-id="${w.id}" data-d="-1" aria-label="Меньше лотов">−</button><b class="num">${w.lots}</b><button class="step" data-act="wishLot" data-id="${w.id}" data-d="1" aria-label="Больше лотов">+</button><span class="fsub">${plural(w.lots,'лот','лота','лотов')}</span></div>
       <b class="num wsum">${c!=null?rub(c*w.lots):'—'}</b><button class="btn small" data-act="wishBuy" data-id="${w.id}">Купил</button></div>`; }).join('');
   return `<section class="card"><div class="row-between"><h3>Хочу купить</h3><button class="btn small" data-act="secAdd" data-mode="wish">+ Бумага</button></div>
@@ -1906,6 +2100,7 @@ function viewSecPos(r){
     ${kpi('Доход получен',r.received,lab.toLowerCase())}</div>`;
   if(bond&&q){ const fut=r.exInc.filter(x=>x.d>today).slice(0,6);
     html+=`<section class="card"><h3>Облигация</h3>
+      ${ytmHtml(q)}
       <div class="ro"><span>Цена</span><b class="num">${NF2.format(q.raw)}% · ${fmtP(q.price)}</b></div>
       <div class="ro"><span>Номинал</span><b class="num">${fmtP(q.face*(q.fx||1))}${q.cur&&!RUBS.has(q.cur)?' ('+NF2.format(q.face)+' '+esc(q.cur)+')':''}</b></div>
       <div class="ro"><span>Накопленный купон (НКД)</span><b class="num">${fmtP(q.nkd)}${r.qty?' × '+fmtQ(r.qty)+' = '+rub(r.nkd):''}</b></div>
@@ -1948,6 +2143,34 @@ function freeList(){
     else if(!r.ex&&p.end&&p.end>=today){ const amt=r.proj?r.proj.vEnd:r.valueNow; if(amt>0) out.push({d:p.end,p,amt,kind:'end'}); } });
   return out.sort((a,b)=>a.d.localeCompare(b.d)||a.amt-b.amt);
 }
+/* Доходность облигации к погашению по текущей цене (с НКД): все будущие купоны и погашения номинала, годовая с реинвестированием.
+   Раскладка: какая часть годовой доходности — от купонов, какая — от того, что цена дорастёт (или упадёт) до номинала. */
+function bondYield(q,nowK){
+  if(!q||!(q.price>0)||!Array.isArray(q.cpn)) return null; nowK=nowK||todayK();
+  const fx=q.fx||1, nkd=q.nkd||0, cost=q.price+nkd, cf=[]; let red=0, cpn=0, est=false;
+  const am=(Array.isArray(q.am)?q.am:[]).filter(a=>a[0]>nowK).sort((a,b)=>a[0].localeCompare(b[0]));
+  if(am.length) am.forEach(([d,v],i)=>{ const x=v!=null?v:(i===am.length-1&&q.face?q.face*fx:null); if(x!=null){ cf.push([d,x]); red+=x; } });
+  else if(q.mat&&q.mat>nowK&&q.face){ cf.push([q.mat,q.face*fx]); red=q.face*fx; }
+  if(!cf.length) return null;
+  const end=cf[cf.length-1][0];
+  q.cpn.forEach(([d,v])=>{ if(d<=nowK||d>end) return; const x=v!=null?v:numOr(q.cv,0); if(v==null) est=true; if(x>0){ cf.push([d,x]); cpn+=x; } });
+  const t0=parseD(nowK).getTime(), T=d=>(parseD(d).getTime()-t0)/(365*864e5), years=T(end);
+  if(!(years>0.02)) return null;
+  const npv=y=>cf.reduce((s,[d,x])=>s+x/Math.pow(1+y,T(d)),0)-cost;
+  let lo=-0.9, hi=3; if(npv(lo)<0||npv(hi)>0) return null;
+  for(let i=0;i<80;i++){ const mid=(lo+hi)/2; if(npv(mid)>0) lo=mid; else hi=mid; }
+  const ytm=(lo+hi)/2, a=(cpn-nkd)/cost/years, b=(red-q.price)/cost/years, sAB=a+b;
+  const yearCpn=q.cpn.filter(([d])=>d>nowK&&d<=dkey(addDays(parseD(nowK),365))).reduce((s,[,v])=>s+(v!=null?v:numOr(q.cv,0)),0);
+  return {ytm,cpn:Math.abs(sAB)>1e-9?ytm*a/sAB:a,grow:Math.abs(sAB)>1e-9?ytm*b/sAB:b,years,end,est,curY:yearCpn/q.price};
+}
+const pctY=v=>(v*100).toFixed(1).replace('.',',').replace('-','−')+'%';
+function ytmShort(q){ const y=bondYield(q); return y?'к погашению '+pctY(y.ytm):''; }
+function ytmHtml(q){ const y=bondYield(q); if(!y) return '';
+  return `<div class="ro"><span>Доходность к погашению</span><b class="num">${pctY(y.ytm)} годовых</b></div>
+    <div class="ro"><span class="fsub">· от купонов</span><span class="num">${pctY(y.cpn)}</span></div>
+    <div class="ro"><span class="fsub">· ${y.grow>=0?'рост цены до номинала':'цена выше номинала — потеря при погашении'}</span><span class="num ${y.grow<0?'neg':''}">${y.grow>=0?'+':''}${pctY(y.grow)}</span></div>
+    <div class="ro"><span class="fsub">Текущая купонная доходность (купоны за год ÷ цена)</span><span class="num">${pctY(y.curY)}</span></div>
+    <p class="hint" style="margin:4px 0 8px">Если купить сейчас по ${fmtP(q.price)} + НКД ${fmtP(q.nkd||0)} и держать до ${dRu(y.end)} (${durText(Math.max(1,Math.round(y.years*12)))}). До налога 13%, без комиссий.${y.est?' Будущие купоны ещё не объявлены — взяты по текущему.':''}</p>`; }
 const freeWhen=d=>{ const n=daysTo(d); return n<=0?'сегодня':n===1?'завтра':'через '+n+' '+plural(n,'день','дня','дней'); };
 function freeHtml(){
   const L=freeList(); if(!L.length) return '';
@@ -2023,6 +2246,7 @@ function viewPos(r){
         <p class="hint" style="margin:6px 0 0">Ожидаемая стоимость по месяцам. ${rate?'Ставка '+String(p.rate).replace('.',',')+'% — ваша оценка, не гарантия.':'Ставка не указана — показаны только пополнения.'}</p></section>`;
     } else if(!r.closed) html+=`<section class="card"><h3>К погашению</h3><p class="hint">${p.end?'Срок погашения наступил.':'Укажите дату погашения в «Изменить» — появится расчёт ожидаемого дохода к погашению.'}</p></section>`;
   }
+  if(r.pdsRows.length) html+=pdsHtml(r);
   const list=r.contribs.slice().reverse();
   html+=`<section class="card"><div class="row-between"><h3>Пополнения</h3><b class="num">${rub(r.contribs.reduce((s,x)=>s+x.v,0))}</b></div><p class="hint">Сколько и когда вносили — на какую сумму купили. Можно суммой: 5000+3000.</p>
     <div class="grid2"><div class="field"><label>Дата</label><input type="date" id="cDate" value="${dkey(TODAY())}"></div><div class="field"><label>Сумма, ₽</label><input class="num" id="cAmount" inputmode="decimal" placeholder="10 000" autocomplete="off"></div></div>
@@ -2031,6 +2255,19 @@ function viewPos(r){
     <div style="margin-top:8px">${list.length?list.map(x=>`<div class="ro"><span>${dRu(x.c.date)}${x.m>C.curM?' <span class="tag">впереди</span>':''}${x.c.note?' <span class="fsub">· '+esc(x.c.note)+'</span>':''}</span><span class="num">${rub(x.v)} <button class="xbtn" data-act="contribDel" data-cid="${x.c.id}" aria-label="Удалить пополнение">×</button></span></div>`).join(''):'<p class="hint">Пополнений пока нет.</p>'}</div></section>`;
   html+=posMonths(r,lab);
   return html;
+}
+/* ПДС: сколько добавит государство и сколько вернёт вычет — по годам */
+function pdsHtml(r){
+  const p=r.p, ratio=numOr(p.pdsRatio,0)>0?1/numOr(p.pdsRatio,0):0, y=Math.floor(C.curM/12), cur=r.pdsRows.find(x=>x.y===y);
+  const lab=(PDS_RATIOS.find(x=>x[0]===String(p.pdsRatio))||[])[1]||'';
+  const need=ratio&&cur?Math.max(0,36000/ratio-cur.c):0;
+  return `<section class="card"><h3>Государство добавит</h3>
+    <p class="hint">${ratio?`Софинансирование ${esc(lab.split(' — ')[0])}: на каждый внесённый рубль государство добавит ${fmtN(ratio)} ₽, но не больше 36 000 ₽ за год — максимум при взносах ${rub(36000/ratio)} за год. Действует 10 лет с первого взноса, если за год внесли от 2 000 ₽. Деньги приходят на счёт ПДС в следующем году.`:''}
+    ${p.taxBack?' Налоговый вычет: 13% от пополнений (с суммы до 400 000 ₽ за год) возвращается вам после декларации или через работодателя — в балансе это доход в мае следующего года.':''}</p>
+    <table class="gtbl num"><thead><tr><th>Год</th><th>Внесено</th>${ratio?'<th>Доплата</th>':''}${p.taxBack?'<th>Вычет</th>':''}</tr></thead><tbody>
+    ${r.pdsRows.map(x=>`<tr class="${x.y===y?'cur':''}"><td>${x.y}</td><td>${fmt(x.c)}</td>${ratio?`<td>${fmt(x.g)}${x.g>=36000?' <span class="fsub">макс.</span>':''}</td>`:''}${p.taxBack?`<td>${fmt(x.t)}</td>`:''}</tr>`).join('')}</tbody></table>
+    ${ratio&&cur?`<p class="hint" style="margin:8px 0 0">${need>0?`Чтобы получить максимум 36 000 ₽ за ${y} год, внесите ещё ${rub(need)} до 31 декабря.`:`За ${y} год доплата будет максимальной — 36 000 ₽.`} В «Внесено» за этот год учтены и плановые пополнения до конца года.</p>`:''}
+    <p class="hint" style="margin:6px 0 0">Доплату государства в «Пополнения» не вписывайте — она уже учтена в стоимости и расчёте к погашению.</p></section>`;
 }
 function posMonths(r,lab){
   const p=r.p;
@@ -3576,7 +3813,7 @@ const FORMS={
     deleteText:g=>'Удалить группу «'+g.name+'» вместе со всеми позициями, пополнениями и записанным доходом?'},
   invPos:{title:'Позиция',list:()=>S.invPositions,keys:['invPositions','invFacts','invContribs'],
     blank:()=>({id:uid(),group:(UI.detail&&UI.detail.kind==='inv'&&UI.detail.id)||(S.invGroups[0]||{}).id,name:'',rate:null,start:dkey(TODAY()),end:'',
-      flow:false,long:false,reinvest:false,contribAmount:null,contribPeriod:0,coFin:null,value:null,valueDate:'',secid:'',board:'',market:'',divPs:null,divDate:'',q:null}),
+      flow:false,long:false,reinvest:false,contribAmount:null,contribPeriod:0,coFin:null,pdsRatio:'',taxBack:false,value:null,valueDate:'',secid:'',board:'',market:'',divPs:null,divDate:'',q:null}),
     fields:[['name','Название (выпуск, банк, тикер)','text'],['group','Группа','select',()=>S.invGroups.map(g=>[g.id,g.name+' · '+g.kind])],
       ['initial','Первое внесение, ₽ (можно позже на странице позиции)','num',null,{newOnly:true}],
       ['rate','Ожидаемая доходность, % годовых','num',null,{only:NOEX}],['start','Дата открытия','date',null,{only:NOEX}],['end','Дата погашения / закрытия (если есть)','date',null,{only:NOEX}],
@@ -3584,7 +3821,9 @@ const FORMS={
       ['long','Долгосрочная — показывать на вкладке «Долгосрочные»','check'],
       ['divPs','Ожидаемый дивиденд на 1 шт., ₽','num',null,{only:SHARE,ph:'Например: 34,84'}],['divDate','Когда придёт (примерно)','date',null,{only:SHARE}],
       ['contribAmount','Плановое пополнение, ₽','num',null,{only:NOEX}],['contribPeriod','Как часто пополнять','cperiod',null,{only:NOEX}],
-      ['coFin','Доплата государства в год, ₽ (софинансирование ПДС)','num',null,{only:NOEX}],
+      ['pdsRatio','ПДС: софинансирование государства (зависит от вашего дохода)','select',PDS_RATIOS,{only:NOEX}],
+      ['taxBack','Налоговый вычет 13% с пополнений (ПДС, ИИС) — учитывать в доходах','check',null,{only:NOEX}],
+      ['coFin','Доплата государства в год, ₽ — фиксированная сумма (если соотношение выше не выбрано)','num',null,{only:NOEX}],
       ['flow','Пополнения — из бюджета плана: идут в «Накопления» баланса, при закрытии сумма возвращается в доход','check']],
     note:'Последнюю галочку не ставьте, если пополнения уже заложены статьёй «Накопление» (как ПДС) или деньги лежали на счёте до плана — иначе посчитаются дважды.',
     onDelete:p=>{ S.invFacts=S.invFacts.filter(f=>f.pos!==p.id); S.invContribs=S.invContribs.filter(c=>c.pos!==p.id); if(UI.detail&&UI.detail.id===p.id) UI.detail=UI.detail.back==='long'?null:{kind:'inv',id:p.group}; },
@@ -4068,6 +4307,10 @@ document.addEventListener('click',e=>{
   else if(a==='qRefresh') refreshQuotes(true);
   else if(a==='divMode'){ UI.divMode=b.dataset.v; render(); }
   else if(a==='freeAll'){ UI.freeAll=!UI.freeAll; render(); }
+  else if(a==='bankOpen') openBank();
+  else if(a==='bankBack'){ if(UI.bank){ UI.bank.step='pick'; UI.bank.err=''; drawBank(); } }
+  else if(a==='bankApply') bankApply();
+  else if(a==='bankUndo'){ const bt=bankBatches().find(x=>x.id===b.dataset.id); if(bt&&confirm('Убрать выписку «'+(bt.file||'Выписка')+'»? Снимутся только её '+bt.n+' '+plural(bt.n,'запись','записи','записей')+'.')) bankUndo(bt.id); }
   else if(a==='wishOpen'){ const i=S.invWish.findIndex(x=>x.id===b.dataset.id); if(i>=0) openEditor('invWish',i); }
   else if(a==='wishLot'){ const w=S.invWish.find(x=>x.id===b.dataset.id); if(!w) return; w.lots=Math.max(1,w.lots+(+b.dataset.d)); persist('invWish'); render(); }
   else if(a==='wishBuy'){ const w=S.invWish.find(x=>x.id===b.dataset.id); if(!w) return;
