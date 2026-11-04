@@ -1193,8 +1193,15 @@ function noteTitleFrom(text){
 function applyInbox(){
   if(!S||!NATIVE||!canSave||!document.getElementById('sheet').hidden) return;
   const items=inboxItems(); if(!items.length) return;
-  const keys=new Set(), seen=[], isDay=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||''); let nt=0, nn=0, nd=0;
-  items.forEach(it=>{ if(!it||!it.id) return; seen.push(it.id); const text=String(it.text||'').trim(); if(!text&&it.type!=='done') return;
+  const keys=new Set(), seen=[], isDay=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||''); let nt=0, nn=0, nd=0, nh=0;
+  items.forEach(it=>{ if(!it||!it.id) return; seen.push(it.id); const text=String(it.text||'').trim(); if(!text&&it.type!=='done'&&it.type!=='habit') return;
+    // привычка из виджета: состояние на день (не «переключить») — повтор ничего не ломает
+    if(it.type==='habit'){ const h=S.habits.find(x=>x.id===it.habit); if(!h||!isDay(it.day)) return;
+      const i=S.habitLog.findIndex(l=>l.habit===h.id&&l.date===it.day), v=numOr(it.value,null);
+      if(h.type==='count'){ if(it.clear||v==null){ if(i<0) return; S.habitLog.splice(i,1); } else if(i>=0){ if(numOr(S.habitLog[i].value,null)===v) return; S.habitLog[i].value=v; } else S.habitLog.push({habit:h.id,date:it.day,value:v}); }
+      else if(it.on){ if(i>=0) return; S.habitLog.push({habit:h.id,date:it.day}); }
+      else { if(i<0) return; S.habitLog.splice(i,1); }
+      keys.add('habitLog'); nh++; return; }
     if(it.type==='note'){ if(S.notes.some(n=>n.id===it.id)) return;
       let f=S.noteFolders.find(x=>x.name===QUICK_FOLDER); if(!f){ f={id:uid(),name:QUICK_FOLDER}; S.noteFolders.push(f); keys.add('noteFolders'); }
       S.notes.push({id:it.id,name:noteTitleFrom(text),body:esc(text).replace(/\n/g,'<br>'),pinned:false,updated:new Date(+it.at||Date.now()).toISOString(),folder:f.id,book:''});
@@ -1211,7 +1218,7 @@ function applyInbox(){
       S.tasks.push(t); keys.add('tasks'); nt++; } });
   if(keys.size){ persist(...keys); if(REMOTE) keepLocal(); render(); }
   try{ NATIVE.ack(JSON.stringify(seen)); }catch(e){}
-  if(nt||nn||nd) toast('Из виджета: '+[nt?nt+' '+plural(nt,'задача','задачи','задач'):'',nn?nn+' '+plural(nn,'заметка','заметки','заметок'):'',nd?'выполнено '+nd:''].filter(Boolean).join(', '));
+  if(nt||nn||nd||nh) toast('Из виджета: '+[nt?nt+' '+plural(nt,'задача','задачи','задач'):'',nn?nn+' '+plural(nn,'заметка','заметки','заметок'):'',nd?'выполнено '+nd:'',nh?'привычки: '+nh:''].filter(Boolean).join(', '));
 }
 // вернулись в приложение, а в окошке добавили что-то новое — сперва свежие данные, потом запись
 document.addEventListener('visibilitychange',()=>{ if(document.hidden||!NATIVE||!inboxItems().length) return;
@@ -1222,7 +1229,7 @@ window.moyplanAction=()=>{ let a=null; try{ a=NATIVE&&NATIVE.takeAction(); }catc
 /* Android: уведомления. Расписание на 2 недели вперёд считает приложение при каждой правке и отдаёт телефону;
    телефон показывает их сам, даже если приложение закрыто. Настройки — на этом устройстве. */
 const NOTIF_KEY='moyplan.notif.v1';
-const NOTIF_DEF={on:true,pay:true,bd:true,task:true,digest:true,digestAt:'09:00',habit:true,habitAt:'21:00'};
+const NOTIF_DEF={on:true,pay:true,bd:true,task:true,free:true,digest:true,digestAt:'09:00',habit:true,habitAt:'21:00'};
 function notifCfg(){ let c={}; try{ c=JSON.parse(localStorage.getItem(NOTIF_KEY)||'{}')||{}; }catch(e){} return Object.assign({},NOTIF_DEF,c); }
 function notifPlan(){
   const c=notifCfg(), out=[]; if(!c.on||!S) return out;
@@ -1235,6 +1242,12 @@ function notifPlan(){
   if(c.bd) S.gifts.forEach(g=>{ const n=bdNext(g); if(!n) return; const k=dkey(n), r=numOr(g.remind,3), age=g.byear?n.getFullYear()-g.byear:0;
     if(r>0) push('bd|'+g.id+'|'+k+'|r',at(dkey(addDays(n,-r)),'10:00'),'Через '+dd(r)+' день рождения: '+g.name,dayLabel(k)+(age?' · '+yrs(age):''),'bdays');
     push('bd|'+g.id+'|'+k,at(k,'09:00'),'Сегодня день рождения: '+g.name,age?yrs(age):'Не забудьте поздравить','bdays'); });
+  if(c.free&&C) freeList().forEach(x=>{ const nm=x.p.name||x.p.secid||'Позиция', k=x.d;
+    if(x.kind==='offer'){ const st=x.from&&x.from>todayK()?x.from:dkey(addDays(parseD(k),-7));
+      push('free|'+x.p.id+'|'+k+'|o',at(st,'10:00'),'Оферта по «'+nm+'» '+dRu(k).slice(0,5),'Можно вернуть до '+rub(x.amt)+' — если нужно, подайте заявку брокеру'+(x.to?' до '+dRu(x.to).slice(0,5):''),'invest'); return; }
+    const what=x.kind==='end'?'закрытие':x.kind==='am'?'частичное погашение':'погашение';
+    push('free|'+x.p.id+'|'+k+'|w',at(dkey(addDays(parseD(k),-7)),'10:00'),'Через неделю освободится '+rub(x.amt),nm+': '+what+' '+dRu(k).slice(0,5)+'. Подумайте, куда реинвестировать','invest');
+    push('free|'+x.p.id+'|'+k,at(k,'10:00'),'Сегодня '+what+': '+nm,'Вернётся около '+rub(x.amt)+' — можно реинвестировать','invest'); });
   if(c.task) S.tasks.forEach(x=>{ if(!x.done&&x.due&&x.time) push('task|'+x.id+'|'+x.due+'|'+x.time,at(x.due,x.time),x.name,'Задача на '+x.time,'task'); });
   if(c.digest) for(let i=0;i<=H;i++){ const k=dkey(addDays(t,i)), l=S.tasks.filter(x=>!x.done&&x.due&&(i===0?x.due<=k:x.due===k));
     if(l.length) push('digest|'+k,at(k,c.digestAt),'На сегодня '+l.length+' '+plural(l.length,'задача','задачи','задач'),l.slice(0,4).map(x=>x.name).join(', ')+(l.length>4?'…':''),'task'); }
@@ -1248,14 +1261,16 @@ function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=se
   NATIVE.schedule(JSON.stringify(notifPlan()));
   const wk=dkey(addDays(TODAY(),7));
   NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&x.due&&x.due<=wk).map(x=>({id:x.id,name:x.name,due:x.due,time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
-    projects:S.projects.map(p=>({id:p.id,name:p.name,parent:p.parent||''}))}));
+    projects:S.projects.map(p=>({id:p.id,name:p.name,parent:p.parent||''})),
+    habits:S.habits.map(h=>({id:h.id,name:h.name,type:h.type==='count'?'count':'check',target:numOr(h.target,1),unit:h.unit||'',days:h.days||'1111111',created:h.created||''})),
+    hday:todayK(),hlog:Object.fromEntries(S.habitLog.filter(l=>l.date===todayK()).map(l=>[l.habit,numOr(l.value,1)]))}));
   NATIVE.setRemote(REMOTE?REMOTE.url:'',REMOTE?REMOTE.key:'');
 }catch(e){} },800); }
 function nativeBox(){
   if(!NATIVE) return ''; const c=notifCfg(), ck=(k,l)=>`<label class="chk"><input type="checkbox" data-ncfg="${k}" ${c[k]?'checked':''}><span>${l}</span></label>`;
   let lock=false, ver=''; try{ lock=!!NATIVE.lockOn(); ver=String(NATIVE.build()); }catch(e){}
   return `<div class="field"><label>Уведомления</label>${ck('on','Присылать уведомления')}
-    <div style="padding-left:26px;display:grid;gap:2px">${ck('pay','Платежи — заранее (как указано в платеже) и в день оплаты')}${ck('bd','Дни рождения')}${ck('task','Задачи, у которых указано время')}
+    <div style="padding-left:26px;display:grid;gap:2px">${ck('pay','Платежи — заранее (как указано в платеже) и в день оплаты')}${ck('bd','Дни рождения')}${ck('free','Погашение облигаций и вкладов — за неделю и в день')}${ck('task','Задачи, у которых указано время')}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('digest','Утром — задачи на день, в')}<input type="time" data-ncfg="digestAt" value="${esc(c.digestAt)}" style="width:auto"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('habit','Вечером — неотмеченные привычки, в')}<input type="time" data-ncfg="habitAt" value="${esc(c.habitAt)}" style="width:auto"></div></div></div>
     <div class="field"><label>Защита</label><label class="chk"><input type="checkbox" id="lockOn" ${lock?'checked':''}><span>Вход по отпечатку пальца (или PIN телефона)</span></label></div>
@@ -1340,6 +1355,7 @@ function launch(a){
   else if(a==='pay'){ UI.section='pay'; UI.sub.pay='upcoming'; render(); }
   else if(a==='bdays'){ UI.section='bdays'; render(); }
   else if(a==='today'){ UI.section='tasks'; UI.sub.tasks='today'; render(); }
+  else if(a==='invest'){ UI.section='fin'; UI.tab='invest'; render(); const f=$view.querySelector('[data-sect="free"]'); if(f) f.scrollIntoView({block:'start'}); }
   saveUI();
 }
 
@@ -1718,9 +1734,12 @@ async function applyQuotes(recs,withCoupons){
     if(bond){ const cv=numOr(sx.COUPONVALUE,null);
       Object.assign(q,{price:raw/100*face*rate,face,nkd:numOr(sx.ACCRUEDINT,0)*rate,cv:cv!=null?cv*rate:null,next:okD(sx.NEXTCOUPON),mat:okD(sx.MATDATE),offer:okD(sx.OFFERDATE)}); }
     else q.price=raw*rate;
-    if(bond&&withCoupons&&(!Array.isArray(q.cpn)||q.ct!==today)){
-      try{ const j=await iss(`statistics/engines/stock/markets/bonds/bondization/${encodeURIComponent(x.secid)}.json?iss.only=coupons&limit=100&from=${new Date().getFullYear()-1}-01-01&coupons.columns=coupondate,value_rub`);
-        q.cpn=issTbl(j,'coupons').filter(c=>okD(c.coupondate)).map(c=>[c.coupondate,+c.value_rub>0?Math.round(c.value_rub*100)/100:null]); q.ct=today; }catch(e){} }
+    // раз в день: купоны, погашения частями (амортизация) и оферты
+    if(bond&&withCoupons&&(!Array.isArray(q.cpn)||!Array.isArray(q.am)||q.ct!==today)){
+      try{ const j=await iss(`statistics/engines/stock/markets/bonds/bondization/${encodeURIComponent(x.secid)}.json?iss.only=coupons,amortizations,offers&limit=100&from=${new Date().getFullYear()-1}-01-01&coupons.columns=coupondate,value_rub&amortizations.columns=amortdate,value_rub&offers.columns=offerdate,offerdatestart,offerdateend`);
+        q.cpn=issTbl(j,'coupons').filter(c=>okD(c.coupondate)).map(c=>[c.coupondate,+c.value_rub>0?Math.round(c.value_rub*100)/100:null]);
+        q.am=issTbl(j,'amortizations').filter(c=>okD(c.amortdate)).map(c=>[c.amortdate,+c.value_rub>0?Math.round(c.value_rub*100)/100:null]);
+        q.of=issTbl(j,'offers').filter(c=>okD(c.offerdate)).map(c=>[c.offerdate,okD(c.offerdatestart),okD(c.offerdateend)]); q.ct=today; }catch(e){} }
     x.q=q; n++; }
   return n;
 }
@@ -1890,7 +1909,9 @@ function viewSecPos(r){
       <div class="ro"><span>Цена</span><b class="num">${NF2.format(q.raw)}% · ${fmtP(q.price)}</b></div>
       <div class="ro"><span>Номинал</span><b class="num">${fmtP(q.face*(q.fx||1))}${q.cur&&!RUBS.has(q.cur)?' ('+NF2.format(q.face)+' '+esc(q.cur)+')':''}</b></div>
       <div class="ro"><span>Накопленный купон (НКД)</span><b class="num">${fmtP(q.nkd)}${r.qty?' × '+fmtQ(r.qty)+' = '+rub(r.nkd):''}</b></div>
-      ${q.mat?`<div class="ro"><span>Погашение</span><b class="num">${dRu(q.mat)}</b></div>`:''}${q.offer?`<div class="ro"><span>Оферта</span><b class="num">${dRu(q.offer)}</b></div>`:''}
+      ${(()=>{ const L=r.closed?[]:freeList().filter(x=>x.p===p);
+        if(!L.length) return (q.mat?`<div class="ro"><span>Погашение</span><b class="num">${dRu(q.mat)}</b></div>`:'')+(q.offer?`<div class="ro"><span>Оферта</span><b class="num">${dRu(q.offer)}</b></div>`:'');
+        return L.map(x=>`<div class="ro"><span>${x.kind==='mat'?'Погашение':x.kind==='am'?'Частичное погашение':'Оферта'} · ${dRu(x.d)} <span class="fsub">${freeWhen(x.d)}</span></span><b class="num">${x.kind==='offer'?'до ':''}${rub(x.amt)}</b></div>`).join(''); })()}
       <h3 style="margin-top:14px">Ближайшие купоны</h3>
       ${fut.length?fut.map(x=>`<div class="ro"><span>${dRu(x.d)}${x.est?' <span class="tag">оценка</span>':''}</span><span class="num">${fmtP(x.per)} × ${fmtQ(x.n)} = <b>${rub(x.v)}</b></span></div>`).join('')
         :`<p class="hint">${Array.isArray(q.cpn)?'Будущих купонов нет.':'График купонов ещё не загружен — нажмите «Обновить».'}</p>`}
@@ -1912,6 +1933,34 @@ function buySum(){ const l=document.getElementById('bLots'), pr=document.getElem
   const p=S.invPositions.find(x=>x.id===pr.dataset.pos), lots=evalExpr(l.value), price=parsePrice(pr.value,p&&p.q), qty=numOr(lots,0)*(+l.dataset.lot||1);
   out.textContent=(qty>0&&price>0)?'= '+fmtQ(qty)+' шт. на '+rub(qty*price):''; }
 
+/* Когда освободятся деньги: погашение облигаций (целиком или частями — амортизация) по графику биржи,
+   окончание вкладов и других позиций с датой закрытия. Оферта — только если подать заявку, в суммы не входит. */
+const FREE_KIND={mat:'погашение',am:'частичное погашение',offer:'оферта',end:'окончание'};
+function freeList(){
+  const today=todayK(), out=[];
+  C.pos.forEach(r=>{ const p=r.p; if(r.closed) return;
+    if(r.ex&&p.market==='bonds'){ const q=r.quote; if(!q||!(r.qty>0)) return; const fx=q.fx||1;
+      const am=(Array.isArray(q.am)?q.am:[]).filter(a=>a[0]>=today);
+      if(am.length) am.forEach(([d,v],i)=>{ const last=i===am.length-1, per=v!=null?v:(last&&q.face?q.face*fx:null); if(per!=null) out.push({d,p,amt:per*r.qty,kind:last?'mat':'am'}); });
+      else if(q.mat&&q.mat>=today&&q.face) out.push({d:q.mat,p,amt:q.face*fx*r.qty,kind:'mat'});
+      const ofs=Array.isArray(q.of)&&q.of.length?q.of:(q.offer?[[q.offer,'','']]:[]);
+      ofs.forEach(([d,s,e])=>{ if(d>=today&&(!q.mat||d<q.mat)&&q.face) out.push({d,p,amt:q.face*fx*r.qty,kind:'offer',from:s||'',to:e||''}); }); }
+    else if(!r.ex&&p.end&&p.end>=today){ const amt=r.proj?r.proj.vEnd:r.valueNow; if(amt>0) out.push({d:p.end,p,amt,kind:'end'}); } });
+  return out.sort((a,b)=>a.d.localeCompare(b.d)||a.amt-b.amt);
+}
+const freeWhen=d=>{ const n=daysTo(d); return n<=0?'сегодня':n===1?'завтра':'через '+n+' '+plural(n,'день','дня','дней'); };
+function freeHtml(){
+  const L=freeList(); if(!L.length) return '';
+  const sumIn=n=>L.filter(x=>x.kind!=='offer'&&daysTo(x.d)<=n).reduce((s,x)=>s+x.amt,0), rows=UI.freeAll?L:L.slice(0,6);
+  return `<section class="card" data-sect="free"><h3>Когда освободятся деньги</h3>
+    <div class="kpis" style="margin:6px 0 10px">${kpi('За 30 дней',sumIn(30))}${kpi('За 3 месяца',sumIn(91))}${kpi('За год',sumIn(365))}</div>
+    ${rows.map(x=>`<button class="list-row" data-act="posOpen" data-id="${x.p.id}"><div class="m"><div class="fname">${esc(x.p.name||x.p.secid||'Без названия')} <span class="tag">${FREE_KIND[x.kind]}</span></div>
+      <div class="fsub">${dRu(x.d)} · ${freeWhen(x.d)}${x.kind==='offer'&&x.from?' · заявка '+dRu(x.from).slice(0,5)+'–'+dRu(x.to||x.d).slice(0,5):''}</div></div>
+      <div class="a num">${x.kind==='offer'?'<span class="fsub">до </span>':''}${rub(x.amt)}</div></button>`).join('')}
+    ${L.length>6?`<div class="actions" style="margin-top:6px"><button class="btn small" data-act="freeAll">${UI.freeAll?'Свернуть':'Показать все ('+L.length+')'}</button></div>`:''}
+    <p class="hint" style="margin:8px 0 0">Облигации — по графику биржи: номинал × количество, частичные погашения — отдельно. Вклады и другие позиции — по дате закрытия. Оферта — деньги вернутся, только если подать заявку брокеру, в суммы не входит. За неделю и в день погашения придёт уведомление — чтобы вовремя реинвестировать.</p></section>`;
+}
+
 /* ---- Инвестиции ---- */
 const tot=(list,k)=>list.reduce((s,r)=>s+(r.closed&&(k==='invested'||k==='valueNow')?0:r[k]),0);
 function viewInvest(){
@@ -1920,6 +1969,7 @@ function viewInvest(){
   const growth=`<span class="${cls}">${inv?(gain>=0?'+':'−')+pctD(Math.abs(gain)/inv):'—'}</span>`;
   const gsub=`<span class="${cls}">${gain>=0?'+':'−'}${fmt(Math.abs(gain))} ₽</span>${Math.round(day)?` · за день <span class="${day>0?'pos':'neg'}">${day>0?'+':'−'}${fmt(Math.abs(day))} ₽</span>`:''}`;
   return `${qBar()}<div class="kpis">${kpi('Стоит сейчас',val,'внесено '+fmt(inv)+' ₽')}${kpiT('Прирост портфеля',growth,gsub)}${kpi('Пришло дохода',rec,'купоны, проценты, дивиденды')}${kpi('Ожидаемый доход',mon,'в месяц: купоны, дивиденды, ставки')}</div>
+  ${freeHtml()}
   ${divHtml(open.filter(r=>r.valueNow>0))}
   <section class="card"><div class="row-between"><h3>Группы</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invGroup">+ Группа</button></div></div>
     <p class="hint">Внутри группы — позиции. У каждой позиции: пополнения, стоимость сейчас и доход по месяцам.</p>
@@ -4017,6 +4067,7 @@ document.addEventListener('click',e=>{
   else if(a==='secSave') secSave();
   else if(a==='qRefresh') refreshQuotes(true);
   else if(a==='divMode'){ UI.divMode=b.dataset.v; render(); }
+  else if(a==='freeAll'){ UI.freeAll=!UI.freeAll; render(); }
   else if(a==='wishOpen'){ const i=S.invWish.findIndex(x=>x.id===b.dataset.id); if(i>=0) openEditor('invWish',i); }
   else if(a==='wishLot'){ const w=S.invWish.find(x=>x.id===b.dataset.id); if(!w) return; w.lots=Math.max(1,w.lots+(+b.dataset.d)); persist('invWish'); render(); }
   else if(a==='wishBuy'){ const w=S.invWish.find(x=>x.id===b.dataset.id); if(!w) return;
