@@ -49,7 +49,7 @@ button{cursor:pointer}
 small{font-size:11.5px;color:var(--muted)}
 
 .top{position:sticky;top:0;z-index:20;background:var(--page);display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 6px}
-.top h1{font-size:20px;margin:0;flex:1 0 auto;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top h1{font-size:20px;margin:0;flex:0 1 auto;min-width:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw;min-width:0;flex:0 1 auto}
 .sync span{overflow:hidden;text-overflow:ellipsis}
 .sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
@@ -592,11 +592,25 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .fund-in{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
 .fgrid{display:grid;grid-template-columns:minmax(0,1fr) 70px 120px 28px;gap:6px;align-items:center;margin-top:6px}
 .fgrid.h{font-size:11.5px;color:var(--muted)}
+/* «?» — пояснение к карточке и справка о разделе */
+.qh{display:inline-grid;place-items:center;width:18px;height:18px;padding:0;margin:0 0 0 6px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:11px;font-weight:700;line-height:1;vertical-align:2px;cursor:pointer;flex:none}
+.qh.on{background:var(--text-2);color:var(--page);border-color:var(--text-2)}
+.qh-top{width:22px;height:22px;font-size:12px;margin:0 auto 0 0}
+.qtip{background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.help p{margin:0 0 10px;line-height:1.5}
+.avgs{display:block;font-size:11px;color:var(--muted);font-weight:400}
+/* подбор облигаций */
+.bf{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.bf .field{margin:0}
+.bf input,.bf select{width:100%}
+.bond-y{text-align:right;white-space:nowrap}
+.bond-y b{font-size:17px}
 </style>
 </head>
 <body>
 <header class="top">
   <h1 id="title">Финансы</h1>
+  <button class="qh qh-top" data-act="secHelp" aria-label="Что это за раздел">?</button>
   <span class="sync" id="sync"><i></i><span></span></span>
   <button class="icon-btn bell" data-act="bell" aria-label="Напоминания" id="btnBell"></button>
   <button class="icon-btn" data-act="settings" aria-label="Настройки" id="btnSettings"></button>
@@ -624,6 +638,8 @@ const TYPE_CAT={'Доход':'inc','Разовый доход':'inc','Обяза
 function mIdx(s){ if(!s) return null; const y=+String(s).slice(0,4), m=+String(s).slice(5,7); return (y&&m)?y*12+m-1:null; }
 function mKey(i){ return Math.floor(i/12)+'-'+String(i%12+1).padStart(2,'0'); }
 function parseD(s){ if(!s) return null; const p=String(s).split('-').map(Number); return p[0]?new Date(p[0],(p[1]||1)-1,p[2]||1):null; }
+const daysTo=k=>Math.round((parseD(k)-TODAY())/864e5);
+function addMonthsKD(d0,k){ const y=d0.getFullYear(), m=d0.getMonth()+k; return new Date(y,m,Math.min(d0.getDate(),new Date(y,m+1,0).getDate())); }
 function datedifM(a,b){ let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate()) m--; return m; }
 function numOr(v,d){ return (v===''||v==null||isNaN(+v))?d:+v; }
 const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -721,22 +737,30 @@ function compute(st,now){
   const insFact=mapFacts(st.insFacts,'ins');
   const ins=st.insurance.map(x=>{
     const B=parseD(x.start), Cd=parseD(x.pay), D=numOr(x.amount,0);
-    let E=(B&&Cd)?datedifM(B,Cd):0; const bad=!!(B&&Cd&&E<0); if(E<=0) E=1;
+    // месяцев для взносов — столько же, сколько строк в таблице взносов: с месяца начала (если с 1-го числа) по месяц платежа (если платёж не 1-го)
+    const insN=(b,c)=>(c.getFullYear()*12+c.getMonth())-(b.getFullYear()*12+b.getMonth())+(c.getDate()>1?1:0)-(b.getDate()>1?1:0);
+    let E=(B&&Cd)?insN(B,Cd):0; const bad=!!(B&&Cd&&(Cd<B||E<0)); if(E<=0) E=1;
     const F=bad?0:D/E;
     const inMonth=cd=>!bad&&B&&Cd&&cd>=B&&cd<Cd;
     const fm=insFact[x.id]||{};
-    const plan=colDates.map(cd=>inMonth(cd)?F:0);
+    // регулярный платёж: дальше по плану — следующие циклы (с месяца после платежа до следующей даты)
+    const rep_=Math.round(numOr(x.repeat,12)), cyc=[];
+    if(!bad&&B&&Cd&&rep_>0){ let pay=Cd;
+      for(let k=0;k<40;k++){ const nb=new Date(pay.getFullYear(),pay.getMonth()+1,1), np=addMonthsKD(pay,rep_); const e=Math.max(1,insN(nb,np));
+        cyc.push([nb,np,D/e]); pay=np; if(np.getFullYear()*12+np.getMonth()>months[months.length-1]) break; } }
+    const plan=colDates.map(cd=>{ if(inMonth(cd)) return F; const c=cyc.find(z=>cd>=z[0]&&cd<z[1]); return c?c[2]:0; });
     const used=plan.map((p,j)=>keys[j] in fm?fm[keys[j]]:p);
     const sched=[];
     if(B&&Cd&&!bad) for(let m=B.getFullYear()*12+B.getMonth(); sched.length<240; m++){ const cd=new Date(Math.floor(m/12),m%12,1); if(!(cd<Cd)) break; if(cd>=B) sched.push(m); }
-    const saved=Object.values(fm).reduce((a,b)=>a+b,0);
+    const sk=B?mKey(B.getFullYear()*12+B.getMonth()):'', saved=Object.keys(fm).filter(k=>!sk||k>=sk).reduce((a,k)=>a+fm[k],0);
+    const paidOnce=rep_===0&&!!x.paid&&!!x.pay&&x.paid>=x.pay;
     const planToDate=sched.filter(m=>m<=curM).length*F;
     const hasCur=mKey(curM) in fm;
     const leftMonths=sched.filter(m=>m>curM||(m===curM&&!hasCur)).length;
     const left=Math.max(D-saved,0);
     const need=leftMonths?left/leftMonths:left;
-    const status=bad?'bad':(D>0&&saved>=D-0.5)?'done':(planToDate===0&&saved===0)?'wait':(saved>=planToDate-0.5)?'ok':'behind';
-    return {x,E,F,plan,used,sched,fm,saved,left,need,leftMonths,planToDate,pct:D?Math.min(1,saved/D):0,status,bad};
+    const status=paidOnce?'paid':bad?'bad':(D>0&&saved>=D-0.5)?'done':(planToDate===0&&saved===0)?'wait':(saved>=planToDate-0.5)?'ok':'behind';
+    return {x,E,F,plan,used,sched,fm,saved,left,need,leftMonths,planToDate,pct:D?Math.min(1,saved/D):0,status,bad,rep:rep_,paidOnce};
   });
 
   // Подарки: сумма в месяц даты, каждый год
@@ -900,7 +924,10 @@ const defaultAlloc=()=>{ const n=new Date(); return {start:mKey(n.getFullYear()*
 const CPERIODS=[[0,'Без пополнений'],[1,'Ежемесячно'],[3,'Раз в квартал'],[6,'Раз в полгода'],[12,'Раз в год']];
 const contribText=p=>{ const per=Math.round(numOr(p.contribPeriod,0)), ca=numOr(p.contribAmount,0); if(!per||!ca) return 'без плановых пополнений'; const f=CPERIODS.find(x=>x[0]===per); return fmt(ca)+' ₽ '+(f?f[1].toLowerCase():'раз в '+per+' мес.'); };
 const plural=(n,a,b,c)=>{ const m=n%100, k=n%10; return (m>10&&m<20)?c:k===1?a:(k>=2&&k<=4)?b:c; };
-const durText=n=>{ if(n==null) return ''; if(n<=0) return 'срок наступил'; const y=Math.floor(n/12), m=n%12; return [y?y+' '+plural(y,'год','года','лет'):'',m?m+' мес.':''].filter(Boolean).join(' '); };
+const durText=n=>{ if(n==null) return ''; if(n<=0) return 'срок наступил'; const y=Math.floor(n/12), m=n%12; return [y?y+' г.':'',m?m+' мес.':''].filter(Boolean).join(' '); };
+// «через 12 дней» / «через 5 мес.» / «через 4 г. 5 мес.»
+function payWhen(k){ const n=daysTo(k); if(n<0) return 'просрочен'; if(n===0) return 'сегодня'; if(n===1) return 'завтра'; if(n<=60) return 'через '+n+' '+plural(n,'день','дня','дней');
+  const a=TODAY(), b=parseD(k); let m=(b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth(); if(b.getDate()<a.getDate()) m--; return 'через '+durText(Math.max(1,m)); }
 const yearAxis=ms=>{ if(ms.length<=18) return ms.map(axisMonth); const k=Math.max(1,Math.ceil(ms.length/12/7)); return ms.map(m=>(m%12===0&&Math.floor(m/12)%k===0)?String(Math.floor(m/12)):''); };
 function resHtml(d,base,stack){
   const cls=d>0.5?'pos':d<-0.5?'neg':'', sg=d>=0?'+':'−', p=base?sg+(Math.abs(d)/base*100).toFixed(1).replace('.',',')+'%':'';
@@ -932,6 +959,39 @@ const ICONS={
 const icon=n=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[n]+'</svg>';
 const CHEV='<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 
+const QH='<button class="qh" data-act="qh" aria-label="Пояснение" aria-expanded="false">?</button>';
+/* Справка о разделе — «?» рядом с названием. Ключ: раздел или «fin.вкладка». */
+const HELP={
+  'fin.summary':['Сводка — общая картина плана: сколько остаётся каждый месяц (прибыль), накопленный остаток, средние траты против плана и прогресс цели.','Где введён факт — считается по факту, где нет — по плану.'],
+  'fin.month':['Месяц — здесь вносится факт: сколько реально получили и потратили по каждой статье.','Нажмите на сумму статьи — откроется список записей: видно, что уже внесено, можно добавить чек или удалить ошибочный.','«В среднем» — средний факт за месяцы, где он введён. Расходы — вместе с резервами (страховки, подарки).'],
+  'fin.items':['Статьи — плановые доходы и расходы: сумма, как часто и с какого месяца. Из них строится план на весь период.'],
+  'fin.balance':['Баланс по месяцам: доходы, расходы, накопления и сколько остаётся. Нажмите на месяц — подробности.'],
+  'fin.funds':['Фонды — с каждого дохода откладывается процент: на инвестиции, хотелки, подарки. Видно, сколько отложено и сколько потрачено из каждого фонда.'],
+  'fin.reserves':['Резервы — крупные платежи, на которые копите заранее (страховка, налог и т. п.), и подарки.','Сумма платежа делится на месяцы до даты платежа — столько откладывать каждый месяц. Заплатили — «Платёж совершён»: регулярный платёж переедет на следующую дату, накопление начнётся заново.'],
+  'fin.invest':['Инвестиции — вклады, облигации, акции, фонды: сколько внесено, сколько стоит сейчас и какой доход приносит.','«Стоит сейчас»: у бумаг с биржи — количество × текущая цена (НКД облигаций не входит), у остальных — вписанная вами стоимость или оценка. Прирост — стоимость против внесённого, без купонов и дивидендов.','Доход в балансе: где введён факт — по факту, иначе ожидаемый по ставке. Внесённые суммы идут в «Сбережения», а не в доход.','«Подбор облигаций» — все облигации Мосбиржи с фильтрами: выбрать, что купить.'],
+  'fin.long':['Долгосрочные — вложения на годы: ПДС, ИИС, длинные облигации, вклады.','Расчёт к погашению: от сегодняшней стоимости, с плановыми пополнениями и доплатой государства. При капитализации доход каждый месяц добавляется к сумме, иначе выплачивается. Ставка — ваша оценка.'],
+  'fin.goal':['Цель — сколько и к какой дате накопить, и сколько реально откладываете по месяцам.'],
+  bonds:['Подбор облигаций — все облигации Мосбиржи (ОФЗ, муниципальные, корпоративные) с ценой, доходностью к погашению (или к оферте), купоном и НКД. Данные с задержкой до 15 минут.','Надёжность: рейтингов на бирже нет, поэтому фильтр — по типу эмитента и уровню листинга. ОФЗ — самые надёжные, 1-й уровень — крупные компании с самыми строгими требованиями биржи. Пометка «высокий риск» — доходность больше ОФЗ на 8 п. п. и выше. Перед покупкой проверьте рейтинг эмитента (АКРА, Эксперт РА).','Оферта — дата, когда эмитент может выкупить облигацию или поменять купон; доходность тогда считается к оферте. Нажмите на облигацию — добавится в «Хочу купить».'],
+  tasks:['Задачи — дела со сроком, повтором, проектами и чек-листами. «Сегодня» — что сделать сегодня и просроченное.','Срок можно писать словами: «завтра в 10», «в пятницу», «каждый понедельник».'],
+  habits:['Привычки — отмечайте каждый день. Бывают «сделал / не сделал» и с количеством (стаканы воды, страницы). Статистика — по дням, неделям и по каждой привычке.'],
+  goals:['Цели — что хотите достичь: шаги и задачи по цели, прогресс.'],
+  notes:['Заметки — тексты и списки по папкам. Быстрые заметки из виджета попадают в папку «Быстрые заметки».'],
+  more:['Остальные разделы приложения.'],
+  pay:['Платежи — регулярные оплаты (связь, кредиты, подписки): когда платить, сколько, отметка «оплачено». Можно связать со статьёй финансов.'],
+  bdays:['Дни рождения — напоминания и бюджет на подарок. Бюджет попадает в финансы каждый год в месяц дня рождения.'],
+  train:['Тренировки — программы, упражнения и история: подставляются прошлые результаты, виден прогресс.'],
+  books:['Книги — что читаю, хочу прочитать и прочитал, с целью на год.'],
+  movies:['Кино — фильмы и сериалы: смотрю (сезон и серия), хочу посмотреть, посмотрел.'],
+  food:['Питание — дневник еды и воды, рецепты и продукты дома.','Рецепт «В план» — продукты попадут в список покупок. «Приготовил» — продукты рецепта спишутся из наличия в том количестве, что в рецепте.']
+};
+function openHelp(){ const sec=SECTIONS.find(s=>s.id===UI.section)||SECTIONS[0];
+  const key=UI.section==='fin'&&UI.detail&&UI.detail.kind==='bonds'?'bonds':UI.section==='fin'?'fin.'+UI.tab:UI.section, t=HELP[key]||HELP[UI.section]||['Справки для этого раздела пока нет.'];
+  const tab=UI.section==='fin'&&key!=='bonds'?(FIN_TABS.find(x=>x[0]===UI.tab)||[])[1]:key==='bonds'?'Подбор облигаций':'';
+  openSheet(`<h2>${esc(sec.title)}${tab?' · '+esc(tab):''}</h2><div class="help">${t.map(p=>`<p>${esc(p)}</p>`).join('')}</div>
+    <p class="hint">Пояснения к отдельным карточкам — значок «?» рядом с заголовком.</p><div class="actions"><span class="sp"></span><button class="btn primary" data-act="sheetClose">Понятно</button></div>`); }
+// «?» у заголовка карточки: показать или скрыть ближайшее пояснение ниже
+function toggleQh(b){ const box=b.closest('section,.card,.sheet')||$view; const tip=[...box.querySelectorAll('.qtip')].find(t=>b.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING);
+  if(!tip) return; tip.hidden=!tip.hidden; b.classList.toggle('on',!tip.hidden); b.setAttribute('aria-expanded',String(!tip.hidden)); }
 const FIN_TABS=[['summary','Сводка'],['month','Месяц'],['items','Статьи'],['balance','Баланс'],['funds','Фонды'],['reserves','Резервы'],['invest','Инвестиции'],['long','Долгосрочные'],['goal','Цель']];
 // nav — в нижнем меню; остальные открываются из «Ещё»
 const SECTIONS=[
@@ -1074,7 +1134,7 @@ const GS_SCHEMA = [
     ['tags', 'Подкатегории записей (по порядку, через |)', 's']] },
   { key: 'insurance', sheet: 'Страхование', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Статья', 's'], ['amount', 'Сумма платежа', 'n'],
-    ['start', 'Начало накопления', 'd'], ['pay', 'Дата платежа', 'd']] },
+    ['start', 'Начало накопления', 'd'], ['pay', 'Дата платежа', 'd'], ['repeat', 'Повтор, мес. (0 — разово)', 'n'], ['paid', 'Последний платёж', 'd']] },
   { key: 'insFacts', sheet: 'Страхование — взносы', cols: [
     ['ins', 'ID страховки', 's'], ['insName', 'Статья', 's'], ['month', 'Месяц', 'm'],
     ['value', 'Перевёл на счёт', 's'], ['sum', 'Сумма', 'n']] },
@@ -1437,6 +1497,7 @@ function normalize(d){
   o.habits.forEach(h=>{ if(!h.type) h.type='check'; });
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
   o.projects.forEach(p=>{ if(p.parent==null) p.parent=''; });
+  o.insurance.forEach(x=>{ x.repeat=(x.repeat==null||x.repeat==='')?12:(+x.repeat||0); if(x.paid==null) x.paid=''; });
   for(const list of [o.items,o.insurance,o.invGroups,o.invPositions,o.invContribs,o.habits,o.tasks,o.goals,o.goalSteps,o.books,o.notes,o.foodLog,o.exercises,o.routines,o.workouts]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
   for(const k of ['readGoal','kcalGoal','waterGoal']) if(o.settings[k]===undefined) o.settings[k]=null;
   if(typeof o.trainActive==='string'){ try{ o.trainActive=o.trainActive?JSON.parse(o.trainActive):null; }catch(e){ o.trainActive=null; } }
@@ -1745,6 +1806,7 @@ function viewHtml(){
     if(UI.detail.kind==='inv'){ const g=C.groups.find(x=>x.g.id===UI.detail.id); if(g) return viewInvDetail(g); }
     if(UI.detail.kind==='ins'){ const r=C.ins.find(x=>x.x.id===UI.detail.id); if(r) return viewInsDetail(r); }
     if(UI.detail.kind==='pos'){ const r=C.pos.find(x=>x.p.id===UI.detail.id); if(r) return viewPos(r); }
+    if(UI.detail.kind==='bonds') return viewBonds();
     UI.detail=null;
   }
   return ({summary:viewSummary,month:viewMonth,items:viewItems,balance:viewBalance,funds:viewFunds,reserves:viewReserves,invest:viewInvest,long:viewLong,goal:viewGoal}[UI.tab]||viewSummary)();
@@ -1783,9 +1845,9 @@ function viewSummary(){
   const g=C.goal, cj=Math.max(0,ms.indexOf(C.curM));
   return `<div class="kpis">${kpi('Остаток на конец периода',T.cum,'на '+monthTitle(ms[ms.length-1]).toLowerCase(),'hero')}</div>
   ${nowNextCard()}
-  <section class="card"><h3>Свободные средства по месяцам</h3><p class="hint">Доходы − расходы − накопления. Там, где введён факт, — по факту.</p><div class="chart" data-chart="free"></div></section>
+  <section class="card"><h3>Прибыль по месяцам${QH}</h3><p class="hint qtip" hidden>Доходы − расходы − накопления. Там, где введён факт, — по факту.</p><div class="chart" data-chart="free"></div></section>
   ${avgCard()}
-  <section class="card"><h3>Накопленный остаток</h3><p class="hint">Свободные средства нарастающим итогом с начала плана.</p><div class="chart" data-chart="cum"></div></section>
+  <section class="card"><h3>Накопленный остаток${QH}</h3><p class="hint qtip" hidden>Прибыль нарастающим итогом с начала плана.</p><div class="chart" data-chart="cum"></div></section>
   <div class="kpis">
     ${kpi('Минимальный месячный остаток',B.free[mi],monthTitle(ms[mi]))}
     ${kpi('Сбережения сейчас',B.savings[cj],'отложено + вклады и инвестиции')}
@@ -1801,7 +1863,7 @@ function nowNextCard(){
   if(!js.length) return `<section class="card"><h3>Текущий месяц</h3><p class="hint">Сегодняшний месяц вне периода плана — продлите план в настройках ⚙.</p></section>`;
   const B=C.B,P=C.P;
   const row=(l,a,p,cls)=>`<tr class="${cls||''}"><td>${l}</td>${js.map(j=>`<td><span class="${a[j]<0?'neg':''}">${fmt(a[j])}</span>${Math.round(a[j])!==Math.round(p[j])?`<small>план ${fmt(p[j])}</small>`:''}</td>`).join('')}</tr>`;
-  return `<section class="card"><h3>${js.length>1?'Этот и следующий месяц':'Этот месяц'}</h3><p class="hint">С учётом введённого факта. Где факт расходится с планом, план показан мелко.</p>
+  return `<section class="card"><h3>${js.length>1?'Этот и следующий месяц':'Этот месяц'}${QH}</h3><p class="hint qtip" hidden>С учётом введённого факта. Где факт расходится с планом, план показан мелко.</p>
     <table class="nn num"><thead><tr><th></th>${js.map(j=>{ const n=factCount(j); return `<th>${MN[C.months[j]%12]}<small>${n?'факт по '+n+' стат.':'только план'}</small></th>`; }).join('')}</tr></thead>
     <tbody>${row('Доходы',B.inc,P.inc)}${row('Расходы',B.exp,P.exp)}${row('Накопления',B.sav,P.sav)}${row('Свободно',B.free,P.free,'key')}</tbody></table></section>`;
 }
@@ -1817,7 +1879,7 @@ function avgCard(){
     return `<div class="avg"><div class="row-between"><span class="fname">${esc(r.it.name)}</span><span class="num"><b>${fmt(r.fact)}</b> <small>/ ${fmt(r.plan)}</small></span></div>
       <div class="bullet"><i class="${over?'over':''}" style="width:${(r.fact/max*100).toFixed(1)}%"></i>${Math.round(r.plan)?`<b style="left:${(r.plan/max*100).toFixed(1)}%"></b>`:''}</div>
       <div class="fsub">${diff}${r.entered<a.tracked.length?` · факт введён за ${r.entered} из ${a.tracked.length} мес.`:''}</div></div>`; };
-  return `<section class="card"><h3>Средние траты к плану</h3><p class="hint">В среднем за месяц: ${span}. Где факт за месяц не введён, берётся план. Разовые статьи не учитываются.</p>
+  return `<section class="card"><h3>Средние траты к плану${QH}</h3><p class="hint qtip" hidden>В среднем за месяц: ${span}. Где факт за месяц не введён, берётся план. Разовые статьи не учитываются.</p>
     <div class="typesum num"><span class="h">Группа</span><span class="h">факт</span><span class="h">план</span>
     ${byType.map(([t,p,f])=>`<span>${TYPE_PLURAL[t]}</span><b class="${f>p+0.5?'neg':''}">${fmt(f)}</b><span>${fmt(p)}</span>`).join('')}</div>
     <div class="legend"><span><i style="--c:var(--pos-bar)"></i>в пределах плана</span><span><i style="--c:var(--neg-bar)"></i>больше плана</span><span><i class="tick" style="--c:var(--text)"></i>план</span></div>
@@ -1826,25 +1888,27 @@ function avgCard(){
 }
 
 /* ---- Месяц ---- */
+// среднее по месяцам с введённым фактом (как в «Средних тратах»)
+function avgOver(arr){ const tr=C.avg.tracked; return tr.length?tr.reduce((s,j)=>s+numOr(arr[j],0),0)/tr.length:null; }
 function viewMonth(){
-  const m=selMonth(), j=C.months.indexOf(m), B=C.B;
+  const m=selMonth(), j=C.months.indexOf(m), B=C.B, aE=avgOver(B.exp);
   let html=monthBar(m)+
-  `<div class="kpis k4" data-live="mkpi">${kpi('Доходы',B.inc[j])}${kpi('Расходы',B.exp[j],'с резервами')}${kpi('Накопления',B.sav[j])}${kpi('Свободно',B.free[j],'итого с начала: '+rub(B.cum[j]))}</div>
+  `<div class="kpis k4" data-live="mkpi">${kpi('Доходы',B.inc[j])}${kpi('Расходы',B.exp[j],'с резервами'+(aE!=null?'<br>в среднем '+rub(aE):''))}${kpi('Накопления',B.sav[j])}${kpi('Свободно',B.free[j])}</div>
   ${C.al&&m>=C.al.start?`<section class="card"><div class="row-between"><h3>Распределение дохода</h3><button class="more" style="padding:0" data-act="tab" data-id="funds">Фонды ›</button></div>
     <div data-live="mfunds">${C.funds.map(x=>`<div class="ro"><span>${esc(x.f.name)} · ${String(x.f.pct).replace('.',',')}% ${x.f.who==='all'?'от общего':'от моего'}</span><b class="num">${rub(x.amt[j])}</b></div>`).join('')}</div></section>`:''}
-  <p class="hint">Нажмите на сумму статьи — откроется список записей: видно, что уже внесено, можно добавить чек или удалить ошибочный.</p>`;
+`;
   const hidden=[];
   for(const t of TYPES){
     const rs=C.rows.filter(r=>r.it.type===t);
     const vis=rs.filter(r=>r.plan[j]!==0||r.fact[j]!=null||UI.showAll);
     rs.forEach(r=>{ if(!vis.includes(r)) hidden.push(r); });
     if(!vis.length) continue;
-    html+=`<section class="card"><div class="ghead"><span class="dot" style="--c:var(${TYPE_COLOR[t]})"></span>${TYPE_PLURAL[t]}<span class="sum num" data-live="gs-${t}">${rub(B[t][j])}</span></div>
+    html+=`<section class="card"><div class="ghead"><span class="dot" style="--c:var(${TYPE_COLOR[t]})"></span>${TYPE_PLURAL[t]}<span class="sum num"><span data-live="gs-${t}">${rub(B[t][j])}</span>${TYPE_CAT[t]==='exp'&&avgOver(B[t])!=null?`<small class="avgs">в среднем ${rub(avgOver(B[t]))}</small>`:''}</span></div>
       ${vis.map(r=>factRow(r,j)).join('')}</section>`;
   }
   if(hidden.length) html+=`<button class="more" data-act="showAll">Ещё ${hidden.length} стат. без плана в этом месяце — показать</button>`;
   else if(UI.showAll) html+=`<button class="more" data-act="showAll">Скрыть статьи без плана</button>`;
-  html+=`<section class="card" style="margin-top:12px"><h3>Резервы и инвестиции</h3><p class="hint">Вносятся на вкладках «Резервы» и «Инвестиции».</p>
+  html+=`<section class="card" style="margin-top:12px"><h3>Резервы и инвестиции${QH}</h3><p class="hint qtip" hidden>Вносятся на вкладках «Резервы» и «Инвестиции».</p>
     <div data-live="mres"><div class="ro"><span>Страхование (взносы)</span><b class="num">${rub(B.ins[j])}</b></div>
     <div class="ro"><span>Подарки</span><b class="num">${rub(B.gifts[j])}</b></div>
     <div class="ro"><span>Инвестиционный доход</span><b class="num">${rub(B.invest[j])}</b></div>
@@ -1852,8 +1916,8 @@ function viewMonth(){
     ${Math.round(B.invBack[j])?`<div class="ro"><span>Возврат вложений</span><b class="num">${rub(B.invBack[j])}</b></div>`:''}</div></section>`;
   return html;
 }
-function factSub(raw,plan,isInc){
-  let sub='план '+fmt(plan);
+function factSub(raw,plan,isInc,avg){
+  let sub='план '+fmt(plan)+(avg!=null?' · в среднем '+fmt(avg):'');
   if(raw!==''){
     const v=evalExpr(raw);
     if(isNaN(v)) return sub+' · <span class="neg">не разобрал выражение</span>';
@@ -1876,7 +1940,7 @@ function factTerms(raw){
 function factRow(r,j){
   const key=r.it.id+'|'+C.keys[j], f=S.facts.find(x=>x.item===r.it.id&&x.month===C.keys[j]), raw=f?f.value:'', v=evalExpr(raw), terms=factTerms(raw);
   const n=terms?terms.length:1;
-  return `<div class="frow"><div class="fmain"><div class="fname">${esc(r.it.name)}${r.it.fund?' <span class="tag">из фонда</span>':''}</div><div class="fsub num" data-live="fs-${key}">${factSub(raw,r.plan[j],TYPE_CAT[r.it.type]==='inc')}</div>${(()=>{ const st=subTotals(f); return st.some(x=>x.name)?`<div class="fsub num">${st.sort((a,b)=>b.sum-a.sum).map(x=>esc(x.name||'прочее')+' '+fmt(x.sum)).join(' · ')}</div>`:''; })()}</div>
+  return `<div class="frow"><div class="fmain"><div class="fname">${esc(r.it.name)}${r.it.fund?' <span class="tag">из фонда</span>':''}</div><div class="fsub num" data-live="fs-${key}">${factSub(raw,r.plan[j],TYPE_CAT[r.it.type]==='inc',TYPE_CAT[r.it.type]==='exp'?((C.avg.rows.find(a=>a.it===r.it)||{}).fact??null):null)}</div>${(()=>{ const st=subTotals(f); return st.some(x=>x.name)?`<div class="fsub num">${st.sort((a,b)=>b.sum-a.sum).map(x=>esc(x.name||'прочее')+' '+fmt(x.sum)).join(' · ')}</div>`:''; })()}</div>
     <button class="factbtn ${raw?'has':''}" data-act="factOpen" data-key="${esc(key)}" aria-label="Факт: ${esc(r.it.name)}"><b class="num">${raw?(isNaN(v)?'ошибка':fmt(v)):'—'}</b><small>${raw?n+' '+plural(n,'запись','записи','записей'):'внести'}</small></button></div>`;
 }
 // подкатегории факта: у статьи — список названий, у записи факта — метки по порядку сумм («Еда|Лекарства|Еда»)
@@ -1944,10 +2008,7 @@ function balRows(){
     ['h','Сбережения на конец месяца'],['r','Отложено нарастающим',B.savCum,'last'],['r','Вклады и инвестиции',B.capital,'last'],['t','Всего сбережений',B.savings,'last']
   ].filter(Boolean);
 }
-function viewBalance(){
-  const seg=`<div class="seg" style="margin-bottom:12px">${[['cards','По месяцам'],['table','Таблица']].map(([v,l])=>`<button class="${UI.balMode===v?'on':''}" data-act="balMode" data-v="${v}">${l}</button>`).join('')}</div>`;
-  return seg+(UI.balMode==='table'?balTable():balCards());
-}
+function viewBalance(){ return balCards(); }
 function balCards(){
   const B=C.B, R=balRows();
   return `<div class="legend"><span><i style="--c:var(--t2)"></i>расходы</span><span><i style="--c:var(--t7)"></i>накопления</span><span><i style="--c:var(--surface-2);outline:1px solid var(--line)"></i>свободно</span><span>нажмите на месяц — подробности</span></div>`+
@@ -1961,16 +2022,6 @@ function balCards(){
       <div class="bm-meta num"><span>доходы ${fmt(B.inc[j])}</span><span>расходы ${fmt(B.exp[j])}</span><span>накопл. ${fmt(B.sav[j])}</span><span>остаток с начала <b class="${B.cum[j]<0?'neg':''}">${fmt(B.cum[j])}</b></span></div>
       ${open?`<div class="bm-more num">${R.map(r=>r[0]==='h'?`<div class="rh">${r[1]}</div>`:(r[0]==='r'&&!Math.round(r[2][j]))?'':`<div class="ro ${r[0]}"><span>${r[1]}</span><span class="${r[4]&&r[2][j]<0?'neg':''}">${rub(r[2][j])}</span></div>`).join('')}</div>`:''}</div></section>`;
   }).join('');
-}
-function balTable(){
-  const ms=C.months, R=balRows();
-  return `<p class="hint">Красным — минус. Рамкой — текущий месяц. Таблица листается вбок.</p>
-  <div class="tbl-wrap"><table class="bal num"><thead><tr><th>Показатель</th>${ms.map((m,j)=>`<th class="${m===C.curM?'cur':''}">${monthShort(m)}<small>${factCount(j)?'факт':'план'}</small></th>`).join('')}<th>Итого</th></tr></thead>
-  <tbody>${R.map(r=>{
-    if(r[0]==='h') return `<tr class="sec"><td>${r[1]}</td>${ms.map(()=>'<td></td>').join('')}<td></td></tr>`;
-    const [cls,name,arr,agg,red]=r, tot=agg==='last'?arr[arr.length-1]:arr.reduce((a,b)=>a+b,0);
-    return `<tr class="${cls}"><td>${name}</td>${arr.map((v,j)=>`<td class="${ms[j]===C.curM?'cur':''} ${red&&v<0?'negc':''} ${!Math.round(v)?'zero':''}">${Math.round(v)?fmt(v):'·'}</td>`).join('')}<td>${fmt(tot)}</td></tr>`;
-  }).join('')}</tbody></table></div>`;
 }
 
 /* ---- Фонды: распределение дохода по процентам ---- */
@@ -1991,7 +2042,7 @@ function viewFunds(){
       ${extra}
       ${spends.length?`<div class="rh">Траты вручную</div>${spends.map(s=>`<div class="ro"><span>${dRu(s.date)}${s.note?' · '+esc(s.note):''}</span><span class="num">${rub(numOr(s.amount,0))} <button class="xbtn" data-act="fundSpendDel" data-id="${s.id}" aria-label="Удалить трату">×</button></span></div>`).join('')}`:''}
       <div class="actions" style="margin-top:8px"><button class="btn small" data-act="fundSpendAdd" data-fund="${f.id}">+ Трата из фонда</button></div></section>`; };
-  return `<section class="card"><h3>Правила</h3><p class="hint">Каждый месяц с дохода откладывается процент в фонд. Фонды «расходные» уменьшают свободные деньги как расход, инвестиции — как накопление. Действует с ${startTxt}.</p>
+  return `<section class="card"><h3>Правила${QH}</h3><p class="hint qtip" hidden>Каждый месяц с дохода откладывается процент в фонд. Фонды «расходные» уменьшают свободные деньги как расход, инвестиции — как накопление. Действует с ${startTxt}.</p>
     <div class="fgrid h"><span>Фонд</span><span>%</span><span>С дохода</span><span></span></div>
     ${AL.funds.map((f,i)=>`<div class="fgrid"><input class="fund-in" data-fund="${i}|name" value="${esc(f.name)}" aria-label="Название фонда"><input class="fund-in num" data-fund="${i}|pct" value="${esc(f.pct)}" inputmode="decimal" aria-label="Процент"><select class="fund-in" data-fund="${i}|who" aria-label="С какого дохода"><option value="me" ${f.who!=='all'?'selected':''}>мой</option><option value="all" ${f.who==='all'?'selected':''}>общий</option></select><button class="xbtn" data-act="fundDel" data-i="${i}" aria-label="Удалить фонд">×</button></div>`).join('')}
     <div class="grid2" style="margin-top:12px"><div class="field"><label>Действует с месяца</label><input type="month" data-alloc="start" value="${esc(AL.start)}"></div>
@@ -2000,24 +2051,36 @@ function viewFunds(){
   ${C.al?`<section class="card"><h3>В этом месяце</h3><div class="ro"><span>Мой доход</span><b class="num">${rub(B.baseMe[jj])}</b></div><div class="ro"><span>Доход супруги</span><b class="num">${rub(B.baseAll[jj]-B.baseMe[jj])}</b></div>
     ${C.funds.map(x=>`<div class="ro"><span>→ ${esc(x.f.name)}</span><b class="num">${rub(x.amt[jj])}</b></div>`).join('')}</section>`:''}
   ${C.funds.map(fundCard).join('')}
-  <section class="card"><h3>Чей доход</h3><p class="hint">От этого зависит, с каких доходов считаются хотелки и подарки.</p>
+  <section class="card"><h3>Чей доход${QH}</h3><p class="hint qtip" hidden>От этого зависит, с каких доходов считаются хотелки и подарки.</p>
     ${incomes.map(it=>`<div class="ro"><span class="fname">${esc(it.name)}</span><div class="seg" style="width:170px;flex:none">${[['me','Мой'],['spouse','Супруги']].map(([v,l])=>`<button class="${(it.owner||'me')===v?'on':''}" data-act="ownerSet" data-id="${it.id}" data-v="${v}">${l}</button>`).join('')}</div></div>`).join('')}</section>`;
 }
 
 /* ---- Резервы ---- */
-const INS_STATUS={done:['good','✓ Накоплено'],ok:['good','В графике'],wait:['idle','Ещё не начали'],behind:['bad','! Отстаёте'],bad:['bad','! Ошибка в датах']};
+const INS_STATUS={done:['good','✓ Накоплено'],ok:['good','В графике'],wait:['idle','Ещё не начали'],behind:['bad','! Отстаёте'],bad:['bad','! Ошибка в датах'],paid:['good','✓ Оплачено']};
 function insStatus(r){ const [c,t]=INS_STATUS[r.status]; return `<span class="status ${c}">${t}${r.status==='behind'?' на '+fmt(r.planToDate-r.saved)+' ₽':''}</span>`; }
+const REPEAT_OPTS=[['12','Каждый год'],['6','Раз в полгода'],['3','Раз в квартал'],['1','Каждый месяц'],['0','Разово']];
+const repeatTxt=n=>(REPEAT_OPTS.find(o=>+o[0]===+n)||['','каждые '+n+' мес.'])[1].toLowerCase();
+// кнопка видна за месяц до платежа и после даты, пока не отметили
+const insDue=r=>!r.paidOnce&&!r.bad&&r.x.pay&&daysTo(r.x.pay)<=31;
+function insPaid(id){ const x=S.insurance.find(z=>z.id===id); if(!x||!x.pay) return;
+  const was={start:x.start,pay:x.pay,paid:x.paid}, rp=Math.round(numOr(x.repeat,12)), d=parseD(x.pay);
+  x.paid=x.pay;
+  if(rp>0){ x.start=dkey(new Date(d.getFullYear(),d.getMonth()+1,1)); x.pay=dkey(addMonthsKD(d,rp)); }
+  persist('insurance'); render();
+  const r=C.ins.find(z=>z.x===x);
+  toast(rp>0?'Оплачено. Следующий платёж '+dRu(x.pay)+(r?' — откладывать по '+rub(r.F)+' в месяц':''):'Отмечено: «'+x.name+'» оплачен',{label:'Отменить',fn:()=>{ Object.assign(x,was); persist('insurance'); render(); }}); }
 function viewReserves(){
   const giftT=C.gifts.reduce((s,r)=>s+r.res.reduce((a,b)=>a+b,0),0);
-  return `<section class="card"><div class="row-between"><h3>Страхование</h3><button class="btn small" data-act="add" data-kind="ins">+ Платёж</button></div>
-    <p class="hint">Отмечайте, сколько перевели на счёт страховки. Нажмите на строку, чтобы внести взносы.</p>
-    ${C.ins.length?C.ins.map(r=>`<button class="list-row" data-act="insOpen" data-id="${r.x.id}" style="display:block"><div class="row-between"><span class="fname"><b>${esc(r.x.name)}</b></span>${insStatus(r)}</div>
-      <div class="thermo"><i class="${r.status==='done'?'done':''}" style="width:${(r.pct*100).toFixed(1)}%"></i></div>
-      <div class="row-between fsub num"><span>отложено ${fmt(r.saved)} из ${rub(numOr(r.x.amount,0))}</span><span>осталось ${rub(r.left)}</span></div>
-      <div class="fsub">платёж ${dRu(r.x.pay)} · по плану ${rub(r.F)} в месяц</div></button>`).join(''):'<p class="hint">Пока пусто.</p>'}
+  return `<section class="card"><div class="row-between"><h3>Страхование${QH}</h3><button class="btn small" data-act="add" data-kind="ins">+ Платёж</button></div>
+    <p class="hint qtip" hidden>Крупные платежи, на которые копите заранее. Сумма делится на месяцы до даты платежа — столько откладывать каждый месяц. Отмечайте, сколько перевели: нажмите на строку. Заплатили — «Платёж совершён»: у регулярного платежа накопление начнётся заново к следующей дате.</p>
+    ${C.ins.length?C.ins.map(r=>`<div class="insrow"><button class="list-row" data-act="insOpen" data-id="${r.x.id}" style="display:block"><div class="row-between"><span class="fname"><b>${esc(r.x.name)}</b></span>${insStatus(r)}</div>
+      ${r.paidOnce?'':`<div class="thermo"><i class="${r.status==='done'?'done':''}" style="width:${(r.pct*100).toFixed(1)}%"></i></div>
+      <div class="row-between fsub num"><span>отложено ${fmt(r.saved)} из ${rub(numOr(r.x.amount,0))}</span><span>осталось ${rub(r.left)}</span></div>`}
+      <div class="fsub">${r.paidOnce?'оплачен '+dRu(r.x.paid):'платёж '+dRu(r.x.pay)+(r.x.pay?' · '+payWhen(r.x.pay):'')+' · по плану '+rub(r.F)+' в месяц'} · ${repeatTxt(r.rep)}</div></button>
+      ${insDue(r)?`<div class="actions" style="margin:4px 0 8px"><span class="sp"></span><button class="btn small primary" data-act="insPaid" data-id="${r.x.id}">Платёж совершён</button></div>`:''}</div>`).join(''):'<p class="hint">Пока пусто.</p>'}
   </section>
-  <section class="card"><div class="row-between"><h3>Подарки</h3><button class="btn small" data-act="add" data-kind="gift">+ Подарок</button></div>
-    <p class="hint">Сумма подарка ставится в месяц даты, каждый год. За весь период: <b class="num">${rub(giftT)}</b>.${C.al&&C.al.funds.some(f=>f.gifts)?` С ${monthTitle(C.al.start).toLowerCase()} подарки оплачиваются из фонда «${esc(C.al.funds.find(f=>f.gifts).name)}» — см. вкладку «Фонды».`:''}</p>
+  <section class="card"><div class="row-between"><h3>Подарки${QH}</h3><button class="btn small" data-act="add" data-kind="gift">+ Подарок</button></div>
+    <p class="hint qtip" hidden>Сумма подарка ставится в месяц даты, каждый год. За весь период: <b class="num">${rub(giftT)}</b>.${C.al&&C.al.funds.some(f=>f.gifts)?` С ${monthTitle(C.al.start).toLowerCase()} подарки оплачиваются из фонда «${esc(C.al.funds.find(f=>f.gifts).name)}» — см. вкладку «Фонды».`:''}</p>
     ${S.gifts.length?S.gifts.map((g,i)=>`<button class="list-row" data-act="edit" data-kind="gift" data-i="${i}"><div class="m"><div class="fname">${esc(g.name)}</div>
       <div class="fsub">${g.date?(+g.date.slice(8,10))+' '+MG[+g.date.slice(5,7)-1]:'дата не указана'}</div></div>
       <div class="a num">${g.amount==null||g.amount===''?'<span class="fsub">сумма не указана</span>':rub(g.amount)}</div></button>`).join(''):'<p class="hint">Пока пусто.</p>'}
@@ -2029,8 +2092,9 @@ function viewInsDetail(r){
   <div class="detail-title"><h2>${esc(x.name)}</h2><button class="btn small" data-act="edit" data-kind="ins" data-i="${i}">Изменить</button></div>
   <section class="card" data-live="insprog"><div class="row-between">${insStatus(r)}<b class="num">${pct(r.pct)}</b></div>
     <div class="thermo big"><i class="${r.status==='done'?'done':''}" style="width:${(r.pct*100).toFixed(1)}%"></i></div>
+    ${r.paidOnce?`<p class="hint" style="margin:8px 0 0">Оплачен ${dRu(x.paid)}. Платёж разовый — больше откладывать не нужно.</p>`:`<div class="actions" style="margin:10px 0 0"><span class="fsub">${repeatTxt(r.rep)}${x.paid?' · прошлый платёж '+dRu(x.paid):''}</span><span class="sp"></span><button class="btn small ${insDue(r)?'primary':''}" data-act="insPaid" data-id="${x.id}">Платёж совершён</button></div>`}
     <div class="kpis" style="margin:10px 0 0">${kpi('Отложено',r.saved)}${kpi('Осталось',r.left,'к '+dRu(x.pay))}${kpi('По плану',r.F,'в месяц, '+r.E+' мес.')}${kpi('Нужно теперь',r.need,r.leftMonths?'в месяц, '+r.leftMonths+' мес. до платежа':'срок платежа наступил')}</div></section>
-  ${r.sched.length?`<section class="card"><h3>Взносы по месяцам</h3><p class="hint">Сколько реально перевели. Пустой месяц в балансе считается по плану.</p>
+  ${r.sched.length?`<section class="card"><h3>Взносы по месяцам${QH}</h3><p class="hint qtip" hidden>Сколько реально перевели. Пустой месяц в балансе считается по плану.</p>
     <table class="gtbl num"><thead><tr><th>Месяц</th><th>План</th><th>Перевёл</th><th>Отложено</th></tr></thead><tbody>
     ${r.sched.map((m,k)=>{ const key=mKey(m), f=S.insFacts.find(z=>z.ins===x.id&&z.month===key); cum+=r.fm[key]||0;
       return `<tr class="${m===C.curM?'cur':''}"><td>${monthShort(m)}</td><td>${fmt(r.F)}</td><td><input data-insf="${x.id}|${key}" value="${esc(f?f.value:'')}" inputmode="decimal" enterkeyhint="done" placeholder="—" aria-label="Перевёл за ${monthShort(m)}"></td><td data-live="insc${k}">${fmt(cum)}</td></tr>`; }).join('')}
@@ -2134,6 +2198,84 @@ const r2=v=>Math.round(v*100)/100;
 const posSub=r=>r.ex?`${fmtQ(r.qty)} шт.${r.quote&&r.quote.price!=null?' × '+fmtP(r.quote.price)+' '+chgHtml(r.quote.chg):''} · средняя ${fmtP(r.avg)}${r.quote&&r.quote.price!=null?'':' · цена не загружена'}${r.p.market==='bonds'&&!r.closed&&ytmShort(r.quote)?' · '+ytmShort(r.quote):''}`
   :`внесено ${fmt(r.invested)} · стоит ${fmt(r.valueNow)}${r.valueManual||r.closed?'':' (оценка)'}${numOr(r.p.rate,0)?' · '+String(r.p.rate).replace('.',',')+'%':''}`;
 
+/* ---- Подбор облигаций: весь список Мосбиржи (ОФЗ и муниципальные — TQOB/TQCB, корпоративные — TQCB), обновление раз в час ---- */
+let BL=null, blBusy=false, blErr='';
+UI.bf={rel:'l1',ymin:'',ymax:'',term:'any',cpn:'any',rub:true,sort:'ytm',q:'',n:40};
+const BF_REL=[['gov','Только ОФЗ и муниципальные'],['l1','+ 1-й уровень листинга'],['l2','+ 2-й уровень'],['all','Все, включая 3-й уровень']];
+const BF_TERM=[['any','Любой'],['1','до 1 года'],['3','1–3 года'],['5','3–5 лет'],['5+','больше 5 лет']];
+const BF_CPN=[['any','Любой'],['fix','Постоянный'],['float','Плавающий (флоатер)']];
+const BF_SORT=[['ytm','Доходность — больше'],['term','Срок — короче'],['val','Оборот за день — больше']];
+async function loadBonds(force){
+  if(blBusy||(!force&&BL&&Date.now()-BL.t<36e5)) return;
+  blBusy=true; blErr=''; if(UI.detail&&UI.detail.kind==='bonds') render();
+  try{ const out=[], today=todayK();
+    for(const bd of ['TQOB','TQCB']){
+      const j=await iss(`engines/stock/markets/bonds/boards/${bd}/securities.json?iss.only=securities,marketdata&securities.columns=SECID,SHORTNAME,MATDATE,OFFERDATE,COUPONPERIOD,COUPONPERCENT,COUPONVALUE,NEXTCOUPON,ACCRUEDINT,PREVPRICE,FACEVALUE,FACEUNIT,LISTLEVEL,BONDTYPE,BONDSUBTYPE,SECTYPE,LOTSIZE,YIELDATPREVWAPRICE&marketdata.columns=SECID,LAST,WAPRICE,YIELD,VALTODAY`);
+      const md={}; issTbl(j,'marketdata').forEach(r=>{ md[r.SECID]=r; });
+      issTbl(j,'securities').forEach(s=>{ const m=md[s.SECID]||{}, type=String(s.BONDTYPE||''), sub=String(s.BONDSUBTYPE||'');
+        const ytm=[m.YIELD,s.YIELDATPREVWAPRICE].map(v=>numOr(v,null)).find(v=>v!=null&&v>0), mat=okD(s.MATDATE), offer=okD(s.OFFERDATE);
+        if(ytm==null||/Структурн|Конвертир/i.test(type)||/Бессрочн/i.test(sub)||!mat||mat<=today) return;
+        out.push({secid:String(s.SECID),board:bd,name:s.SHORTNAME||s.SECID,mat,offer:offer>today?offer:'',per:numOr(s.COUPONPERIOD,0),cp:numOr(s.COUPONPERCENT,null),cv:numOr(s.COUPONVALUE,null),
+          next:okD(s.NEXTCOUPON),nkd:numOr(s.ACCRUEDINT,0),price:[m.LAST,m.WAPRICE,s.PREVPRICE].map(v=>numOr(v,null)).find(v=>v!=null&&v>0)||null,face:numOr(s.FACEVALUE,0),
+          cur:String(s.FACEUNIT||'SUR').toUpperCase(),lvl:numOr(s.LISTLEVEL,3),st:String(s.SECTYPE||''),float:/плавающ/i.test(type),amort:/Амортиз/i.test(type),put:/оферт/i.test(sub),ytm,val:numOr(m.VALTODAY,0)}); }); }
+    const seen=new Set(), list=out.filter(x=>!seen.has(x.secid)&&seen.add(x.secid));
+    const ofz=list.filter(x=>x.st==='3').map(x=>x.ytm).sort((a,b)=>a-b);
+    BL={t:Date.now(),list,ofz:ofz.length?ofz[Math.floor(ofz.length/2)]:null}; }
+  catch(e){ blErr='Биржа не отвечает — попробуйте позже'; }
+  blBusy=false; if(UI.detail&&UI.detail.kind==='bonds') render();
+}
+const bondGov=x=>x.st==='3'||x.st==='4';
+const bondEnd=x=>x.offer||x.mat;
+const bondRisky=x=>BL&&BL.ofz!=null&&!bondGov(x)&&x.ytm-BL.ofz>=8;
+const cpnFreq=d=>{ if(!(d>0)) return ''; const n=Math.round(365/d); return n>=12?'ежемесячно':n===1?'раз в год':n+' '+plural(n,'раз','раза','раз')+' в год'; };
+function bondFilter(){ const f=UI.bf, y0=numOr(evalExpr(f.ymin),null), y1=numOr(evalExpr(f.ymax),null), q=pkey(f.q);
+  const yrs=x=>daysTo(bondEnd(x))/365.25;
+  let l=BL.list.filter(x=>{
+    if(f.rel==='gov'&&!bondGov(x)) return false;
+    if(f.rel==='l1'&&!bondGov(x)&&x.lvl>1) return false;
+    if(f.rel==='l2'&&!bondGov(x)&&x.lvl>2) return false;
+    if(f.rub&&x.cur!=='SUR') return false;
+    if(f.cpn==='fix'&&x.float) return false; if(f.cpn==='float'&&!x.float) return false;
+    if(y0!=null&&x.ytm<y0) return false; if(y1!=null&&x.ytm>y1) return false;
+    const t=yrs(x); if(f.term==='1'&&t>1) return false; if(f.term==='3'&&(t<=1||t>3)) return false; if(f.term==='5'&&(t<=3||t>5)) return false; if(f.term==='5+'&&t<=5) return false;
+    if(q&&!pkey(x.name).includes(q)&&!x.secid.toLowerCase().includes(q)) return false;
+    return true; });
+  l.sort(f.sort==='term'?(a,b)=>bondEnd(a).localeCompare(bondEnd(b)):f.sort==='val'?(a,b)=>b.val-a.val:(a,b)=>b.ytm-a.ytm);
+  return l; }
+function bondRow(x){ const own=S.invPositions.some(p=>p.secid===x.secid), wish=S.invWish.some(w=>w.secid===x.secid);
+  const tags=[bondGov(x)?(x.st==='3'?'ОФЗ':'муниципальная'):x.lvl+'-й уровень',x.float?'флоатер':'',x.amort?'амортизация':'',x.cur!=='SUR'?'номинал в '+x.cur:'',own?'есть в портфеле':wish?'в «Хочу купить»':''].filter(Boolean);
+  const nk=x.cur==='SUR'?fmtP(x.nkd):NF2.format(x.nkd)+' '+x.cur;
+  return `<button class="list-row" data-act="bondPick" data-id="${esc(x.secid)}" style="display:block"><div class="row-between" style="align-items:flex-start;gap:10px">
+    <div style="min-width:0"><div class="fname"><b>${esc(x.name)}</b></div><div class="fsub">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(' ')}${bondRisky(x)?' <span class="tag" style="color:var(--critical)">высокий риск</span>':''}</div></div>
+    <div class="bond-y num"><b>${NF2.format(x.ytm)}%</b><div class="fsub">${x.offer?'к оферте':'к погашению'}</div></div></div>
+    <div class="fsub num">цена ${x.price?NF2.format(x.price)+'%':'—'} · купон ${x.cp!=null?NF2.format(x.cp)+'%':x.float?'плавающий':'—'}${x.per?' ('+cpnFreq(x.per)+')':''} · НКД ${nk}</div>
+    <div class="fsub num">погашение ${dRu(x.mat)} (${payWhen(x.mat)})${x.offer?' · оферта '+dRu(x.offer)+' ('+payWhen(x.offer)+')':''}${x.next?' · купон '+dRu(x.next):''}</div></button>`; }
+function viewBonds(){
+  if(!BL&&!blBusy&&!blErr) setTimeout(()=>loadBonds(),0);
+  const f=UI.bf, sel=(k,o)=>`<select data-bf="${k}">${o.map(([v,l])=>`<option value="${v}" ${String(f[k])===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  let body;
+  if(!BL) body=blErr?`<p class="hint neg">${esc(blErr)}</p><button class="btn small" data-act="bondsReload">Повторить</button>`:'<p class="hint">Загружаю облигации с Мосбиржи…</p>';
+  else { const l=bondFilter(), shown=l.slice(0,f.n);
+    body=`<div class="row-between" style="margin:0 0 6px"><span class="fsub">Найдено ${l.length} из ${BL.list.length}${BL.ofz!=null?' · ОФЗ в среднем '+NF2.format(BL.ofz)+'%':''}</span><button class="btn small" data-act="bondsReload" ${blBusy?'disabled':''}>${blBusy?'Обновляю…':'Обновить'}</button></div>
+      ${shown.map(bondRow).join('')||'<p class="hint">Под фильтры ничего не подходит — ослабьте условия.</p>'}
+      ${l.length>shown.length?`<button class="more" data-act="bondMore">Показать ещё (${l.length-shown.length})</button>`:''}`; }
+  return `<button class="back" data-act="back">‹ Инвестиции</button>
+  <div class="detail-title"><h2>Подбор облигаций</h2></div>
+  <section class="card"><div class="bf">
+    <div class="field" style="grid-column:1/-1"><label>Надёжность</label>${sel('rel',BF_REL)}</div>
+    <div class="field"><label>Доходность от, %</label><input class="num" data-bf="ymin" inputmode="decimal" value="${esc(f.ymin)}" placeholder="—"></div>
+    <div class="field"><label>до, %</label><input class="num" data-bf="ymax" inputmode="decimal" value="${esc(f.ymax)}" placeholder="—"></div>
+    <div class="field"><label>Срок (до погашения или оферты)</label>${sel('term',BF_TERM)}</div>
+    <div class="field"><label>Купон</label>${sel('cpn',BF_CPN)}</div>
+    <div class="field"><label>Сортировка</label>${sel('sort',BF_SORT)}</div>
+    <div class="field"><label>Название или код</label><input data-bf="q" value="${esc(f.q)}" placeholder="ОФЗ, Сбер…" autocomplete="off"></div>
+    <label class="chk" style="grid-column:1/-1"><input type="checkbox" data-bf="rub" ${f.rub?'checked':''}><span>Только с номиналом в рублях</span></label></div></section>
+  <section class="card">${body}</section>
+  <p class="hint">Рейтингов эмитентов на бирже нет — надёжность здесь по типу эмитента и уровню листинга. Перед покупкой проверьте рейтинг (АКРА, Эксперт РА).</p>`;
+}
+document.addEventListener('change',e=>{ const el=e.target; if(!el.dataset||el.dataset.bf==null||!UI.bf) return;
+  UI.bf[el.dataset.bf]=el.type==='checkbox'?el.checked:el.value; UI.bf.n=40; render(); });
+
 /* поиск бумаги и добавление: «У меня есть» (количество и средняя цена) или «Хочу купить» (лоты) */
 function openSecSearch(mode){ UI.sec={mode:mode||'own',res:[],q:'',busy:false,err:''}; UI.secPre=null; drawSecSearch(); }
 function drawSecSearch(){ const s=UI.sec;
@@ -2185,7 +2327,7 @@ function drawSecAdd(){
       ${have?'':gsel+'<label class="chk"><input type="checkbox" id="saLong"><span>Долгосрочная — показывать на вкладке «Долгосрочные»</span></label>'}`;
   openSheet(`<h2>${esc(r.name)} <span class="tag">${esc(r.kind)}</span></h2><p class="hint" style="margin-top:-4px">${esc(r.secid)}</p>${price}
     <form class="form" onsubmit="return false">${body}</form>
-    <div class="actions">${s.fromWish?'':'<button class="btn" data-act="secBack">‹ Назад</button>'}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="secSave">${mode==='wish'?'В список':'Сохранить'}</button></div>`);
+    <div class="actions">${s.fromWish||s.fromBonds?'':'<button class="btn" data-act="secBack">‹ Назад</button>'}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="secSave">${mode==='wish'?'В список':'Сохранить'}</button></div>`);
 }
 function secSave(){
   const r=UI.secRec, s=UI.sec; if(!r||!s) return; const v=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
@@ -2330,7 +2472,7 @@ function ytmHtml(q){ const y=bondYield(q); if(!y) return '';
     <div class="ro"><span class="fsub">· ${y.grow>=0?'рост цены до номинала':'цена выше номинала — потеря при погашении'}</span><span class="num ${y.grow<0?'neg':''}">${y.grow>=0?'+':''}${pctY(y.grow)}</span></div>
     <div class="ro"><span class="fsub">Текущая купонная доходность (купоны за год ÷ цена)</span><span class="num">${pctY(y.curY)}</span></div>
     <p class="hint" style="margin:4px 0 8px">Если купить сейчас по ${fmtP(q.price)} + НКД ${fmtP(q.nkd||0)} и держать до ${dRu(y.end)} (${durText(Math.max(1,Math.round(y.years*12)))}). До налога 13%, без комиссий.${y.est?' Будущие купоны ещё не объявлены — взяты по текущему.':''}</p>`; }
-const freeWhen=d=>{ const n=daysTo(d); return n<=0?'сегодня':n===1?'завтра':'через '+n+' '+plural(n,'день','дня','дней'); };
+const freeWhen=d=>daysTo(d)<=0?'сегодня':payWhen(d);
 function freeHtml(){
   const L=freeList(); if(!L.length) return '';
   const sumIn=n=>L.filter(x=>x.kind!=='offer'&&daysTo(x.d)<=n).reduce((s,x)=>s+x.amt,0), rows=UI.freeAll?L:L.slice(0,6);
@@ -2351,15 +2493,16 @@ function viewInvest(){
   const growth=`<span class="${cls}">${inv?(gain>=0?'+':'−')+pctD(Math.abs(gain)/inv):'—'}</span>`;
   const gsub=`<span class="${cls}">${gain>=0?'+':'−'}${fmt(Math.abs(gain))} ₽</span>${Math.round(day)?` · за день <span class="${day>0?'pos':'neg'}">${day>0?'+':'−'}${fmt(Math.abs(day))} ₽</span>`:''}`;
   return `${qBar()}<div class="kpis">${kpi('Стоит сейчас',val,'внесено '+fmt(inv)+' ₽')}${kpiT('Прирост портфеля',growth,gsub)}${kpi('Пришло дохода',rec,'купоны, проценты, дивиденды')}${kpi('Ожидаемый доход',mon,'в месяц: купоны, дивиденды, ставки')}</div>
+  <button class="list-row" data-act="bondsOpen" style="margin-bottom:12px"><div class="m"><div class="fname"><b>Подбор облигаций</b></div><div class="fsub">Все облигации Мосбиржи: доходность к погашению, купон, оферта, НКД — с фильтрами</div></div>${CHEV}</button>
   ${freeHtml()}
   ${divHtml(open.filter(r=>r.valueNow>0))}
-  <section class="card"><div class="row-between"><h3>Группы</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invGroup">+ Группа</button></div></div>
-    <p class="hint">Внутри группы — позиции. У каждой позиции: пополнения, стоимость сейчас и доход по месяцам.</p>
+  <section class="card"><div class="row-between"><h3>Группы${QH}</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invGroup">+ Группа</button></div></div>
+    <p class="hint qtip" hidden>Внутри группы — позиции. У каждой позиции: пополнения, стоимость сейчас и доход по месяцам.</p>
     ${C.groups.length?C.groups.map(g=>`<button class="list-row" data-act="invOpen" data-id="${g.g.id}"><div class="m"><div class="fname"><b>${esc(g.g.name)}</b> <span class="tag">${esc(g.g.kind)}</span></div>
       <div class="fsub num">${g.pos.length} поз. · внесено ${fmt(g.invested)} · стоит ${fmt(g.value)}</div></div>
       <div class="a num">${resHtml(g.value-g.invested,g.invested,true)}</div>${CHEV}</button>`).join(''):'<p class="hint">Пока пусто.</p>'}</section>
   ${wishHtml()}
-  <p class="hint">«Стоит сейчас»: у бумаг с биржи — количество × текущая цена (НКД облигаций не входит), у остальных — вписанная вами стоимость или оценка (внесено, при капитализации — с ростом по ставке). Прирост — стоимость против внесённого, без полученных купонов и дивидендов. Доход в балансе: где введён факт — по факту, иначе ожидаемый по ставке. Внесённые суммы идут в «Сбережения», а не в доход.</p>`;
+`;
 }
 function viewInvDetail(G){
   const g=G.g, gi=S.invGroups.indexOf(g), m=selMonth(), j=C.months.indexOf(m), lab=KIND_INCOME[g.kind]||'Доход';
@@ -2367,8 +2510,8 @@ function viewInvDetail(G){
   return `<button class="back" data-act="back">‹ Инвестиции</button>
   <div class="detail-title"><h2>${esc(g.name)} <span class="tag">${esc(g.kind)}</span></h2><button class="btn small" data-act="edit" data-kind="invGroup" data-i="${gi}">Изменить</button></div>
   <div class="kpis" data-live="invk">${kpi('Внесено',G.invested)}${kpi('Стоит сейчас',G.value,resHtml(G.value-G.invested,G.invested))}${kpi('Пришло всего',G.received,lab.toLowerCase())}${kpi('Ожидается в месяц',G.mon,'по ставкам')}</div>
-  <section class="card"><div class="row-between"><h3>Позиции</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invPos">+ Вручную</button></div></div>
-    <p class="hint">Нажмите на позицию: пополнения, стоимость сейчас, доход по месяцам.</p>
+  <section class="card"><div class="row-between"><h3>Позиции${QH}</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invPos">+ Вручную</button></div></div>
+    <p class="hint qtip" hidden>Нажмите на позицию: пополнения, стоимость сейчас, доход по месяцам.</p>
     ${G.pos.length?G.pos.map(r=>`<button class="list-row" data-act="posOpen" data-id="${r.p.id}"><div class="m"><div class="fname">${esc(r.p.name||'Без названия')}${r.p.long?' <span class="tag">долгоср.</span>':''}${r.closed?' <span class="tag">закрыта</span>':''}</div>
       <div class="fsub num">${posSub(r)}</div></div>
       <div class="a num">${resHtml(r.result,r.invested,true)}</div>${CHEV}</button>`).join(''):'<p class="hint">Добавьте первую позицию — например, облигацию на 10 000 ₽ под 15%.</p>'}</section>
@@ -2390,7 +2533,7 @@ function viewPos(r){
     ${p.long?' <span class="tag">долгосрочная</span>':''}${p.reinvest?' <span class="tag">капитализация</span>':''}${p.flow?' <span class="tag">из бюджета</span>':''}${r.closed?' <span class="tag">закрыта</span>':''}</p>
   <div class="kpis" data-live="posk">${kpi('Внесено',r.invested,r.contribs.filter(x=>x.m<=C.curM).length+' пополн.')}${kpi('Стоит сейчас',r.valueNow,valSub)}
     ${kpiT('Результат',resHtml(r.result,r.invested),'стоимость − внесено')}${kpi('Доход получен',r.received,lab.toLowerCase())}</div>
-  <section class="card"><h3>Стоимость сейчас</h3><p class="hint">Сколько позиция стоит сегодня — из приложения брокера или банка. Пусто — ${p.reinvest&&rate?'оценка по ставке':'считается равной внесённому'}.</p>
+  <section class="card"><h3>Стоимость сейчас${QH}</h3><p class="hint qtip" hidden>Сколько позиция стоит сегодня — из приложения брокера или банка. Пусто — ${p.reinvest&&rate?'оценка по ставке':'считается равной внесённому'}.</p>
     <div class="row-between"><div class="finput"><input class="num" data-posval="${p.id}" value="${esc(p.value??'')}" placeholder="${fmt(r.est)}" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Стоимость сейчас" style="width:160px"></div>
     <span class="fsub" data-live="posvd">${r.valueManual&&p.valueDate?'обновлено '+dRu(p.valueDate):''}</span></div></section>`;
   if(p.long||p.end){
@@ -2431,7 +2574,7 @@ function pdsHtml(r){
 function posMonths(r,lab){
   const p=r.p;
   const rows=C.months.map((m,j)=>({m,j})).filter(({m,j})=>r.plan[j]>0||r.fact[j]!=null||(m<=C.curM&&(!p.start||m>=mIdx(p.start))));
-  return `<section class="card"><h3>${lab} по месяцам</h3><p class="hint">${p.reinvest?'При капитализации доход остаётся внутри и в бюджет не идёт. Если что-то всё же выплатили — впишите.':(r.ex?(p.market==='bonds'?'Пусто — в балансе купон по графику биржи.':'Пусто — в балансе ожидаемый дивиденд, если он указан.'):'Пусто — в балансе ожидаемый доход по ставке.')+' Ничего не пришло — впишите 0.'}</p>
+  return `<section class="card"><h3>${lab} по месяцам${QH}</h3><p class="hint qtip" hidden>${p.reinvest?'При капитализации доход остаётся внутри и в бюджет не идёт. Если что-то всё же выплатили — впишите.':(r.ex?(p.market==='bonds'?'Пусто — в балансе купон по графику биржи.':'Пусто — в балансе ожидаемый дивиденд, если он указан.'):'Пусто — в балансе ожидаемый доход по ставке.')+' Ничего не пришло — впишите 0.'}</p>
     ${rows.length?`<table class="gtbl num"><thead><tr><th>Месяц</th><th>Ожидалось</th><th>Пришло</th></tr></thead><tbody>${rows.map(({m,j})=>{ const key=p.id+'|'+C.keys[j], f=S.invFacts.find(z=>z.pos===p.id&&z.month===C.keys[j]);
       return `<tr class="${m===C.curM?'cur':''}"><td>${monthShort(m)}</td><td>${fmt(r.plan[j])}</td><td><input data-ifact="${key}" value="${esc(f?f.value:'')}" inputmode="decimal" enterkeyhint="done" placeholder="—" aria-label="${lab} за ${monthShort(m)}"></td></tr>`; }).join('')}</tbody></table>`:'<p class="hint">В периоде плана месяцев с доходом нет.</p>'}</section>`;
 }
@@ -2441,15 +2584,15 @@ function viewLong(){
   if(!L.length) return `<section class="card empty"><h3>Долгосрочных вложений пока нет</h3><p>Отметьте позицию как долгосрочную в «Инвестициях» или добавьте новую: ПДС, ИИС, длинные облигации, вклад на годы.</p>${add}</section>`;
   const inv=tot(L,'invested'), val=tot(L,'valueNow'), endT=L.reduce((s,r)=>s+(r.proj?r.proj.total:0),0), inc=L.reduce((s,r)=>s+(r.proj?r.proj.income:0),0);
   return `<div class="kpis">${kpi('Внесено',inv)}${kpi('Стоит сейчас',val,resHtml(val-inv,inv))}${kpi('Будет к погашению',endT,'по всем позициям')}${kpi('Доход за весь срок',inc,'ожидаемый')}</div>
-  <section class="card"><div class="row-between"><h3>Вложения</h3>${add.replace('btn primary','btn small primary')}</div>
-    <p class="hint">Нажмите, чтобы внести пополнение, обновить стоимость или посмотреть расчёт к погашению.</p>
+  <section class="card"><div class="row-between"><h3>Вложения${QH}</h3>${add.replace('btn primary','btn small primary')}</div>
+    <p class="hint qtip" hidden>Нажмите, чтобы внести пополнение, обновить стоимость или посмотреть расчёт к погашению.</p>
     ${L.map(r=>{ const p=r.p, G=C.groups.find(g=>g.g.id===p.group);
       return `<button class="list-row" data-act="posOpen" data-id="${p.id}" data-back="long" style="display:block">
         <div class="row-between"><span class="fname" style="min-width:0"><b>${esc(p.name||'Без названия')}</b>${G?' <span class="tag">'+esc(G.g.kind)+'</span>':''}</span><span class="num" style="white-space:nowrap">${resHtml(r.result,r.invested)}</span></div>
         ${r.progress!=null?`<div class="thermo" style="height:8px;margin:7px 0 5px"><i style="width:${(r.progress*100).toFixed(1)}%"></i></div>`:''}
         <div class="fsub num">внесено ${fmt(r.invested)} · стоит ${fmt(r.valueNow)} · ${contribText(p)}</div>
         <div class="fsub num">${p.end?'погашение '+dRu(p.end)+' · '+(r.monthsLeft>0?'через '+durText(r.monthsLeft):'срок наступил'):'дата погашения не указана'}${r.proj?' · к погашению ≈ '+rub(r.proj.total)+', доход ≈ '+rub(r.proj.income):''}</div></button>`; }).join('')}</section>
-  <p class="hint">Расчёт к погашению: от сегодняшней стоимости, с плановыми пополнениями и доплатой государства. При капитализации доход каждый месяц добавляется к сумме, иначе выплачивается. Ставка — ваша оценка.</p>`;
+`;
 }
 
 /* ---- Цель ---- */
@@ -2457,7 +2600,7 @@ function viewGoal(){
   const g=C.goal, G=S.goal, cur=C.curM;
   const leftMonths=g.rows.filter(r=>mIdx(r.key)>=cur).length;
   const need=leftMonths?g.left/leftMonths:g.left;
-  return `<section class="card"><h3>Параметры цели</h3><p class="hint">Изменения сохраняются сразу.</p>
+  return `<section class="card"><h3>Параметры цели${QH}</h3><p class="hint qtip" hidden>Изменения сохраняются сразу.</p>
     <div class="form"><div class="field"><label>Название</label><input data-path="goal.name" value="${esc(G.name)}"></div>
     <div class="grid2"><div class="field"><label>Целевая сумма, ₽</label><input class="num" data-path="goal.target" data-type="n" inputmode="decimal" value="${esc(G.target)}"></div>
     <div class="field"><label>Целевая дата</label><input type="date" data-path="goal.date" data-full="1" value="${esc(G.date)}"></div></div>
@@ -2465,7 +2608,7 @@ function viewGoal(){
   <section class="card" data-live="gprog"><div class="row-between"><h3>${esc(G.name||'Цель')}</h3><b class="num">${pct(g.pct)}</b></div>
     <div class="thermo big"><i style="width:${(g.pct*100).toFixed(1)}%"></i></div>
     <div class="kpis" style="margin:10px 0 0">${kpi('Накоплено',g.saved)}${kpi('Осталось',g.left)}${kpi('Плановый темп',g.pace,'в месяц, равномерно')}${kpi('Нужно теперь',need,leftMonths?'в месяц, '+leftMonths+' мес. до цели':'срок прошёл')}</div></section>
-  ${g.n?`<section class="card"><h3>По месяцам</h3><p class="hint">Вводите, сколько реально отложили.</p>
+  ${g.n?`<section class="card"><h3>По месяцам${QH}</h3><p class="hint qtip" hidden>Вводите, сколько реально отложили.</p>
     <table class="gtbl num"><thead><tr><th>Месяц</th><th>План</th><th>Факт</th><th>Накоплено</th><th>%</th></tr></thead><tbody>
     ${g.rows.map((r,k)=>{ const f=S.goalFacts.find(x=>x.month===r.key);
       return `<tr class="${mIdx(r.key)===cur?'cur':''}"><td>${monthShort(mIdx(r.key))}</td><td>${fmt(r.plan)}</td><td><input data-gfact="${r.key}" value="${esc(f?f.value:'')}" inputmode="decimal" enterkeyhint="done" aria-label="Факт за ${monthShort(mIdx(r.key))}"></td><td data-live="gc${k}">${fmt(r.cum)}</td><td data-live="gp${k}">${pct(r.pct)}</td></tr>`; }).join('')}
@@ -2520,9 +2663,9 @@ function habitsStats(){
   const bestNow=S.habits.reduce((b,h)=>(!b||HS[h.id].cur>HS[b.id].cur)?h:b,null);
   const ranked=S.habits.slice().sort((a,b)=>(HS[b.id].d30.pct??-1)-(HS[a.id].d30.pct??-1));
   return `<div class="kpis">${kpiT('Сегодня',doneN+' из '+due.length)}${kpiT('За 7 дней',pct(agg('d7')))}${kpiT('За 30 дней',pct(agg('d30')))}${kpiT('Лучшая серия сейчас',bestNow?HS[bestNow.id].cur+' дн.':'—',bestNow?esc(bestNow.name):'')}</div>
-  <section class="card"><h3>Выполнение по дням</h3><p class="hint">Доля сделанных из запланированных на день, последние 30 дней.</p><div class="chart" data-chart="hday"></div>
+  <section class="card"><h3>Выполнение по дням${QH}</h3><p class="hint qtip" hidden>Доля сделанных из запланированных на день, последние 30 дней.</p><div class="chart" data-chart="hday"></div>
     <div class="legend" style="margin-top:8px"><span><i style="--c:var(--good)"></i>всё выполнено</span><span><i style="--c:var(--serious)"></i>не всё</span></div></section>
-  <section class="card"><h3>По привычкам</h3><p class="hint">За 30 дней. Нажмите, чтобы открыть статистику привычки.</p>
+  <section class="card"><h3>По привычкам${QH}</h3><p class="hint qtip" hidden>За 30 дней. Нажмите, чтобы открыть статистику привычки.</p>
     ${ranked.map(h=>{ const st=HS[h.id]; return `<button class="pbar" data-act="habit" data-id="${h.id}"><div class="m"><div class="row-between"><span class="fname">${esc(h.name)}</span><b class="num">${pct(st.d30.pct)}</b></div>
       <div class="thermo"><i style="width:${((st.d30.pct||0)*100).toFixed(1)}%"></i></div><div class="fsub">${st.d30.c} из ${st.d30.s} · серия ${st.cur}, лучшая ${st.best}</div></div>${CHEV}</button>`; }).join('')}
   </section>`;
@@ -2542,7 +2685,7 @@ function viewHabit(h){
   <p class="hint" style="margin-top:-6px">${daysText(h.days)} · с ${st.created.getDate()} ${MG[st.created.getMonth()]} ${st.created.getFullYear()}</p>
   <div class="kpis">${kpiT('Текущая серия',st.cur+' дн.')}${kpiT('Лучшая серия',st.best+' дн.')}${kpiT('За 30 дней',pct(st.d30.pct),st.d30.c+' из '+st.d30.s)}${kpiT('Всего выполнено',String(st.total)+' дн.','выполнение '+pct(st.all.pct))}
     ${h.type==='count'?kpiT('В среднем',vals.length?fmtN(vals.reduce((a,b)=>a+b,0)/vals.length)+' '+esc(h.unit||''):'—','за день с записью, цель '+fmtN(h.target)):''}${h.type==='count'?kpiT('Перевыполнено',String(vals.filter(v=>v>habitTarget(h)).length)+' дн.','больше цели'):''}</div>
-  <section class="card"><h3>По неделям</h3><p class="hint">Доля выполненных дней за неделю, последние 12 недель.</p><div class="chart" data-chart="hweek"></div>
+  <section class="card"><h3>По неделям${QH}</h3><p class="hint qtip" hidden>Доля выполненных дней за неделю, последние 12 недель.</p><div class="chart" data-chart="hweek"></div>
     <div class="legend" style="margin-top:8px"><span><i style="--c:var(--good)"></i>неделя без пропусков</span><span><i style="--c:var(--serious)"></i>были пропуски</span></div></section>
   <section class="card"><div class="monthbar" style="margin-bottom:8px"><button class="nav-btn" data-act="hcal" data-d="-1" aria-label="Предыдущий месяц">‹</button><div class="t"><b>${monthTitle(cm)}</b></div><button class="nav-btn" data-act="hcal" data-d="1" ${cm>=todayM?'disabled':''} aria-label="Следующий месяц">›</button></div>
     <div class="cal">${WD.map(w=>`<span class="wd">${w}</span>`).join('')}${cells.join('')}</div><p class="hint" style="margin:8px 0 0">Нажмите на день, чтобы отметить или снять отметку.</p></section>`;
@@ -2551,7 +2694,6 @@ function viewHabit(h){
 /* ======== общее для новых разделов ======== */
 const todayK=()=>dkey(TODAY());
 const WDS=['вс','пн','вт','ср','чт','пт','сб'];
-const daysTo=k=>Math.round((parseD(k)-TODAY())/864e5);
 function dayLabel(k){
   if(!k) return 'Без срока';
   const d=parseD(k), t=TODAY(), n=daysTo(k);
@@ -2925,10 +3067,10 @@ function viewGoalPage(g){
   ${smartCard(g,i)}
   <section class="card" data-live="gprog"><div class="row-between"><h3>Прогресс</h3><b class="num">${pct(p.pct)}</b></div><div class="thermo big"><i class="${g.status==='done'?'done':''}" style="width:${(p.pct*100).toFixed(1)}%"></i></div><div class="hint" style="margin:0">${p.text}</div></section>
   ${numOr(g.target,0)>0?`<section class="card"><div class="row-between"><span>Сейчас${g.unit?', '+esc(g.unit):''}</span><div class="finput"><input class="num" data-path="goals.${i}.current" data-type="n" inputmode="decimal" value="${esc(g.current??'')}" enterkeyhint="done" aria-label="Текущее значение"></div></div></section>`:''}
-  <section class="card"><h3>Шаги</h3><p class="hint">Разбейте цель на конкретные шаги.</p>
+  <section class="card"><h3>Шаги${QH}</h3><p class="hint qtip" hidden>Разбейте цель на конкретные шаги.</p>
     ${steps.map(s=>`<div class="trow ${s.done?'done':''}"><button class="tcheck" data-act="stepToggle" data-id="${s.id}" aria-pressed="${!!s.done}" aria-label="Шаг: ${esc(s.name)}">${s.done?'✓':''}</button><div class="tmain"><div class="fname">${esc(s.name)}</div></div><button class="xbtn" data-act="stepDel" data-id="${s.id}" aria-label="Удалить шаг">×</button></div>`).join('')}
     <div class="qa-row" style="margin-top:8px"><input class="inline-in" id="stepTitle" placeholder="Новый шаг…" enterkeyhint="done" autocomplete="off" aria-label="Новый шаг"><button class="btn" data-act="stepAdd" data-id="${g.id}">Добавить</button></div></section>
-  <section class="card"><h3>Задачи по цели</h3><p class="hint">Видны и в разделе «Задачи».</p>${tasks.map(taskRow).join('')}
+  <section class="card"><h3>Задачи по цели${QH}</h3><p class="hint qtip" hidden>Видны и в разделе «Задачи».</p>${tasks.map(taskRow).join('')}
     <div class="qa-row" style="margin-top:8px"><input class="inline-in" id="gtTitle" placeholder="Новая задача…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача по цели"><button class="btn" data-act="goalTaskAdd" data-id="${g.id}">Добавить</button></div></section>
   <div class="actions">${g.status==='done'?`<button class="btn" data-act="goalStatus" data-id="${g.id}" data-v="active">Вернуть в активные</button>`:`<button class="btn primary" data-act="goalStatus" data-id="${g.id}" data-v="done">✓ Цель достигнута</button>`}</div>`;
 }
@@ -3112,6 +3254,14 @@ function planRecipe(r){
   t.checklist=ings.map(gi=>({id:uid(),text:gi.name+(gi.qty?' — '+gi.qty:''),done:false,k:pkey(gi.name)}));
   syncShop(); persist('recipes','tasks','projects','pantry'); return true;
 }
+// приготовили: из наличия уходит столько, сколько в рецепте (бекона было 4 шт, в рецепте 2 — останется 2)
+function consumeRecipe(r){ const used=[], gone=[];
+  recIngs(r).forEach(gi=>{ const x=prodBy(gi.name); if(!x||!x.have) return; const q=parseQty(gi.qty), hv=parseQty(x.qty);
+    if(!q||!hv||q.u!==hv.u) return;
+    const rest=hv.n-q.n; used.push(x.name);
+    if(rest<=1e-9){ x.have=false; x.qty=''; gone.push(x.name); } else x.qty=qtyStr({n:rest,u:hv.u}); });
+  if(used.length) persist('pantry');
+  return {used,gone}; }
 function unplanRecipe(r,cooked){
   const t=r.task&&S.tasks.find(x=>x.id===r.task);
   if(t&&!t.done){ if(cooked){ t.done=true; t.doneAt=todayK(); t.timesDone=t.times||1; } else S.tasks=S.tasks.filter(x=>x!==t); }
@@ -3157,11 +3307,11 @@ function viewRecipe(r){
     <div class="grid2" style="margin-top:8px"><div class="field"><label>Порций</label><input data-rec="${r.id}|servings" value="${esc(r.servings)}" inputmode="numeric" placeholder="4"></div>
     <div class="field"><label>Ккал на порцию</label><input class="num" data-rec="${r.id}|kcal" value="${esc(r.kcal??'')}" inputmode="decimal" placeholder="—"></div></div>
     ${r.url?`<p class="hint" style="margin:8px 0 0"><a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">Источник ↗</a></p>`:''}</section>
-  <section class="card"><h3>Продукты</h3><p class="hint">По одному на строке: «Свёкла — 2 шт.»</p>
+  <section class="card"><h3>Продукты${QH}</h3><p class="hint qtip" hidden>По одному на строке: «Свёкла — 2 шт.»</p>
     <textarea class="note-body" style="min-height:150px" data-rec="${r.id}|ingredients" placeholder="Свёкла — 2 шт.\nКартофель — 3 шт.\nГовядина — 500 г" aria-label="Продукты">${esc(r.ingredients)}</textarea>
     <div id="recIngs" style="margin-top:8px">${recIngsHtml(r)}</div></section>
   <section class="card"><h3>Приготовление</h3><textarea class="note-body" style="min-height:140px" data-rec="${r.id}|steps" placeholder="Шаги приготовления…" aria-label="Приготовление">${esc(r.steps)}</textarea></section>
-  ${isNew?'':`<div class="actions" style="margin-top:0">${r.planned?`<button class="btn small" data-act="recipeUnplan" data-id="${r.id}">Убрать из плана</button><button class="btn small primary" data-act="recipeCooked" data-id="${r.id}">Приготовил</button>`:`<button class="btn small primary" data-act="recipePlan" data-id="${r.id}">Хочу приготовить</button>`}<span class="sp"></span><button class="btn small danger" data-act="recipeDel" data-id="${r.id}">Удалить</button></div>`}
+  ${isNew?'':`<div class="actions" style="margin-top:0">${r.planned?`<button class="btn small" data-act="recipeUnplan" data-id="${r.id}">Убрать из плана</button><button class="btn small primary" data-act="recipeCooked" data-id="${r.id}">Приготовил</button>`:`<button class="btn small primary" data-act="recipePlan" data-id="${r.id}">Хочу приготовить</button><button class="btn small" data-act="recipeCooked" data-id="${r.id}">Приготовил</button>`}<span class="sp"></span><button class="btn small danger" data-act="recipeDel" data-id="${r.id}">Удалить</button></div>`}
   <div class="actions sticky-ok"><span class="sp"></span>${isNew?`<button class="btn" data-act="recipeCancel" data-id="${r.id}">Отмена</button><button class="btn primary" data-act="recipeSave">Сохранить</button>`:'<button class="btn primary" data-act="recipeSave">Готово</button>'}</div>`;
 }
 function viewProducts(){
@@ -3262,7 +3412,7 @@ function viewFoodDiary(){
     return `<section class="card"><div class="ghead">${m}<span class="sum num fsub">${es.length?fmt(es.reduce((s,f)=>s+numOr(f.kcal,0),0))+' ккал':''}</span></div>
       ${es.map(f=>`<div class="trow"><button class="tmain" data-act="editId" data-kind="food" data-id="${f.id}"><div class="fname">${esc(f.name)}</div><div class="fsub num">${fmt(numOr(f.kcal,0))} ккал${(f.p||f.f||f.c)?' · Б '+fmt(numOr(f.p,0))+' Ж '+fmt(numOr(f.f,0))+' У '+fmt(numOr(f.c,0)):''}</div></button><button class="xbtn" data-act="foodDel" data-id="${f.id}" aria-label="Удалить">×</button></div>`).join('')}
       <button class="more" data-act="foodAdd" data-meal="${m}">+ Добавить</button></section>`; }).join('')}
-  ${recent.length?`<section class="card"><h3>Быстро добавить</h3><p class="hint">Недавние блюда — нажмите, и они запишутся в «${guessMeal()}» за ${dayLabel(dk).toLowerCase()}.</p><div class="qa-chips">${recent.map(f=>`<button class="chip" data-act="foodRe" data-id="${f.id}">${esc(f.name)} · ${fmt(numOr(f.kcal,0))}</button>`).join('')}</div></section>`:''}
+  ${recent.length?`<section class="card"><h3>Быстро добавить${QH}</h3><p class="hint qtip" hidden>Недавние блюда — нажмите, и они запишутся в «${guessMeal()}» за ${dayLabel(dk).toLowerCase()}.</p><div class="qa-chips">${recent.map(f=>`<button class="chip" data-act="foodRe" data-id="${f.id}">${esc(f.name)} · ${fmt(numOr(f.kcal,0))}</button>`).join('')}</div></section>`:''}
   <section class="card"><div class="row-between"><h3>Вода</h3><span class="num"><b>${water}</b> из ${wg} стаканов</span></div><div class="cups" aria-hidden="true">${[...Array(Math.max(wg,water))].map((_,k)=>`<span class="cup ${k<water?'on':''}"></span>`).join('')}</div>
     <div class="actions" style="margin-top:4px"><button class="btn small" data-act="water" data-d="-1" ${water?'':'disabled'}>− стакан</button><button class="btn small primary" data-act="water" data-d="1">+ стакан</button></div></section>
   <section class="card"><div class="row-between"><h3>Вес</h3><div class="finput"><input class="num" style="width:80px" data-weight="${dk}" value="${wt?esc(String(wt.kg).replace('.',',')):''}" inputmode="decimal" placeholder="кг" enterkeyhint="done" aria-label="Вес за день"><span class="fsub">кг</span></div></div>
@@ -3446,7 +3596,6 @@ document.addEventListener('paste',e=>{ const ed=e.target.closest&&e.target.close
 const PREPEAT=[['monthly','Каждый месяц'],['weekly','Каждую неделю'],['2weeks','Раз в 2 недели'],['quarterly','Раз в квартал'],['yearly','Раз в год'],['once','Один раз']];
 const REMINDS=[[0,'В день платежа'],[1,'За 1 день'],[2,'За 2 дня'],[3,'За 3 дня'],[5,'За 5 дней'],[7,'За неделю']];
 const EXP_TYPES=['Обязательный расход','Необязательный расход','Кредит','Разовая покупка'];
-const addMonthsKD=(d0,k)=>{ const y=d0.getFullYear(), m=d0.getMonth()+k; return new Date(y,m,Math.min(d0.getDate(),new Date(y,m+1,0).getDate())); };
 // даты платежа в промежутке [fromK, toK]
 function payDates(p,fromK,toK){
   const s0=parseD(p.start); if(!s0) return [];
@@ -3689,7 +3838,7 @@ function viewTrainHome(){
   CH.tweeks={vals:weeks.map(s=>ws.filter(w=>inWeek(w,s)).length),tips:weeks.map(s=>'Неделя с '+s.getDate()+' '+MG[s.getMonth()]),axis:weeks.map((s,k)=>(9-k)%3===0?s.getDate()+'.'+String(s.getMonth()+1).padStart(2,'0'):''),kind:'bar',sparse:true,fv:v=>String(Math.round(v)),ftip:v=>v+' '+plural(v,'тренировка','тренировки','тренировок')};
   return `<div class="kpis">${kpiT('На этой неделе',String(week.length),plural(week.length,'тренировка','тренировки','тренировок'))}${kpiT('В этом месяце',String(month.length),'')}
     ${kpiT('Время за неделю',mmss(week.reduce((a,w)=>a+numOr(w.duration,0),0)),'')}${kpiT('Серия недель',String(streak),'подряд хотя бы одна')}</div>
-  <section class="card"><h3>Начать тренировку</h3><p class="hint">По программе — подставятся прошлые результаты. Или пустую — упражнения добавите по ходу.</p>
+  <section class="card"><h3>Начать тренировку${QH}</h3><p class="hint qtip" hidden>По программе — подставятся прошлые результаты. Или пустую — упражнения добавите по ходу.</p>
     ${S.routines.map(r=>{ const lw=lastRoutineWorkout(r.id); return `<div class="trow"><button class="tmain" data-act="routineOpen" data-id="${r.id}"><div class="fname"><b>${esc(r.name)}</b></div><div class="fsub">${r.items.length} упр. · ~${routineMin(r)} мин${lw?' · прошлый раз '+dayLabel(lw.date).toLowerCase():' · ещё не делали'}</div></button><button class="btn small primary" data-act="wStart" data-id="${r.id}">Начать</button></div>`; }).join('')}
     <div class="actions" style="margin-top:8px"><button class="btn" data-act="wStart" data-id="">Пустая тренировка</button></div></section>
   <section class="card"><h3>Тренировки по неделям</h3><div class="chart" data-chart="tweeks"></div></section>
@@ -3782,7 +3931,7 @@ function viewExercise(e){
   <p class="hint" style="margin-top:-6px">${esc(e.muscle||'')} · ${EKIND.find(k=>k[0]===e.kind)[1]}</p>${e.note?`<div class="why">${esc(e.note)}</div>`:''}
   <div class="kpis">${kpiT('Тренировок',String(h.length))}${kpiT('Лучший результат',h.length?metricText(e.kind,best):'—')}
     ${e.kind==='weight'?kpiT('Оценка 1ПМ',orm?fmtW(Math.round(orm*10)/10)+' кг':'—','по формуле Эпли'):''}${kpiT('Последний раз',h.length?dayLabel(h[h.length-1].w.date):'—')}</div>
-  ${h.length>=2?`<section class="card"><h3>Прогресс</h3><p class="hint">${e.kind==='weight'?'Максимальный вес':e.kind==='time'?'Лучшее время':'Максимум повторов'} за тренировку.</p><div class="chart" data-chart="exprog"></div></section>`:''}
+  ${h.length>=2?`<section class="card"><h3>Прогресс${QH}</h3><p class="hint qtip" hidden>${e.kind==='weight'?'Максимальный вес':e.kind==='time'?'Лучшее время':'Максимум повторов'} за тренировку.</p><div class="chart" data-chart="exprog"></div></section>`:''}
   <section class="card"><h3>История</h3>${h.length?h.slice().reverse().map(x=>`<div class="ro"><span>${dayLabel(x.w.date)}</span><span class="num fsub" style="text-align:right">${x.sets.map(s=>setShort(e.kind,s)).join(', ')}</span></div>`).join(''):'<p class="hint" style="margin:0">Ещё не выполняли.</p>'}</section>`;
 }
 function viewHistory(){
@@ -3943,8 +4092,9 @@ const FORMS={
       ['fund','Оплачивается из фонда (для расходов)','select',()=>[['','— нет —']].concat(((S.settings.alloc||{}).funds||[]).filter(f=>f.kind!=='save').map(f=>[f.id,f.name]))]],
     note:'Разово — сумма попадёт только в месяц даты старта.<br>Подкатегории: при внесении факта можно выбрать, к чему относится сумма, и видеть итог по каждой.',
     onDelete:it=>{ S.facts=S.facts.filter(f=>f.item!==it.id); }},
-  ins:{title:'Страховой платёж',list:()=>S.insurance,keys:['insurance','insFacts'],blank:()=>({id:uid(),name:'',amount:null,start:S.settings.periodStart+'-01',pay:''}),
-    fields:[['name','Что страхуем','text'],['amount','Сумма платежа, ₽','num'],['start','Начинаю откладывать с','date'],['pay','Дата платежа','date']],
+  ins:{title:'Страховой платёж',list:()=>S.insurance,keys:['insurance','insFacts'],blank:()=>({id:uid(),name:'',amount:null,start:S.settings.periodStart+'-01',pay:'',repeat:12,paid:''}),
+    fields:[['name','Что страхуем','text'],['amount','Сумма платежа, ₽','num'],['repeat','Повторяется','select',REPEAT_OPTS],['start','Начинаю откладывать с','date'],['pay','Дата платежа','date']],
+    note:'Регулярный платёж: после отметки «Платёж совершён» дата сдвинется на следующий срок, а накопление начнётся заново.',
     onDelete:x=>{ S.insFacts=S.insFacts.filter(f=>f.ins!==x.id); if(UI.detail&&UI.detail.id===x.id) UI.detail=null; }},
   gift:{title:'День рождения',list:()=>S.gifts,keys:['gifts'],blank:()=>({id:uid(),name:'',date:'',byear:null,amount:null,remind:3,note:'',ideas:[]}),
     fields:[['name','Кто','text'],['date','День рождения','date'],['byear','Год рождения (чтобы видеть возраст)','num'],['amount','Бюджет на подарок, ₽','num'],
@@ -4494,6 +4644,7 @@ document.addEventListener('click',e=>{
   else if(a==='balMode'){ UI.balMode=b.dataset.v; saveUI(); render(); }
   else if(a==='balToggle'){ const k=b.dataset.k; UI.balOpen=UI.balOpen.includes(k)?UI.balOpen.filter(x=>x!==k):UI.balOpen.concat(k); render(); }
   else if(a==='invOpen'){ UI.detail={kind:'inv',id:b.dataset.id}; go(); }
+  else if(a==='insPaid'){ insPaid(b.dataset.id); }
   else if(a==='insOpen'){ UI.detail={kind:'ins',id:b.dataset.id}; go(); }
   else if(a==='plus'){ const inp=$view.querySelector(`input[data-${b.dataset.attr}="${CSS.escape(b.dataset.key)}"]`); if(inp.value.trim()!=='') inp.value=inp.value.trim()+'+'; inp.focus(); const n=inp.value.length; try{ inp.setSelectionRange(n,n); }catch(err){} }
   else if(a==='add'){ if(b.dataset.kind==='invPos'&&!S.invGroups.length){ toast('Сначала создайте группу на вкладке «Инвестиции»'); return; }
@@ -4502,6 +4653,13 @@ document.addEventListener('click',e=>{
   else if(a==='edSave') saveEditor();
   else if(a==='edDelete') deleteEditor();
   else if(a==='sheetClose') closeSheet();
+  else if(a==='qh') toggleQh(b);
+  else if(a==='secHelp') openHelp();
+  else if(a==='bondsOpen'){ UI.detail={kind:'bonds'}; go(); }
+  else if(a==='bondMore'){ UI.bf.n+=40; render(); }
+  else if(a==='bondsReload'){ loadBonds(true); }
+  else if(a==='bondPick'){ const x=BL&&BL.list.find(z=>z.secid===b.dataset.id); if(!x) return;
+    UI.sec={mode:'wish',res:[{secid:x.secid,name:x.name,board:x.board,market:'bonds',kind:'Облигации'}],q:'',busy:false,err:'',fromBonds:true}; secPick(0); }
   else if(a==='settings') openSettings();
   else if(a==='hview'){ UI.hview=b.dataset.v; saveUI(); render(); }
   else if(a==='habit'){ UI.habit=b.dataset.id; UI.hcal=null; go(); }
@@ -4655,7 +4813,8 @@ document.addEventListener('click',e=>{
     if(r.planned) unplanRecipe(r,false); S.recipes=S.recipes.filter(x=>x!==r); persist('recipes'); UI.page=null; go(); }
   else if(a==='recipePlan'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r&&planRecipe(r)){ render(); const m=recMissing(r).length; toast(m?'В плане. Купить '+m+' '+plural(m,'продукт','продукта','продуктов')+' — Задачи → «Список покупок»':'В плане. Все продукты есть дома'); } }
   else if(a==='recipeUnplan'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r){ unplanRecipe(r,false); render(); toast('Убрано из плана, список покупок для блюда удалён'); } }
-  else if(a==='recipeCooked'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r){ unplanRecipe(r,true); render(); toast('Приятного аппетита!'); } }
+  else if(a==='recipeCooked'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r){ const was=clone(S.pantry), c=consumeRecipe(r); if(r.planned) unplanRecipe(r,true); else syncShop(); render();
+    toast('Приятного аппетита!'+(c.used.length?' Списано из наличия: '+c.used.length+(c.gone.length?', закончилось: '+c.gone.slice(0,3).join(', ')+(c.gone.length>3?'…':''):''):''),c.used.length?{label:'Вернуть продукты',fn:()=>{ S.pantry=was; persist('pantry'); syncShop(); render(); }}:undefined); } }
   else if(a==='prodAdd'){ const have=b.dataset.have==='1', inp=document.getElementById(have?'pHave':'pNeed'), items=(inp&&inp.value||'').split(/[,;\n]/).map(parseIng).filter(Boolean);
     if(!items.length){ if(inp) inp.focus(); return; }
     items.forEach(gi=>{ let x=prodBy(gi.name); if(!x){ x={id:uid(),name:gi.name,have,qty:''}; S.pantry.push(x); } x.have=have; if(gi.qty) x.qty=gi.qty; });
