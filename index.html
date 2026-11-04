@@ -50,6 +50,8 @@ small{font-size:11.5px;color:var(--muted)}
 
 .top{position:sticky;top:0;z-index:20;background:var(--page);display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 6px}
 .top h1{font-size:20px;margin:0;flex:0 1 auto;min-width:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync>span{display:none}
+.sync{cursor:pointer;padding:10px 6px;margin:-10px -6px;}
 .sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw;min-width:0;flex:0 1 auto}
 .sync span{overflow:hidden;text-overflow:ellipsis}
 .sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
@@ -611,7 +613,7 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 <header class="top">
   <h1 id="title">Финансы</h1>
   <button class="qh qh-top" data-act="secHelp" aria-label="Что это за раздел">?</button>
-  <span class="sync" id="sync"><i></i><span></span></span>
+  <span class="sync" id="sync" data-act="syncInfo" role="button" tabindex="0" aria-label="Сохранение"><i></i><span></span></span>
   <button class="icon-btn bell" data-act="bell" aria-label="Напоминания" id="btnBell"></button>
   <button class="icon-btn" data-act="settings" aria-label="Настройки" id="btnSettings"></button>
 </header>
@@ -672,8 +674,10 @@ function buildBal(months,rows,ins,gifts,pos,pick,al){
   if(al){
     const base=who=>months.map((m,j)=>m<al.start?0:rows.reduce((s,r)=>{ const t=r.it.type;
       if(!(t==='Доход'||(al.base==='all'&&t==='Разовый доход'))) return s;
-      return s+((who==='all'||r.it.owner!=='spouse')?r[pick][j]:0); },0));
+      return s+((who==='all'||(r.it.owner||'me')===who)?r[pick][j]:0); },0));
     const bAll=base('all'), bMe=base('me');
+    // доходы остальных — по каждому человеку (супруги, «другой»)
+    B.baseBy={}; [...new Set(rows.filter(r=>r.it.type==='Доход'||r.it.type==='Разовый доход').map(r=>r.it.owner||'me'))].filter(o=>o!=='me').forEach(o=>{ B.baseBy[o]=base(o); });
     al.funds.forEach(f=>B.funds.push({f,amt:(f.who==='all'?bAll:bMe).map(v=>v*numOr(f.pct,0)/100)}));
     B.baseMe=bMe; B.baseAll=bAll;
   }
@@ -966,9 +970,9 @@ const HELP={
   'fin.month':['Месяц — здесь вносится факт: сколько реально получили и потратили по каждой статье.','Нажмите на сумму статьи — откроется список записей: видно, что уже внесено, можно добавить чек или удалить ошибочный.','«В среднем» — средний факт за месяцы, где он введён. Расходы — вместе с резервами (страховки, подарки).'],
   'fin.items':['Статьи — плановые доходы и расходы: сумма, как часто и с какого месяца. Из них строится план на весь период.'],
   'fin.balance':['Баланс по месяцам: доходы, расходы, накопления и сколько остаётся. Нажмите на месяц — подробности.'],
-  'fin.funds':['Фонды — с каждого дохода откладывается процент: на инвестиции, хотелки, подарки. Видно, сколько отложено и сколько потрачено из каждого фонда.'],
+  'fin.funds':['Фонды — с каждого дохода откладывается процент: на инвестиции, хотелки, подарки. Видно, сколько отложено и сколько потрачено из каждого фонда.','«Чей доход» — у каждого дохода можно указать, чей он: мой, супруги или другого человека. От этого зависит, с каких доходов считается процент фонда («мой» или «общий»).','Ниже — резервы: крупные платежи, на которые копите заранее (страховка, налог и т. п.), и подарки. Сумма платежа делится на месяцы до даты платежа. Заплатили — «Платёж совершён»: регулярный платёж переедет на следующую дату, накопление начнётся заново.'],
   'fin.reserves':['Резервы — крупные платежи, на которые копите заранее (страховка, налог и т. п.), и подарки.','Сумма платежа делится на месяцы до даты платежа — столько откладывать каждый месяц. Заплатили — «Платёж совершён»: регулярный платёж переедет на следующую дату, накопление начнётся заново.'],
-  'fin.invest':['Инвестиции — вклады, облигации, акции, фонды: сколько внесено, сколько стоит сейчас и какой доход приносит.','«Стоит сейчас»: у бумаг с биржи — количество × текущая цена (НКД облигаций не входит), у остальных — вписанная вами стоимость или оценка. Прирост — стоимость против внесённого, без купонов и дивидендов.','Доход в балансе: где введён факт — по факту, иначе ожидаемый по ставке. Внесённые суммы идут в «Сбережения», а не в доход.','«Подбор облигаций» — все облигации Мосбиржи с фильтрами: выбрать, что купить.'],
+  'fin.invest':['Инвестиции — вклады, облигации, акции, фонды: сколько внесено, сколько стоит сейчас и какой доход приносит.','«Стоит сейчас»: у бумаг с биржи — количество × текущая цена (НКД облигаций не входит), у остальных — вписанная вами стоимость или оценка. Прирост — стоимость против внесённого, без купонов и дивидендов.','Доход в балансе: где введён факт — по факту, иначе ожидаемый по ставке. Внесённые суммы идут в «Сбережения», а не в доход.','«Подбор облигаций» — все облигации Мосбиржи с фильтрами: выбрать, что купить.','«Долгосрочные» внизу — вложения на годы (ПДС, ИИС, длинные облигации, вклады) с расчётом к погашению: от сегодняшней стоимости, с плановыми пополнениями и доплатой государства.'],
   'fin.long':['Долгосрочные — вложения на годы: ПДС, ИИС, длинные облигации, вклады.','Расчёт к погашению: от сегодняшней стоимости, с плановыми пополнениями и доплатой государства. При капитализации доход каждый месяц добавляется к сумме, иначе выплачивается. Ставка — ваша оценка.'],
   'fin.goal':['Цель — сколько и к какой дате накопить, и сколько реально откладываете по месяцам.'],
   bonds:['Подбор облигаций — все облигации Мосбиржи (ОФЗ, муниципальные, корпоративные) с ценой, доходностью к погашению (или к оферте), купоном и НКД. Данные с задержкой до 15 минут.','Надёжность: рейтингов на бирже нет, поэтому фильтр — по типу эмитента и уровню листинга. ОФЗ — самые надёжные, 1-й уровень — крупные компании с самыми строгими требованиями биржи. Пометка «высокий риск» — доходность больше ОФЗ на 8 п. п. и выше. Перед покупкой проверьте рейтинг эмитента (АКРА, Эксперт РА).','Оферта — дата, когда эмитент может выкупить облигацию или поменять купон; доходность тогда считается к оферте. Нажмите на облигацию — добавится в «Хочу купить».'],
@@ -982,7 +986,7 @@ const HELP={
   train:['Тренировки — программы, упражнения и история: подставляются прошлые результаты, виден прогресс.'],
   books:['Книги — что читаю, хочу прочитать и прочитал, с целью на год.'],
   movies:['Кино — фильмы и сериалы: смотрю (сезон и серия), хочу посмотреть, посмотрел.'],
-  food:['Питание — дневник еды и воды, рецепты и продукты дома.','Рецепт «В план» — продукты попадут в список покупок. «Приготовил» — продукты рецепта спишутся из наличия в том количестве, что в рецепте.']
+  food:['Питание — дневник еды и воды, рецепты и продукты дома.','Рецепт «В план» — продукты попадут в список покупок. «Приготовил» — продукты рецепта спишутся из наличия в том количестве, что в рецепте; закончившиеся просто уберутся, в покупки не попадут.']
 };
 function openHelp(){ const sec=SECTIONS.find(s=>s.id===UI.section)||SECTIONS[0];
   const key=UI.section==='fin'&&UI.detail&&UI.detail.kind==='bonds'?'bonds':UI.section==='fin'?'fin.'+UI.tab:UI.section, t=HELP[key]||HELP[UI.section]||['Справки для этого раздела пока нет.'];
@@ -992,7 +996,7 @@ function openHelp(){ const sec=SECTIONS.find(s=>s.id===UI.section)||SECTIONS[0];
 // «?» у заголовка карточки: показать или скрыть ближайшее пояснение ниже
 function toggleQh(b){ const box=b.closest('section,.card,.sheet')||$view; const tip=[...box.querySelectorAll('.qtip')].find(t=>b.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING);
   if(!tip) return; tip.hidden=!tip.hidden; b.classList.toggle('on',!tip.hidden); b.setAttribute('aria-expanded',String(!tip.hidden)); }
-const FIN_TABS=[['summary','Сводка'],['month','Месяц'],['items','Статьи'],['balance','Баланс'],['funds','Фонды'],['reserves','Резервы'],['invest','Инвестиции'],['long','Долгосрочные'],['goal','Цель']];
+const FIN_TABS=[['summary','Сводка'],['month','Месяц'],['items','Статьи'],['balance','Баланс'],['funds','Фонды'],['invest','Инвестиции'],['goal','Цель']];
 // nav — в нижнем меню; остальные открываются из «Ещё»
 const SECTIONS=[
   {id:'fin',title:'Финансы',nav:1,tabs:FIN_TABS},
@@ -1246,7 +1250,8 @@ const GS_SETTINGS = [
   ['settings.kcalGoal', 'Питание — цель, ккал', 'n'],
   ['settings.waterGoal', 'Вода — стаканов в день', 'n'],
   ['trainActive', 'Тренировка в процессе (служебное)', 'j'],
-  ['settings.alloc', 'Фонды: проценты и правила (служебное)', 'j']
+  ['settings.alloc', 'Фонды: проценты и правила (служебное)', 'j'],
+  ['settings.people', 'Чей доход: другие люди (служебное)', 'j']
 ];
 /*schema@@*/
 const GS_FMT={n:{type:'NUMBER',pattern:'#,##0.##'},d:{type:'DATE',pattern:'dd.mm.yyyy'},s:{type:'TEXT',pattern:'@'}};
@@ -1386,6 +1391,7 @@ const UI={section:'fin',tab:'summary',month:null,showAll:false,detail:null,balMo
   sub:{tasks:'today',train:'home',goals:'active',books:'reading',movies:'watching',pay:'upcoming',food:'diary'},page:null,qaDue:'today',foodDate:null,noteQ:'',pickTarget:null};
 try{ const u=JSON.parse(localStorage.getItem(UI_KEY)||'{}'); for(const k of ['section','tab','balMode','hview']) if(u[k]) UI[k]=u[k]; if(u.sub) Object.assign(UI.sub,u.sub); }catch(e){}
 if(UI.tab==='scen') UI.tab='summary';
+if(UI.tab==='reserves') UI.tab='funds'; if(UI.tab==='long') UI.tab='invest';
 if(!SECTIONS.some(s=>s.id===UI.section)) UI.section='fin';
 const saveUI=()=>{ try{ localStorage.setItem(UI_KEY,JSON.stringify({section:UI.section,tab:UI.tab,balMode:UI.balMode,hview:UI.hview,sub:UI.sub})); }catch(e){} };
 
@@ -1497,6 +1503,7 @@ function normalize(d){
   o.habits.forEach(h=>{ if(!h.type) h.type='check'; });
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
   o.projects.forEach(p=>{ if(p.parent==null) p.parent=''; });
+  if(!Array.isArray(o.settings.people)) o.settings.people=[];
   o.insurance.forEach(x=>{ x.repeat=(x.repeat==null||x.repeat==='')?12:(+x.repeat||0); if(x.paid==null) x.paid=''; });
   for(const list of [o.items,o.insurance,o.invGroups,o.invPositions,o.invContribs,o.habits,o.tasks,o.goals,o.goalSteps,o.books,o.notes,o.foodLog,o.exercises,o.routines,o.workouts]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
   for(const k of ['readGoal','kcalGoal','waterGoal']) if(o.settings[k]===undefined) o.settings[k]=null;
@@ -1527,7 +1534,7 @@ function normalize(d){
   return [o,migrated];
 }
 function jsonOr(v){ if(typeof v==='string'){ try{ v=v?JSON.parse(v):null; }catch(e){ v=null; } } return (v&&typeof v==='object')?v:null; }
-function setSync(kind,text){ const el=document.getElementById('sync'); el.className='sync '+kind; el.lastChild.textContent=text; el.title=text; }
+function setSync(kind,text){ const el=document.getElementById('sync'); el.className='sync '+kind; el.lastChild.textContent=text; el.title=text; el.setAttribute('aria-label',text); }
 
 /* Сохранение: в таблицу уходят только изменившиеся разделы (persist('facts') и т.п.); persist() — всё. */
 let saveTimer=null, saving=false, dirtyAll=false;
@@ -1809,7 +1816,7 @@ function viewHtml(){
     if(UI.detail.kind==='bonds') return viewBonds();
     UI.detail=null;
   }
-  return ({summary:viewSummary,month:viewMonth,items:viewItems,balance:viewBalance,funds:viewFunds,reserves:viewReserves,invest:viewInvest,long:viewLong,goal:viewGoal}[UI.tab]||viewSummary)();
+  return ({summary:viewSummary,month:viewMonth,items:viewItems,balance:viewBalance,funds:viewFunds,reserves:viewFunds,invest:viewInvest,long:viewInvest,goal:viewGoal}[UI.tab]||viewSummary)();
 }
 /* Мягкая перерисовка: поля ввода не трогаем, обновляем только блоки с data-live */
 function softRender(){
@@ -1908,7 +1915,7 @@ function viewMonth(){
   }
   if(hidden.length) html+=`<button class="more" data-act="showAll">Ещё ${hidden.length} стат. без плана в этом месяце — показать</button>`;
   else if(UI.showAll) html+=`<button class="more" data-act="showAll">Скрыть статьи без плана</button>`;
-  html+=`<section class="card" style="margin-top:12px"><h3>Резервы и инвестиции${QH}</h3><p class="hint qtip" hidden>Вносятся на вкладках «Резервы» и «Инвестиции».</p>
+  html+=`<section class="card" style="margin-top:12px"><h3>Резервы и инвестиции${QH}</h3><p class="hint qtip" hidden>Вносятся на вкладках «Фонды» (резервы и подарки) и «Инвестиции».</p>
     <div data-live="mres"><div class="ro"><span>Страхование (взносы)</span><b class="num">${rub(B.ins[j])}</b></div>
     <div class="ro"><span>Подарки</span><b class="num">${rub(B.gifts[j])}</b></div>
     <div class="ro"><span>Инвестиционный доход</span><b class="num">${rub(B.invest[j])}</b></div>
@@ -2019,13 +2026,15 @@ function balCards(){
       <div class="t"><b>${monthTitle(m)}</b> <span class="tag ${n?'f':''}">${n?'факт':'план'}</span></div>
       <div class="bm-free num ${B.free[j]<0?'neg':''}">${rub(B.free[j])}<small>свободно</small></div>${CHEV}</button>
       <div class="bm-body"><div class="bm-bar" role="img" aria-label="Расходы ${fmt(B.exp[j])}, накопления ${fmt(B.sav[j])} из доходов ${fmt(B.inc[j])}"><i style="width:${(B.exp[j]/base*100).toFixed(1)}%;background:var(--t2)"></i><i style="width:${(B.sav[j]/base*100).toFixed(1)}%;background:var(--t7)"></i></div>
-      <div class="bm-meta num"><span>доходы ${fmt(B.inc[j])}</span><span>расходы ${fmt(B.exp[j])}</span><span>накопл. ${fmt(B.sav[j])}</span><span>остаток с начала <b class="${B.cum[j]<0?'neg':''}">${fmt(B.cum[j])}</b></span></div>
+      <div class="bm-meta num"><span>доходы ${fmt(B.inc[j])}</span><span>расходы ${fmt(B.exp[j])}</span><span>накопл. ${fmt(B.sav[j])}</span></div>
       ${open?`<div class="bm-more num">${R.map(r=>r[0]==='h'?`<div class="rh">${r[1]}</div>`:(r[0]==='r'&&!Math.round(r[2][j]))?'':`<div class="ro ${r[0]}"><span>${r[1]}</span><span class="${r[4]&&r[2][j]<0?'neg':''}">${rub(r[2][j])}</span></div>`).join('')}</div>`:''}</div></section>`;
   }).join('');
 }
 
 /* ---- Фонды: распределение дохода по процентам ---- */
-function viewFunds(){
+// «Фонды»: распределение дохода, ниже — резервы (страховки и крупные платежи, подарки)
+function viewFunds(){ return fundsMain()+viewReserves(); }
+function fundsMain(){
   const AL=S.settings.alloc;
   if(!AL) return emptyCard('Распределение выключено','Включите, чтобы с каждого дохода откладывать проценты по фондам.')+`<div class="actions"><button class="btn primary" data-act="allocOn">Включить: 10% инвестиции, 5% хотелки, 2,5% подарки</button></div>`;
   const j=C.months.indexOf(C.curM), jj=j>=0?j:0, B=C.B, startTxt=C.al?monthTitle(C.al.start).toLowerCase():'—';
@@ -2034,7 +2043,7 @@ function viewFunds(){
     const fromWhat=f.who==='all'?'от дохода — моего и супруги':'только от моего дохода';
     let extra='';
     if(f.gifts){ const up=C.gifts.map(r=>({g:r.g,j:r.res.findIndex((v,k)=>k>=jj&&v>0)})).filter(x=>x.j>=0).sort((a,b)=>a.j-b.j).slice(0,4);
-      extra=`<div class="rh">Ближайшие подарки</div>${up.length?up.map(u=>`<div class="ro"><span>${esc(u.g.name)} · ${MN[C.months[u.j]%12].toLowerCase()}</span><span class="num">${rub(numOr(u.g.amount,0))} ${x.balance[u.j]<0?'<span class="neg">· не хватит</span>':'<span class="pos">· хватит</span>'}</span></div>`).join(''):'<p class="hint" style="margin:0">Дат с суммой подарка нет — добавьте на вкладке «Резервы».</p>'}`; }
+      extra=`<div class="rh">Ближайшие подарки</div>${up.length?up.map(u=>`<div class="ro"><span>${esc(u.g.name)} · ${MN[C.months[u.j]%12].toLowerCase()}</span><span class="num">${rub(numOr(u.g.amount,0))} ${x.balance[u.j]<0?'<span class="neg">· не хватит</span>':'<span class="pos">· хватит</span>'}</span></div>`).join(''):'<p class="hint" style="margin:0">Дат с суммой подарка нет — добавьте ниже, в «Подарках».</p>'}`; }
     if(f.kind==='save') extra=`<p class="hint" style="margin:6px 0 0">Пополнения позиций на вкладке «Инвестиции» засчитываются сюда сами.</p>`;
     return `<section class="card"><div class="row-between"><h3>${esc(f.name)}</h3><span class="tag">${String(f.pct).replace('.',',')}%</span></div><p class="hint">${fromWhat}</p>
       <div class="kpis" style="margin-bottom:6px">${kpi('Отложить в этом месяце',x.amt[jj])}${kpi('Потрачено в этом месяце',x.use[jj])}${kpi('Остаток фонда',bal,bal<0?'<span class="neg">перерасход</span>':'на конец месяца','hero')}</div>
@@ -2048,12 +2057,26 @@ function viewFunds(){
     <div class="grid2" style="margin-top:12px"><div class="field"><label>Действует с месяца</label><input type="month" data-alloc="start" value="${esc(AL.start)}"></div>
       <div class="field"><label>Какие доходы считать</label><select data-alloc="base"><option value="regular" ${AL.base!=='all'?'selected':''}>Только регулярные</option><option value="all" ${AL.base==='all'?'selected':''}>Включая разовые</option></select></div></div>
     <div class="actions"><button class="btn small" data-act="fundAdd">+ Фонд</button><span class="sp"></span><button class="btn small danger" data-act="allocOff">Выключить распределение</button></div></section>
-  ${C.al?`<section class="card"><h3>В этом месяце</h3><div class="ro"><span>Мой доход</span><b class="num">${rub(B.baseMe[jj])}</b></div><div class="ro"><span>Доход супруги</span><b class="num">${rub(B.baseAll[jj]-B.baseMe[jj])}</b></div>
+  ${C.al?`<section class="card"><h3>В этом месяце</h3><div class="ro"><span>Мой доход</span><b class="num">${rub(B.baseMe[jj])}</b></div>${Object.keys(B.baseBy||{}).map(o=>`<div class="ro"><span>Доход: ${esc(ownerName(o).toLowerCase())}</span><b class="num">${rub(B.baseBy[o][jj])}</b></div>`).join('')}
     ${C.funds.map(x=>`<div class="ro"><span>→ ${esc(x.f.name)}</span><b class="num">${rub(x.amt[jj])}</b></div>`).join('')}</section>`:''}
   ${C.funds.map(fundCard).join('')}
-  <section class="card"><h3>Чей доход${QH}</h3><p class="hint qtip" hidden>От этого зависит, с каких доходов считаются хотелки и подарки.</p>
-    ${incomes.map(it=>`<div class="ro"><span class="fname">${esc(it.name)}</span><div class="seg" style="width:170px;flex:none">${[['me','Мой'],['spouse','Супруги']].map(([v,l])=>`<button class="${(it.owner||'me')===v?'on':''}" data-act="ownerSet" data-id="${it.id}" data-v="${v}">${l}</button>`).join('')}</div></div>`).join('')}</section>`;
+  <section class="card"><h3>Чей доход${QH}</h3><p class="hint qtip" hidden>У каждого дохода — чей он: мой, супруги или другого человека. Фонд «с моего дохода» считается только с ваших доходов, «общий» — со всех.</p>
+    ${incomes.length?incomes.map(it=>`<div class="ro"><span class="fname">${esc(it.name)}</span><select data-owner="${it.id}" style="width:auto;max-width:55%;flex:none" aria-label="Чей доход: ${esc(it.name)}">${ownerOpts().map(([v,l])=>`<option value="${esc(v)}" ${(it.owner||'me')===v?'selected':''}>${esc(l)}</option>`).join('')}<option value="__new">+ Другой человек…</option></select></div>`).join('')
+      :'<p class="hint" style="margin:0">Доходов пока нет — добавьте их на вкладке «Статьи» (тип «Доход»).</p>'}
+    ${S.settings.people.length?`<div class="rh">Другие люди</div>${S.settings.people.map(p=>`<div class="ro"><span>${esc(p.name)}</span><span class="num fsub">${S.items.filter(it=>it.owner==='p:'+p.id).length} дох. <button class="xbtn" data-act="personDel" data-id="${p.id}" aria-label="Убрать ${esc(p.name)}">×</button></span></div>`).join('')}`:''}
+    <div class="actions" style="margin-top:8px"><button class="btn small" data-act="personAdd">+ Человек</button></div></section>`;
 }
+
+const ownerOpts=()=>[['me','Мой'],['spouse','Супруги']].concat((S.settings.people||[]).map(p=>['p:'+p.id,p.name]));
+const ownerName=o=>(ownerOpts().find(x=>x[0]===o)||[o,'другой человек'])[1];
+function personAdd(itemId){ const n=(prompt('Чей это доход? Например: Сын, Мама')||'').trim(); if(!n) return null;
+  let p=S.settings.people.find(x=>x.name.toLowerCase()===n.toLowerCase()); if(!p){ p={id:uid(),name:n}; S.settings.people.push(p); }
+  const keys=['settings']; if(itemId){ const it=S.items.find(x=>x.id===itemId); if(it){ it.owner='p:'+p.id; keys.push('items'); } }
+  persist(...keys); render(); return p; }
+document.addEventListener('change',e=>{ const el=e.target; if(!el.dataset||el.dataset.owner==null) return;
+  const it=S.items.find(x=>x.id===el.dataset.owner); if(!it) return;
+  if(el.value==='__new'){ if(!personAdd(it.id)) el.value=it.owner||'me'; return; }
+  it.owner=el.value; persist('items'); render(); });
 
 /* ---- Резервы ---- */
 const INS_STATUS={done:['good','✓ Накоплено'],ok:['good','В графике'],wait:['idle','Ещё не начали'],behind:['bad','! Отстаёте'],bad:['bad','! Ошибка в датах'],paid:['good','✓ Оплачено']};
@@ -2088,7 +2111,7 @@ function viewReserves(){
 }
 function viewInsDetail(r){
   const x=r.x, i=S.insurance.indexOf(x); let cum=0;
-  return `<button class="back" data-act="back">‹ Резервы</button>
+  return `<button class="back" data-act="back">‹ Фонды</button>
   <div class="detail-title"><h2>${esc(x.name)}</h2><button class="btn small" data-act="edit" data-kind="ins" data-i="${i}">Изменить</button></div>
   <section class="card" data-live="insprog"><div class="row-between">${insStatus(r)}<b class="num">${pct(r.pct)}</b></div>
     <div class="thermo big"><i class="${r.status==='done'?'done':''}" style="width:${(r.pct*100).toFixed(1)}%"></i></div>
@@ -2324,7 +2347,7 @@ function drawSecAdd(){
       <div class="field"><label>${s.fromWish?'Цена покупки':'Средняя цена покупки'}, ₽ за шт.</label><input class="num" id="saPrice" inputmode="decimal" value="${pre.price!=null?priceIn(pre.price):''}" placeholder="${q&&q.price!=null?priceIn(q.price):''}"></div></div>
       ${bond?'<p class="hint" style="margin:0">Цену облигации можно вписать в процентах: 98,5%</p>':''}
       <div class="field"><label>Дата покупки${s.fromWish?'':' (можно примерно)'}</label><input type="date" id="saDate" value="${todayK()}"></div>
-      ${have?'':gsel+'<label class="chk"><input type="checkbox" id="saLong"><span>Долгосрочная — показывать на вкладке «Долгосрочные»</span></label>'}`;
+      ${have?'':gsel+'<label class="chk"><input type="checkbox" id="saLong"><span>Долгосрочная — показывать в блоке «Долгосрочные» в Инвестициях</span></label>'}`;
   openSheet(`<h2>${esc(r.name)} <span class="tag">${esc(r.kind)}</span></h2><p class="hint" style="margin-top:-4px">${esc(r.secid)}</p>${price}
     <form class="form" onsubmit="return false">${body}</form>
     <div class="actions">${s.fromWish||s.fromBonds?'':'<button class="btn" data-act="secBack">‹ Назад</button>'}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="secSave">${mode==='wish'?'В список':'Сохранить'}</button></div>`);
@@ -2390,7 +2413,7 @@ function wishHtml(){
 function viewSecPos(r){
   const p=r.p, q=r.quote, G=C.groups.find(g=>g.g.id===p.group), pi=S.invPositions.indexOf(p), bond=p.market==='bonds', lot=q?q.lot||1:1, hasP=q&&q.price!=null;
   const lab=bond?'Купоны':KIND_INCOME[G?G.g.kind:'']||'Доход', today=todayK(), rc=r.result>0.5?'pos':r.result<-0.5?'neg':'';
-  const backLbl=UI.detail.back==='long'?'Долгосрочные':(G?G.g.name:'Инвестиции');
+  const backLbl=UI.detail.back==='long'?'Инвестиции':(G?G.g.name:'Инвестиции');
   let html=`<button class="back" data-act="back">‹ ${esc(backLbl)}</button>
   <div class="detail-title"><h2>${esc(p.name||p.secid)}</h2><button class="btn small" data-act="edit" data-kind="invPos" data-i="${pi}">Изменить</button></div>
   <p class="hint" style="margin-top:-6px">${esc(p.secid)}${G?' · '+esc(G.g.name):''}${p.long?' <span class="tag">долгосрочная</span>':''}</p>
@@ -2502,7 +2525,7 @@ function viewInvest(){
       <div class="fsub num">${g.pos.length} поз. · внесено ${fmt(g.invested)} · стоит ${fmt(g.value)}</div></div>
       <div class="a num">${resHtml(g.value-g.invested,g.invested,true)}</div>${CHEV}</button>`).join(''):'<p class="hint">Пока пусто.</p>'}</section>
   ${wishHtml()}
-`;
+  ${longCard()}`;
 }
 function viewInvDetail(G){
   const g=G.g, gi=S.invGroups.indexOf(g), m=selMonth(), j=C.months.indexOf(m), lab=KIND_INCOME[g.kind]||'Доход';
@@ -2525,7 +2548,7 @@ function viewInvDetail(G){
 function viewPos(r){
   if(r.ex) return viewSecPos(r);
   const p=r.p, G=C.groups.find(g=>g.g.id===p.group), pi=S.invPositions.indexOf(p), lab=KIND_INCOME[G?G.g.kind:'']||'Доход', rate=numOr(p.rate,0);
-  const backLbl=UI.detail.back==='long'?'Долгосрочные':(G?G.g.name:'Инвестиции');
+  const backLbl=UI.detail.back==='long'?'Инвестиции':(G?G.g.name:'Инвестиции');
   const valSub=r.closed?'позиция закрыта':r.valueManual?(p.valueDate?'на '+dRu(p.valueDate):'вписано вами'):(p.reinvest&&rate?'оценка по ставке':'оценка = внесено');
   let html=`<button class="back" data-act="back">‹ ${esc(backLbl)}</button>
   <div class="detail-title"><h2>${esc(p.name||'Без названия')}</h2><button class="btn small" data-act="edit" data-kind="invPos" data-i="${pi}">Изменить</button></div>
@@ -2578,14 +2601,14 @@ function posMonths(r,lab){
     ${rows.length?`<table class="gtbl num"><thead><tr><th>Месяц</th><th>Ожидалось</th><th>Пришло</th></tr></thead><tbody>${rows.map(({m,j})=>{ const key=p.id+'|'+C.keys[j], f=S.invFacts.find(z=>z.pos===p.id&&z.month===C.keys[j]);
       return `<tr class="${m===C.curM?'cur':''}"><td>${monthShort(m)}</td><td>${fmt(r.plan[j])}</td><td><input data-ifact="${key}" value="${esc(f?f.value:'')}" inputmode="decimal" enterkeyhint="done" placeholder="—" aria-label="${lab} за ${monthShort(m)}"></td></tr>`; }).join('')}</tbody></table>`:'<p class="hint">В периоде плана месяцев с доходом нет.</p>'}</section>`;
 }
-function viewLong(){
+function longCard(){
   const L=C.pos.filter(r=>r.p.long);
   const add=`<button class="btn primary" data-act="add" data-kind="invPos" data-long="1">+ Долгосрочная</button>`;
-  if(!L.length) return `<section class="card empty"><h3>Долгосрочных вложений пока нет</h3><p>Отметьте позицию как долгосрочную в «Инвестициях» или добавьте новую: ПДС, ИИС, длинные облигации, вклад на годы.</p>${add}</section>`;
+  if(!L.length) return `<section class="card"><div class="row-between"><h3>Долгосрочные</h3>${add.replace('btn primary','btn small')}</div><p class="hint" style="margin:0">Пока нет. Отметьте позицию как долгосрочную или добавьте: ПДС, ИИС, длинные облигации, вклад на годы.</p></section>`;
   const inv=tot(L,'invested'), val=tot(L,'valueNow'), endT=L.reduce((s,r)=>s+(r.proj?r.proj.total:0),0), inc=L.reduce((s,r)=>s+(r.proj?r.proj.income:0),0);
-  return `<div class="kpis">${kpi('Внесено',inv)}${kpi('Стоит сейчас',val,resHtml(val-inv,inv))}${kpi('Будет к погашению',endT,'по всем позициям')}${kpi('Доход за весь срок',inc,'ожидаемый')}</div>
-  <section class="card"><div class="row-between"><h3>Вложения${QH}</h3>${add.replace('btn primary','btn small primary')}</div>
+  return `<section class="card"><div class="row-between"><h3>Долгосрочные${QH}</h3>${add.replace('btn primary','btn small primary')}</div>
     <p class="hint qtip" hidden>Нажмите, чтобы внести пополнение, обновить стоимость или посмотреть расчёт к погашению.</p>
+    <div class="kpis" style="margin:2px 0 8px">${kpi('Внесено',inv)}${kpi('Стоит сейчас',val,resHtml(val-inv,inv))}${kpi('Будет к погашению',endT,'по всем позициям')}${kpi('Доход за весь срок',inc,'ожидаемый')}</div>
     ${L.map(r=>{ const p=r.p, G=C.groups.find(g=>g.g.id===p.group);
       return `<button class="list-row" data-act="posOpen" data-id="${p.id}" data-back="long" style="display:block">
         <div class="row-between"><span class="fname" style="min-width:0"><b>${esc(p.name||'Без названия')}</b>${G?' <span class="tag">'+esc(G.g.kind)+'</span>':''}</span><span class="num" style="white-space:nowrap">${resHtml(r.result,r.invested)}</span></div>
@@ -3259,7 +3282,7 @@ function consumeRecipe(r){ const used=[], gone=[];
   recIngs(r).forEach(gi=>{ const x=prodBy(gi.name); if(!x||!x.have) return; const q=parseQty(gi.qty), hv=parseQty(x.qty);
     if(!q||!hv||q.u!==hv.u) return;
     const rest=hv.n-q.n; used.push(x.name);
-    if(rest<=1e-9){ x.have=false; x.qty=''; gone.push(x.name); } else x.qty=qtyStr({n:rest,u:hv.u}); });
+    if(rest<=1e-9){ S.pantry=S.pantry.filter(y=>y!==x); gone.push(x.name); } else x.qty=qtyStr({n:rest,u:hv.u}); });
   if(used.length) persist('pantry');
   return {used,gone}; }
 function unplanRecipe(r,cooked){
@@ -3723,7 +3746,7 @@ function viewBdays(){
     ${later.length?`<section class="card"><div class="ghead">Дальше</div>${later.map(row).join('')}</section>`:''}
     ${noDate.length?`<section class="card"><div class="ghead">Без даты</div>${noDate.map(({g})=>`<button class="list-row" data-act="bdOpen" data-id="${g.id}"><div class="m"><div class="fname">${esc(g.name)}</div><div class="fsub">укажите дату</div></div>${CHEV}</button>`).join('')}</section>`:''}
     <div class="actions" style="margin-top:0"><button class="btn primary" data-act="add" data-kind="gift">+ День рождения</button></div>
-    <p class="hint">Бюджет на подарок попадает в финансы каждый год в месяц дня рождения (Финансы → Резервы → Подарки, а с включёнными фондами — из фонда «Подарки»).</p>`;
+    <p class="hint">Бюджет на подарок попадает в финансы каждый год в месяц дня рождения (Финансы → Фонды → Подарки, а с включёнными фондами — из фонда «Подарки»).</p>`;
 }
 
 const ideasLeft=g=>(g.ideas||[]).filter(x=>!x.done).length;
@@ -4088,7 +4111,7 @@ const FORMS={
   item:{title:'Статья',list:()=>S.items,keys:['items','facts'],blank:()=>({id:uid(),type:'Обязательный расход',name:'',amount:null,period:1,start:S.settings.periodStart+'-01',end:'',comment:''}),
     fields:[['type','Тип','select',TYPES.map(t=>[t,t])],['name','Статья','text'],['amount','Сумма, ₽','num'],['period','Периодичность','period'],['start','Дата старта','date'],['end','Дата окончания (если есть)','date'],['comment','Комментарий','text'],
       ['subs','Подкатегории для факта (через запятую)','text',null,{ph:'Например: Еда, Лекарства, Ветеринар'}],
-      ['owner','Чей доход (для распределения по фондам)','select',[['me','Мой'],['spouse','Супруги']]],
+      ['owner','Чей доход (для распределения по фондам)','select',()=>ownerOpts()],
       ['fund','Оплачивается из фонда (для расходов)','select',()=>[['','— нет —']].concat(((S.settings.alloc||{}).funds||[]).filter(f=>f.kind!=='save').map(f=>[f.id,f.name]))]],
     note:'Разово — сумма попадёт только в месяц даты старта.<br>Подкатегории: при внесении факта можно выбрать, к чему относится сумма, и видеть итог по каждой.',
     onDelete:it=>{ S.facts=S.facts.filter(f=>f.item!==it.id); }},
@@ -4127,7 +4150,7 @@ const FORMS={
       ['initial','Первое внесение, ₽ (можно позже на странице позиции)','num',null,{newOnly:true}],
       ['rate','Ожидаемая доходность, % годовых','num',null,{only:NOEX}],['start','Дата открытия','date',null,{only:NOEX}],['end','Дата погашения / закрытия (если есть)','date',null,{only:NOEX}],
       ['reinvest','Капитализация: доход остаётся внутри и в бюджет не поступает (ПДС, вклад с капитализацией, реинвест)','check',null,{only:NOEX}],
-      ['long','Долгосрочная — показывать на вкладке «Долгосрочные»','check'],
+      ['long','Долгосрочная — показывать в блоке «Долгосрочные»','check'],
       ['divPs','Ожидаемый дивиденд на 1 шт., ₽','num',null,{only:SHARE,ph:'Например: 34,84'}],['divDate','Когда придёт (примерно)','date',null,{only:SHARE}],
       ['contribAmount','Плановое пополнение, ₽','num',null,{only:NOEX}],['contribPeriod','Как часто пополнять','cperiod',null,{only:NOEX}],
       ['pdsRatio','ПДС: софинансирование государства (зависит от вашего дохода)','select',PDS_RATIOS,{only:NOEX}],
@@ -4654,6 +4677,7 @@ document.addEventListener('click',e=>{
   else if(a==='edDelete') deleteEditor();
   else if(a==='sheetClose') closeSheet();
   else if(a==='qh') toggleQh(b);
+  else if(a==='syncInfo') toast(document.getElementById('sync').title||'Сохранено');
   else if(a==='secHelp') openHelp();
   else if(a==='bondsOpen'){ UI.detail={kind:'bonds'}; go(); }
   else if(a==='bondMore'){ UI.bf.n+=40; render(); }
@@ -4697,6 +4721,10 @@ document.addEventListener('click',e=>{
     S.settings.alloc.funds.splice(+b.dataset.i,1); S.items.forEach(it=>{ if(it.fund===f.id) it.fund=''; }); S.fundSpend=S.fundSpend.filter(s=>s.fund!==f.id); persist('settings','items','fundSpend'); render(); }
   else if(a==='allocOff'){ if(!confirm('Выключить распределение? Фонды пропадут из баланса, настройки процентов сотрутся.')) return; S.settings.alloc=null; S.items.forEach(it=>{ it.fund=''; }); persist('settings','items'); render(); }
   else if(a==='allocOn'){ S.settings.alloc=defaultAlloc(); persist('settings'); render(); }
+  else if(a==='personAdd'){ personAdd(); }
+  else if(a==='personDel'){ const id=b.dataset.id, n=S.items.filter(it=>it.owner==='p:'+id);
+    if(n.length&&!confirm('Его доходы ('+n.length+') станут «моими». Убрать?')) return;
+    n.forEach(it=>{ it.owner='me'; }); S.settings.people=S.settings.people.filter(p=>p.id!==id); persist('settings','items'); render(); }
   else if(a==='ownerSet'){ const it=S.items.find(x=>x.id===b.dataset.id); if(it){ it.owner=b.dataset.v; persist('items'); render(); } }
   else if(a==='editId'){ const F=FORMS[b.dataset.kind], i=F.list().findIndex(x=>x.id===b.dataset.id); if(i>=0) openEditor(b.dataset.kind,i); }
   // задачи
