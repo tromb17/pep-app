@@ -274,6 +274,13 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--surface);border-radius:20px 20px 0 0;max-height:90vh;overflow:auto;padding:16px 16px calc(18px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
 .sheet h2{margin:0 0 12px;font-size:18px}
 .actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.welcome{position:fixed;inset:0;z-index:45;background:var(--page);display:flex;align-items:center;justify-content:center;padding:24px 16px calc(24px + env(safe-area-inset-bottom));overflow:auto}
+.welcome .wbox{max-width:400px;width:100%;text-align:center}
+.welcome img{width:84px;height:84px;border-radius:20px}
+.welcome h2{margin:14px 0 8px;font-size:24px}
+.welcome p{color:var(--text-2);margin:0 0 10px;line-height:1.45}
+.welcome .btn{display:block;width:100%;margin-top:10px;padding:13px 14px;font-size:16px}
+.welcome .btn.link{border:0;background:none;color:var(--text-2);font-weight:500}
 .actions .sp{flex:1}
 .sheet textarea{min-height:110px}
 #jsonBox{min-height:110px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
@@ -622,6 +629,7 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 <nav class="bottom" id="bottom"></nav>
 <div class="sheet-bg" id="sheetBg" hidden data-act="sheetClose"></div>
 <div class="sheet" id="sheet" hidden></div>
+<div class="welcome" id="welcome" hidden></div>
 <div class="toast" id="toast"></div>
 <div class="alerts" id="alerts" aria-live="polite"></div>
 <div class="timerbar" id="timerBar" hidden></div>
@@ -1368,7 +1376,7 @@ async function gsSetup(){
     localStorage.setItem(RC_KEY,JSON.stringify(rc)); localStorage.removeItem(PEND_KEY); }catch(e){}
   REMOTE=rc; gsMeta.c=null; clearTimeout(saveTimer); dirtyAll=false; dirtyKeys.clear(); canSave=true;
   if(!document.getElementById('sheet').hidden) closeSheet();
-  await pullRemote(); nativeSync();
+  hideWelcome(); await pullRemote(); nativeSync();
   toast(made?'Готово: на вашем Диске создана таблица «'+GS_TITLE+'», данные перенесены в неё':'Вход выполнен — данные из вашей таблицы «'+GS_TITLE+'»');
 }
 async function gsLogin(){
@@ -1762,8 +1770,25 @@ function boot(){
   } else {
     let d=null; try{ const s=localStorage.getItem(LS_KEY); d=s?JSON.parse(s):null; }catch(e){}
     const [o,mig]=normalize(d||DEFAULT_DATA); S=o; setSync('ok',d?'Данные из этого браузера':'Новый план'); render(); if(d&&mig) persist(); applyInbox();
+    if(!d&&gOK()&&!welcomeSkipped()) showWelcome();
   }
 }
+
+/* Первый запуск: сразу предлагаем вход через Google — данные будут в своей таблице с самого начала.
+   «Без входа» — данные только на устройстве; войти можно потом в настройках. */
+const WELCOME_KEY='moyplan.welcome.v1';
+function welcomeSkipped(){ try{ return !!localStorage.getItem(WELCOME_KEY); }catch(e){ return false; } }
+function showWelcome(){
+  const w=document.getElementById('welcome');
+  w.innerHTML=`<div class="wbox"><img src="icons/icon-192.png" alt=""><h2>Мой план</h2>
+    <p>Финансы, задачи, привычки, цели, питание и заметки — в одном месте.</p>
+    <p>Войдите через Google: приложение создаст на вашем Google Диске свою таблицу «${GS_TITLE}», и данные будут на всех ваших устройствах. Таблицу видите только вы.</p>
+    <button class="btn primary" data-act="welcomeLogin">Войти через Google</button>
+    <button class="btn link" data-act="welcomeSkip">Продолжить без входа</button>
+    <p class="hint" style="margin-top:6px">Без входа данные хранятся только на этом устройстве. Войти можно позже в настройках.</p></div>`;
+  w.hidden=false;
+}
+function hideWelcome(){ const w=document.getElementById('welcome'); if(w){ w.hidden=true; w.innerHTML=''; } }
 
 /* Ярлык на значке приложения: сразу открыть нужное окно */
 function launch(a){
@@ -4895,6 +4920,8 @@ document.addEventListener('click',e=>{
     if(!confirm('Заменить все текущие данные копией?')) return; S=normalize(d)[0]; closeSheet(); persist(); render(); toast('Загружено'); }
   else if(a==='rcConnect'){ rcConnect(); }
   else if(a==='gsLogin'){ gsLogin(); }
+  else if(a==='welcomeLogin'){ gsLogin(); }
+  else if(a==='welcomeSkip'){ try{ localStorage.setItem(WELCOME_KEY,'1'); }catch(err){} hideWelcome(); }
   else if(a==='gsOpen'){ const u='https://docs.google.com/spreadsheets/d/'+REMOTE.sheet+'/edit'; if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }
   else if(a==='apkCheck'){ checkApk(true); }
   else if(a==='apkGet'){ if(APK_NEW) NATIVE.openUrl(APK_NEW.url); }
