@@ -21,7 +21,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
   --r:14px;
   --s-home:#2a78d6; --s-tasks:#2a78d6; --s-fin:#159a6b; --s-habits:#e5672f; --s-goals:#6250d6; --s-notes:#d49400; --s-more:#6f6e69;
-  --s-pay:#0d93a3; --s-bdays:#d9558c; --s-train:#d6453d; --s-books:#9a6b3f; --s-movies:#8a4fd0; --s-food:#4e9e2c;
+  --s-pay:#0d93a3; --s-bdays:#d9558c; --s-train:#d6453d; --s-books:#9a6b3f; --s-movies:#8a4fd0; --s-food:#4e9e2c; --s-week:#2a78d6; --s-trash:#6f6e69;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -33,7 +33,7 @@
     --t1:#3987e5; --t2:#d95926; --t3:#199e70; --t4:#c98500; --t5:#d55181; --t6:#008300; --t7:#9085e9;
     --shadow:none;
     --s-home:#4a92ea; --s-tasks:#4a92ea; --s-fin:#2fc28c; --s-habits:#f08250; --s-goals:#9085e9; --s-notes:#e8b330; --s-more:#a3a29b;
-    --s-pay:#2ab7c7; --s-bdays:#ec7aa8; --s-train:#ef6b63; --s-books:#c99566; --s-movies:#b182ec; --s-food:#7cc456;
+    --s-pay:#2ab7c7; --s-bdays:#ec7aa8; --s-train:#ef6b63; --s-books:#c99566; --s-movies:#b182ec; --s-food:#7cc456; --s-week:#5a9bea; --s-trash:#a3a29c;
 }
 }
 :root[data-theme="dark"]{
@@ -45,7 +45,7 @@
   --t1:#3987e5; --t2:#d95926; --t3:#199e70; --t4:#c98500; --t5:#d55181; --t6:#008300; --t7:#9085e9;
   --shadow:none;
   --s-home:#4a92ea; --s-tasks:#4a92ea; --s-fin:#2fc28c; --s-habits:#f08250; --s-goals:#9085e9; --s-notes:#e8b330; --s-more:#a3a29b;
-  --s-pay:#2ab7c7; --s-bdays:#ec7aa8; --s-train:#ef6b63; --s-books:#c99566; --s-movies:#b182ec; --s-food:#7cc456;
+  --s-pay:#2ab7c7; --s-bdays:#ec7aa8; --s-train:#ef6b63; --s-books:#c99566; --s-movies:#b182ec; --s-food:#7cc456; --s-week:#5a9bea; --s-trash:#a3a29c;
 }
 :root{color-scheme:light dark}
 :root[data-theme="light"]{color-scheme:light}
@@ -459,6 +459,12 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .tfields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tfields label{display:block;font-size:12px;color:var(--text-2);margin-bottom:3px}
 .tfields select,.tfields input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.trashrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.trashrow:first-child{border-top:0}.trashrow .m{flex:1;min-width:0}
+.wk-nav{display:flex;align-items:center;gap:8px;margin:2px 0 10px}.wk-nav b{flex:1;text-align:center;font-size:15px}
+.wk-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 4px}.wk-kpis>div{background:var(--surface-2);border-radius:12px;padding:10px 8px;text-align:center;min-width:0}
+.wk-kpis b{display:block;font-size:22px;line-height:1.1}.wk-kpis span{font-size:12px;color:var(--text-2)}
+.wk-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line)}.wk-row:first-of-type{border-top:0}.wk-row .fname{min-width:0}
+.wk-home{display:flex;align-items:center;gap:10px}.wk-home .m{flex:1;min-width:0}
 .hsub{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2);margin:8px 0 2px}.hsub.neg{color:var(--neg)}
 .dwrap{display:flex;gap:4px;align-items:center}.dwrap input{flex:1;min-width:0}
 .cl-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
@@ -1049,10 +1055,13 @@ function resHtml(d,base,stack){
 }
 const daysText=s=>s==='1111111'?'каждый день':s==='1111100'?'по будням':s==='0000011'?'по выходным':WD.filter((_,k)=>s[k]==='1').join(', ').toLowerCase();
 const uid=()=>'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const TRASH_DAYS=30; // сколько дней удалённое лежит в корзине
 const clone=o=>JSON.parse(JSON.stringify(o));
 const TODAY=()=>{ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate()); };
 
 const ICONS={
+  week:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m8.5 15 2.2 2.2 4.8-4.7"/>',
+  trash:'<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
   fin:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="M16 15h2"/><path d="M7 6V4.5h10V6"/>',
   habits:'<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9"/>',
   train:'<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>',
@@ -1347,7 +1356,10 @@ const GS_SCHEMA = [
   { key: 'movies', sheet: 'Кино', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Название', 's'], ['kind', 'Тип (film/series)', 's'], ['status', 'Статус (want/watching/done)', 's'],
     ['season', 'Сезон', 'n'], ['episode', 'Серия', 'n'], ['year', 'Год', 'n'], ['where', 'Где смотреть', 's'], ['rating', 'Оценка', 'n'],
-    ['note', 'Заметка', 's'], ['started', 'Начал', 'd'], ['finished', 'Посмотрел', 'd'], ['created', 'Добавлен', 'd']] }
+    ['note', 'Заметка', 's'], ['started', 'Начал', 'd'], ['finished', 'Посмотрел', 'd'], ['created', 'Добавлен', 'd']] },
+  // корзина: удалённое лежит 30 дней; в «Данных» — сами записи (по разделам), чтобы вернуть
+  { key: 'trash', sheet: 'Корзина', cols: [
+    ['id', 'ID (не менять)', 's'], ['kind', 'Что', 's'], ['name', 'Название', 's'], ['deleted', 'Удалено', 'd'], ['data', 'Данные (служебное)', 'j']] }
 ];
 const GS_SETTINGS_SHEET = 'Настройки';
 const GS_SETTINGS = [
@@ -1524,7 +1536,7 @@ function normalize(d){
     foodLog:d.foodLog||[], waterLog:d.waterLog||[], weightLog:d.weightLog||[],
     exercises:d.exercises||[], routines:d.routines||[], workouts:d.workouts||[], trainActive:d.trainActive||null,
     projects:d.projects||[], fundSpend:d.fundSpend||[], payments:d.payments||[], payLog:d.payLog||[],
-    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[]};
+    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[], trash:d.trash||[]};
   let migrated=false;
   if(o.version<2){
     migrated=true;
@@ -1650,6 +1662,9 @@ function normalize(d){
   const gids=new Set(o.invGroups.map(g=>g.id)), orphans=o.invPositions.filter(p=>!gids.has(p.group));
   if(orphans.length){ const g={id:uid(),name:'Без группы',kind:'Другое'}; o.invGroups.push(g); orphans.forEach(p=>p.group=g.id); }
   o.habits.forEach(h=>{ h.days=String(h.days||'1111111').padStart(7,'0').slice(-7); if(!h.created) h.created=dkey(TODAY()); });
+  // корзина: старше 30 дней стирается
+  const tOld=dkey(addDays(TODAY(),-TRASH_DAYS));
+  o.trash=o.trash.filter(e=>e&&e.id).map(e=>Object.assign(e,{data:jsonOr(e.data)})).filter(e=>e.data&&String(e.deleted||'')>=tOld);
   return [o,migrated];
 }
 function jsonOr(v){ if(typeof v==='string'){ try{ v=v?JSON.parse(v):null; }catch(e){ v=null; } } return (v&&typeof v==='object')?v:null; }
@@ -1762,7 +1777,7 @@ window.moyplanAction=()=>{ let a=null; try{ a=NATIVE&&NATIVE.takeAction(); }catc
 /* Android: уведомления. Расписание на 2 недели вперёд считает приложение при каждой правке и отдаёт телефону;
    телефон показывает их сам, даже если приложение закрыто. Настройки — на этом устройстве. */
 const NOTIF_KEY='moyplan.notif.v1';
-const NOTIF_DEF={on:true,pay:true,bd:true,task:true,free:true,digest:true,digestAt:'09:00',habit:true,habitAt:'21:00'};
+const NOTIF_DEF={on:true,pay:true,bd:true,task:true,free:true,digest:true,digestAt:'09:00',habit:true,habitAt:'21:00',week:true,weekAt:'19:00'};
 function notifCfg(){ let c={}; try{ c=JSON.parse(localStorage.getItem(NOTIF_KEY)||'{}')||{}; }catch(e){} return Object.assign({},NOTIF_DEF,c); }
 function notifPlan(){
   const c=notifCfg(), out=[]; if(!c.on||!S) return out;
@@ -1786,6 +1801,8 @@ function notifPlan(){
     if(l.length) push('digest|'+k,at(k,c.digestAt),'На сегодня '+l.length+' '+plural(l.length,'задача','задачи','задач'),l.slice(0,4).map(x=>x.name).join(', ')+(l.length>4?'…':''),'task'); }
   if(c.habit) for(let i=0;i<=H;i++){ const d=addDays(t,i), k=dkey(d), l=S.habits.filter(h=>h.days[wd(d)]==='1'&&(h.created||'')<=k&&!(HL[h.id]&&HL[h.id].has(k)));
     if(l.length) push('habit|'+k,at(k,c.habitAt),'Не отмечены привычки',l.slice(0,4).map(h=>h.name).join(', ')+(l.length>4?'…':''),'habit'); }
+  if(c.week) for(let i=0;i<=H;i++){ const d=addDays(t,i); if(wd(d)!==6) continue; const k=dkey(d);
+    push('week|'+k,at(k,c.weekAt),'Итоги недели','Сколько сделано, как с привычками и что ждёт на следующей неделе','week'); }
   return out.sort((a,b)=>a.at-b.at).slice(0,200);
 }
 // после каждой отрисовки (с задержкой): уведомления, задачи для виджета, ссылка на таблицу для виджета
@@ -1806,7 +1823,8 @@ function nativeBox(){
   return `<div class="field"><label>Уведомления</label>${ck('on','Присылать уведомления')}
     <div style="padding-left:26px;display:grid;gap:2px">${ck('pay','Платежи — заранее (как указано в платеже) и в день оплаты')}${ck('bd','Дни рождения')}${ck('free','Погашение облигаций и вкладов — за неделю и в день')}${ck('task','Задачи, у которых указано время')}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('digest','Утром — задачи на день, в')}<input type="time" data-ncfg="digestAt" value="${esc(c.digestAt)}" style="width:auto"></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('habit','Вечером — неотмеченные привычки, в')}<input type="time" data-ncfg="habitAt" value="${esc(c.habitAt)}" style="width:auto"></div></div></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('habit','Вечером — неотмеченные привычки, в')}<input type="time" data-ncfg="habitAt" value="${esc(c.habitAt)}" style="width:auto"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('week','В воскресенье — итоги недели, в')}<input type="time" data-ncfg="weekAt" value="${esc(c.weekAt)}" style="width:auto"></div></div></div>
     <div class="field"><label>Защита</label><label class="chk"><input type="checkbox" id="lockOn" ${lock?'checked':''}><span>Вход по отпечатку пальца (или PIN телефона)</span></label></div>
     <div class="field"><label>Приложение</label><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(ver)}</span><span class="sp"></span>${APK_NEW?`<button class="btn small primary" data-act="apkGet">Скачать 1.${APK_NEW.n}</button>`:'<button class="btn small" data-act="apkCheck">Проверить обновления</button>'}</div></div>`;
 }
@@ -1915,6 +1933,7 @@ function launch(a){
   else if(a==='pay'){ UI.section='pay'; UI.sub.pay='upcoming'; render(); }
   else if(a==='bdays'){ UI.section='bdays'; render(); }
   else if(a==='today'){ UI.section='tasks'; UI.sub.tasks='today'; render(); }
+  else if(a==='week'){ UI.section='more'; render(); UI.page={kind:'week',off:wd(TODAY())===6?0:-1}; render(); }
   else if(a==='invest'){ UI.section='fin'; UI.tab='invest'; render(); const f=$view.querySelector('[data-sect="free"]'); if(f) f.scrollIntoView({block:'start'}); }
   saveUI();
 }
@@ -2986,6 +3005,7 @@ function viewHome(){
   const WDF=['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'];
   let html=`<div class="hello"><b>${hello}</b><span>${WDF[wd(today)]}, ${today.getDate()} ${MG[today.getMonth()]}</span></div>
   <div class="quick"><button style="--sec:var(--s-fin)" data-act="quickExp">${icon('fin')}Трата</button><button style="--sec:var(--s-notes)" data-act="homeGo" data-v="note">${icon('notes')}Заметка</button><button style="--sec:var(--s-pay)" data-act="homeGo" data-v="pay">${icon('pay')}Платежи</button></div>`;
+  html+=weekHomeCard();
   // задачи: просроченные и на сегодня
   const onDay=t=>repOk(today,t.repeat,t.repeatDays);
   const open=S.tasks.filter(t=>tNow(t,tk)).sort((a,b)=>(tOver(a,tk)?0:1)-(tOver(b,tk)?0:1)||(a.deadline&&a.deadline>tk?1:0)-(b.deadline&&b.deadline>tk?1:0)||sortT(a,b));
@@ -3019,6 +3039,8 @@ function viewHome(){
   return html;
 }
 function viewMore(){
+  if(UI.page&&UI.page.kind==='trash') return viewTrash();
+  if(UI.page&&UI.page.kind==='week') return viewWeek(UI.page.off||0);
   const tk=todayK(), rd=S.books.filter(b=>b.status==='reading'), mon=addDays(TODAY(),-wd(TODAY()));
   const wk=S.workouts.filter(w=>parseD(w.date)>=mon).length;
   const cj=C.months.indexOf(C.curM), hd=S.habits.filter(h=>HS[h.id].sched(TODAY())||HL[h.id].has(tk));
@@ -3032,7 +3054,82 @@ function viewMore(){
     pay:(()=>{ const n=payOcc(tk,dkey(addDays(TODAY(),7))).filter(o=>!o.paid).length; return S.payments.length?(n?'на неделе: '+n:'на неделе платежей нет'):'регулярные платежи'; })(),
     bdays:(()=>{ const x=S.gifts.map(g=>({g,n:bdNext(g)})).filter(x=>x.n).sort((a,b)=>a.n-b.n)[0]; return x?esc(x.g.name)+' · '+bdWhen(x.n).toLowerCase():'кого поздравить'; })()};
   return `<div class="tiles">${SECTIONS.filter(s=>!s.nav).map(s=>s.id).map(id=>{ const s=SECTIONS.find(x=>x.id===id);
-    return `<button class="tile" style="--sec:var(--s-${id})" data-act="section" data-id="${id}"><span class="ic">${icon(id)}</span><b>${s.title}</b><span class="fsub">${esc(info[id])}</span></button>`; }).join('')}</div>`;
+    return `<button class="tile" style="--sec:var(--s-${id})" data-act="section" data-id="${id}"><span class="ic">${icon(id)}</span><b>${s.title}</b><span class="fsub">${esc(info[id])}</span></button>`; }).join('')}
+  <button class="tile" style="--sec:var(--s-week)" data-act="moreOpen" data-v="week"><span class="ic">${icon('week')}</span><b>Итоги недели</b><span class="fsub">${weekLine(weekData(0))}</span></button>
+    <button class="tile" style="--sec:var(--s-trash)" data-act="moreOpen" data-v="trash"><span class="ic">${icon('trash')}</span><b>Корзина</b><span class="fsub">${S.trash.length?S.trash.length+' '+plural(S.trash.length,'запись','записи','записей'):'пусто'}</span></button></div>`;
+}
+
+/* ======== Итоги недели: сделано, привычки, тренировки, деньги и что впереди ======== */
+const WEEK_SEEN='moyplan.weekseen.v1';
+function weekData(off){
+  const T=TODAY(), tk=todayK(), mon=addDays(T,-wd(T)+7*off), sun=addDays(mon,6), a=dkey(mon), b=dkey(sun), end=b<tk?b:tk, inW=k=>k&&k>=a&&k<=b;
+  const done=S.tasks.filter(t=>t.done&&inW(t.doneAt));
+  // не сделано в срок: срок (или крайний срок) был на этой неделе, а к её концу (или к сегодня) задача не закрыта
+  const missed=S.tasks.filter(t=>{ const k=t.deadline||t.due; return k&&k>=a&&k<end&&(!t.done||(t.doneAt||'')>k); });
+  const added=S.tasks.filter(t=>inW(t.created)).length;
+  // привычки: за неделю (у «пн, ср, пт» — сколько раз из плана)
+  const idx=11+off, hab=off<-11?[]:S.habits.map(h=>{ const w=HS[h.id]&&HS[h.id].weeks[idx]; return w&&w.s?{h,s:w.s,c:w.c}:null; }).filter(Boolean);
+  const hs=hab.reduce((x,r)=>x+r.s,0), hc=hab.reduce((x,r)=>x+r.c,0);
+  const wo=S.workouts.filter(w=>inW(w.date)), woMin=Math.round(wo.reduce((x,w)=>x+numOr(w.duration,0),0)/60);
+  const books=S.books.filter(x=>inW(x.finished)), movies=S.movies.filter(x=>inW(x.finished));
+  const paid=S.payLog.filter(l=>inW(l.paidAt)), paidSum=paid.reduce((x,l)=>x+numOr(l.amount,0),0);
+  const fs=S.fundSpend.filter(x=>inW(x.date)).reduce((x,f)=>x+numOr(f.amount,0),0);
+  const wl=S.weightLog.filter(x=>inW(x.date)&&numOr(x.kg,null)!=null).sort((x,y)=>x.date.localeCompare(y.date));
+  const food=S.foodLog.filter(x=>inW(x.date)), fdays=new Set(food.map(x=>x.date)).size, kcal=fdays?Math.round(food.reduce((x,f)=>x+numOr(f.kcal,0),0)/fdays):0;
+  const goals=S.goals.filter(g=>inW(g.doneAt)), steps=S.goalSteps.filter(x=>x.done&&inW(x.doneAt)).length;
+  // деньги — по месяцу, в котором кончается неделя (факт записывается за месяц, не по дням)
+  const m=C&&C.months?C.months.indexOf(sun.getFullYear()*12+sun.getMonth()):-1;
+  const over=m>=0?S.items.map(it=>({it,L:limitOf(it,dkey(sun).slice(0,7))})).filter(x=>x.L&&x.L.left<0):[];
+  // следующая неделя
+  const na=dkey(addDays(sun,1)), nb=dkey(addDays(sun,7)), inN=k=>k&&k>=na&&k<=nb;
+  const next={tasks:S.tasks.filter(t=>!t.done&&(inN(t.due)||inN(t.deadline))),pays:payOcc(na,nb).filter(o=>!o.paid),bds:S.gifts.map(g=>{ const d=parseD(g.date), f=addDays(sun,1); if(!d) return {g,n:null}; let n=bdIn(f.getFullYear(),d); if(n<f) n=bdIn(f.getFullYear()+1,d); return {g,n}; }).filter(x=>x.n&&inN(dkey(x.n)))};
+  return {off,mon,sun,a,b,cur:off===0,done,missed,added,hab,hs,hc,hpct:hs?hc/hs:null,wo,woMin,books,movies,paid,paidSum,fs,wl,kcal,fdays,goals,steps,m,over,next};
+}
+function weekLine(W){ const p=[]; if(W.done.length) p.push('сделано '+W.done.length); if(W.hpct!=null) p.push('привычки '+pct(W.hpct)); if(W.wo.length) p.push('тренировок '+W.wo.length); return p.length?p.join(' · '):'сколько сделано за неделю'; }
+const wkTitle=W=>{ const a=W.mon, b=W.sun; return a.getMonth()===b.getMonth()?a.getDate()+'–'+b.getDate()+' '+MG[b.getMonth()]:a.getDate()+' '+MG[a.getMonth()]+' – '+b.getDate()+' '+MG[b.getMonth()]; };
+function viewWeek(off){
+  const W=weekData(off), row=(l,v)=>`<div class="wk-row"><span class="fname">${l}</span><span class="num">${v}</span></div>`;
+  let h=`${pageBack('Ещё')}<div class="wk-nav"><button class="btn small" data-act="weekNav" data-d="-1" aria-label="Прошлая неделя">‹</button><b>${W.cur?'Эта неделя':off===-1?'Прошлая неделя':'Неделя'} · ${wkTitle(W)}</b><button class="btn small" data-act="weekNav" data-d="1" ${W.cur?'disabled':''} aria-label="Следующая неделя">›</button></div>`;
+  h+=`<section class="card"><div class="wk-kpis"><div><b class="num">${W.done.length}</b><span>${plural(W.done.length,'задача сделана','задачи сделано','задач сделано')}</span></div>
+    <div><b class="num">${W.hpct==null?'—':pct(W.hpct)}</b><span>привычки${W.hs?' · '+W.hc+' из '+W.hs:''}</span></div>
+    <div><b class="num">${W.wo.length}</b><span>${plural(W.wo.length,'тренировка','тренировки','тренировок')}${W.woMin?' · '+W.woMin+' мин':''}</span></div></div>
+    ${W.cur&&!W.done.length&&W.hpct==null&&!W.wo.length?'<p class="hint" style="margin:6px 0 0">Неделя только началась — итоги появятся по ходу.</p>':''}</section>`;
+  // задачи
+  const tl=[]; if(W.added) tl.push(row('Новых задач',W.added));
+  if(W.missed.length) tl.push(row('<span class="neg">Не сделано в срок</span>',W.missed.length));
+  const ml=W.missed.slice(0,5).map(t=>`<button class="soonrow" data-act="taskOpen" data-id="${t.id}"><span class="dot" style="--c:var(--neg)"></span><span class="m fname">${esc(t.name)}</span><span class="w">${dayLabel(t.deadline||t.due)}</span></button>`).join('');
+  if(W.done.length||tl.length) h+=homeCard('tasks','Задачи',(W.done.length?`<p class="fsub" style="margin:0 0 4px">Сделано: ${W.done.slice(0,6).map(t=>esc(t.name)).join(', ')}${W.done.length>6?' и ещё '+(W.done.length-6):''}</p>`:'')+tl.join('')+ml);
+  // привычки
+  if(W.hab.length) h+=homeCard('habits','Привычки',W.hab.sort((x,y)=>y.c/y.s-x.c/x.s).map(r=>`<div class="wk-row"><span class="fname">${esc(r.h.name)}</span><span class="num ${r.c>=r.s?'pos':r.c/r.s<0.5?'neg':''}">${r.c} из ${r.s}${r.c>=r.s?' ✓':''}</span></div>`).join(''));
+  // тело и досуг
+  const life=[]; if(W.wl.length) { const d=numOr(W.wl[W.wl.length-1].kg,0)-numOr(W.wl[0].kg,0); life.push(row('Вес',fmtN(W.wl[W.wl.length-1].kg)+' кг'+(W.wl.length>1&&Math.abs(d)>=0.05?' ('+(d>0?'+':'−')+fmtN(Math.abs(Math.round(d*10)/10))+')':''))); }
+  if(W.fdays) life.push(row('Питание, в среднем в день',fmt(W.kcal)+' ккал'));
+  if(W.books.length) life.push(row('Прочитано книг',W.books.map(x=>esc(x.name)).join(', ')));
+  if(W.movies.length) life.push(row('Посмотрено',W.movies.map(x=>esc(x.name)).join(', ')));
+  if(W.goals.length) life.push(row('Цели достигнуты',W.goals.map(x=>esc(x.name)).join(', ')));
+  else if(W.steps) life.push(row('Шагов к целям',W.steps));
+  if(life.length) h+=homeCard('train','Здоровье и досуг',life.join(''));
+  // деньги
+  const mon=[]; if(W.paid.length) mon.push(row('Оплачено платежей · '+W.paid.length,rub(W.paidSum)));
+  if(W.fs) mon.push(row('Траты из фондов',rub(W.fs)));
+  if(W.m>=0&&S.items.length) mon.push(row('Свободно в '+monthIn(C.months[W.m]),`<span class="${C.B.free[W.m]<0?'neg':'pos'}">${rub(C.B.free[W.m])}</span>`));
+  W.over.forEach(({it,L})=>mon.push(row('<span class="neg">Лимит превышен: '+esc(it.name)+'</span>','+'+rub(-L.left))));
+  if(mon.length) h+=homeCard('fin','Деньги',mon.join(''));
+  // что впереди
+  const N=W.next, nx=[];
+  if(N.tasks.length) nx.push(row('Задач со сроком',N.tasks.length));
+  N.pays.slice(0,5).forEach(o=>nx.push(row(esc(o.p.name)+' · '+dayLabel(o.due).toLowerCase(),rub(numOr(o.p.amount,0)))));
+  N.bds.forEach(x=>nx.push(row('День рождения: '+esc(x.g.name),dayLabel(dkey(x.n)).toLowerCase())));
+  if(nx.length) h+=homeCard('pay',W.cur?'На следующей неделе':'Неделя после',nx.join(''));
+  return h;
+}
+// на главной: в воскресенье после обеда — итоги этой недели, в понедельник — прошлой (можно скрыть)
+function weekHomeCard(){
+  const T=TODAY(), d=wd(T), hr=new Date().getHours(); if(!(d===6&&hr>=12||d===0)) return '';
+  const W=weekData(d===6?0:-1); let seen=''; try{ seen=localStorage.getItem(WEEK_SEEN)||''; }catch(e){}
+  if(seen===W.a||!(W.done.length||W.hs||W.wo.length)) return '';
+  return `<section class="card" style="--sec:var(--s-week)"><div class="wk-home"><span class="hic">${icon('week')}</span><div class="m"><b>Итоги недели</b><div class="fsub">${wkTitle(W)} · ${weekLine(W)}</div></div>
+    <button class="btn small primary" data-act="weekOpen" data-off="${W.off}">Смотреть</button><button class="btn small" data-act="weekHide" data-k="${W.a}" aria-label="Скрыть">×</button></div></section>`;
 }
 
 /* ======== Привычки, которые отмечаются сами ======== */
@@ -4599,9 +4696,8 @@ function saveEditor(){
 function deleteEditor(){
   const F=FORMS[edit.kind], list=F.list(), rec=list[edit.i];
   if(!confirm(F.deleteText?F.deleteText(rec):'Удалить «'+(rec.name||'запись')+'»?')) return;
-  if(F.onDelete) F.onDelete(rec);
-  const idx=F.list().indexOf(rec); if(idx>=0) F.list().splice(idx,1);
-  closeSheet(); persist(...F.keys,...(F.extraKeys||[])); render();
+  const tr=trashed(F.keys.concat(F.extraKeys||[]),rec.name||F.title,F.title,()=>{ if(F.onDelete) F.onDelete(rec); const idx=F.list().indexOf(rec); if(idx>=0) F.list().splice(idx,1); });
+  closeSheet(); persist(...F.keys,...(F.extraKeys||[])); render(); if(tr) toast('Удалено — можно вернуть из корзины');
 }
 function storageBox(){
   if(IS_GAS) return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">В Google Таблице, к которой подключён скрипт. Каждая правка сохраняется сама.</div></div>`;
@@ -4708,21 +4804,57 @@ function tdragEnd(){
 }
 document.addEventListener('pointerup',tdragEnd); document.addEventListener('pointercancel',tdragEnd);
 
+/* ---------- корзина: удалённое лежит 30 дней, оттуда можно вернуть ---------- */
+// снимок разделов до удаления → после удаления в корзину попадает всё, что из них исчезло (запись и её отметки, факт и т.п.)
+const trashSnap=keys=>[...new Set(keys)].filter(k=>Array.isArray(S[k])).map(k=>[k,S[k].slice()]);
+function trashPut(snap,name,kind,main){
+  const data={};
+  snap.forEach(([k,arr])=>{ const now=new Set(S[k]), gone=arr.filter(x=>!now.has(x)); if(gone.length) data[k]=clone(gone); });
+  const ks=Object.keys(data); if(!ks.length) return null;
+  // ячейка таблицы — до 50 000 знаков: если не влезает, кладём только саму запись
+  const fit=d=>JSON.stringify(d).length<45000;
+  let d=data; if(!fit(d)){ main=main||ks[0]; d=data[main]?{[main]:data[main]}:null; if(!d||!fit(d)) return null; }
+  const e={id:uid(),kind:kind||'Запись',name:String(name||'запись').slice(0,200),deleted:todayK(),data:d};
+  S.trash.unshift(e); persist('trash'); return e;
+}
+// удалить с корзиной: fn делает само удаление
+function trashed(keys,name,kind,fn){ const snap=trashSnap(keys); fn(); return trashPut(snap,name,kind,keys[0]); }
+function trashRestore(id){
+  const i=S.trash.findIndex(x=>x.id===id); if(i<0) return; const e=S.trash[i], keys=[];
+  Object.entries(e.data||{}).forEach(([k,arr])=>{ if(!Array.isArray(S[k])||!Array.isArray(arr)) return; keys.push(k);
+    const ids=new Set(S[k].map(x=>x&&x.id).filter(Boolean)), js=new Set(S[k].filter(x=>x&&!x.id).map(x=>JSON.stringify(x)));
+    arr.forEach(x=>{ if(!x||typeof x!=='object') return;
+      if(x.id?ids.has(x.id):js.has(JSON.stringify(x))) return;
+      // проект или раздел заметок могли удалить — тогда запись возвращается без него
+      if(k==='tasks'&&x.project&&!projById(x.project)) x.project='';
+      if(k==='notes'&&x.folder&&!S.noteFolders.some(f=>f.id===x.folder)) x.folder='';
+      S[k].push(x); }); });
+  S.trash.splice(i,1); persist(...keys,'trash'); render(); toast('Возвращено: '+e.name);
+}
+function viewTrash(){
+  const L=S.trash, left=e=>Math.max(0,TRASH_DAYS+daysTo(e.deleted));
+  return `${pageBack('Ещё')}<div class="detail-title"><h2>Корзина</h2>${L.length?'<button class="btn small danger" data-act="trashEmpty">Очистить</button>':''}</div>
+  <section class="card">${L.length?L.map(e=>`<div class="trashrow"><div class="m"><div class="fname">${esc(e.name)}</div><div class="fsub">${esc(e.kind)} · удалено ${dayLabel(e.deleted).toLowerCase()} · сотрётся через ${left(e)} ${plural(left(e),'день','дня','дней')}</div></div>
+    <button class="btn small" data-act="trashBack" data-id="${e.id}">Вернуть</button><button class="btn small" data-act="trashDel" data-id="${e.id}" aria-label="Стереть навсегда" title="Стереть навсегда">×</button></div>`).join('')
+    :'<p class="hint" style="margin:0">Корзина пуста. Сюда попадают удалённые задачи, заметки, привычки и другие записи — их можно вернуть в течение '+TRASH_DAYS+' дней.</p>'}</section>
+  ${L.length?`<p class="hint">Удалённое хранится ${TRASH_DAYS} дней, потом стирается само.</p>`:''}`;
+}
+
 /* ---------- удаление из списка, не заходя внутрь: правой кнопкой мыши или свайпом влево ---------- */
 const DEL_KINDS={taskOpen:'task',goalOpen:'goal',payOpen:'payment',bookOpen:'book',movieOpen:'movie',habit:'habit',posOpen:'invPos',invOpen:'invGroup',wishOpen:'invWish',nfOpen:'noteFolder',bdOpen:'gift'};
 function delSpec(b){
   if(!b||!S||!b.dataset) return null; const a=b.dataset.act, id=b.dataset.id;
-  const mk=(list,keys,rec,name,onDelete)=>rec?{list,keys:[...new Set(keys)],rec,name:String(name||'запись'),onDelete}:null;
-  const byF=(kind,rec)=>{ const F=FORMS[kind]; return mk(F.list(),F.keys.concat(F.extraKeys||[]),rec,rec&&(rec.name||F.title),F.onDelete); };
+  const mk=(list,keys,rec,name,onDelete,kind)=>rec?{list,keys:[...new Set(keys)],rec,name:String(name||'запись'),onDelete,kind}:null;
+  const byF=(kind,rec)=>{ const F=FORMS[kind]; return mk(F.list(),F.keys.concat(F.extraKeys||[]),rec,rec&&(rec.name||F.title),F.onDelete,F.title); };
   if(DEL_KINDS[a]) return byF(DEL_KINDS[a],FORMS[DEL_KINDS[a]].list().find(x=>x.id===id));
   if(a==='edit'&&FORMS[b.dataset.kind]) return byF(b.dataset.kind,FORMS[b.dataset.kind].list()[+b.dataset.i]);
   if(a==='exOpen'&&b.classList.contains('list-row')) return byF('exercise',S.exercises.find(x=>x.id===id));
   if(a==='tView'&&String(b.dataset.v||'').startsWith('p:')) return byF('project',projById(b.dataset.v.slice(2)));
-  if(a==='recipeOpen'){ const r=S.recipes.find(x=>x.id===id); return mk(S.recipes,['recipes','tasks'],r,r&&(r.name||'рецепт'),x=>{ const t=x.task&&S.tasks.find(y=>y.id===x.task&&!y.done); if(t) S.tasks=S.tasks.filter(y=>y!==t); }); }
-  if(a==='prodMove'||a==='prodBuy'){ const r=S.pantry.find(x=>x.id===id); return mk(S.pantry,['pantry'],r,r&&r.name); }
-  if(a==='noteOpen'){ const r=S.notes.find(x=>x.id===id); return mk(S.notes,['notes'],r,r&&(r.name||firstLine(noteText(r.body))||'заметка')); }
-  if(a==='routineOpen'){ const r=S.routines.find(x=>x.id===id); return mk(S.routines,['routines'],r,r&&r.name); }
-  if(a==='workoutOpen'){ const r=S.workouts.find(x=>x.id===id); return mk(S.workouts,['workouts'],r,r&&((r.name||'Тренировка')+', '+dRu(r.date))); }
+  if(a==='recipeOpen'){ const r=S.recipes.find(x=>x.id===id); return mk(S.recipes,['recipes','tasks'],r,r&&(r.name||'рецепт'),x=>{ const t=x.task&&S.tasks.find(y=>y.id===x.task&&!y.done); if(t) S.tasks=S.tasks.filter(y=>y!==t); },'Рецепт'); }
+  if(a==='prodMove'||a==='prodBuy'){ const r=S.pantry.find(x=>x.id===id); return mk(S.pantry,['pantry'],r,r&&r.name,null,'Продукт'); }
+  if(a==='noteOpen'){ const r=S.notes.find(x=>x.id===id); return mk(S.notes,['notes'],r,r&&(r.name||firstLine(noteText(r.body))||'заметка'),null,'Заметка'); }
+  if(a==='routineOpen'){ const r=S.routines.find(x=>x.id===id); return mk(S.routines,['routines'],r,r&&r.name,null,'Программа тренировок'); }
+  if(a==='workoutOpen'){ const r=S.workouts.find(x=>x.id===id); return mk(S.workouts,['workouts'],r,r&&((r.name||'Тренировка')+', '+dRu(r.date)),null,'Тренировка'); }
   return null;
 }
 // строка списка и то, что в ней удаляется (свайп может начаться и на галочке строки)
@@ -4754,10 +4886,9 @@ function delTarget(el){
 }
 function delRecord(sp){
   const snap=sp.keys.map(k=>[k,JSON.stringify(S[k])]);
-  if(sp.onDelete) sp.onDelete(sp.rec);
-  const i=sp.list.indexOf(sp.rec); if(i>=0) sp.list.splice(i,1);
+  const tr=trashed(sp.keys,sp.name,sp.kind,()=>{ if(sp.onDelete) sp.onDelete(sp.rec); const i=sp.list.indexOf(sp.rec); if(i>=0) sp.list.splice(i,1); });
   persist(...sp.keys); render();
-  toast('Удалено: '+sp.name,{label:'Вернуть',fn:()=>{ snap.forEach(([k,v])=>{ S[k]=JSON.parse(v); }); persist(...sp.keys); render(); }});
+  toast('Удалено: '+sp.name,{label:'Вернуть',fn:()=>{ snap.forEach(([k,v])=>{ S[k]=JSON.parse(v); }); if(tr){ S.trash=S.trash.filter(x=>x!==tr); persist('trash'); } persist(...sp.keys); render(); }});
 }
 // меню по правой кнопке
 function hideCtx(){ const m=document.getElementById('ctx'); if(m) m.remove(); }
@@ -5093,7 +5224,14 @@ document.addEventListener('click',e=>{
     UI.page={kind:'task',id:b.dataset.id,back,from:UI.section==='goals'&&UI.page?UI.page:null}; if(UI.section!=='tasks'){ UI.section='tasks'; } go(); }
   else if(a==='taskNew'){ const inp=document.getElementById('qaTitle'), v=UI.sub.tasks||''; const t=newTask(inp?inp.value.trim():'','',v.startsWith('p:')?v.slice(2):'');
     UI.draft=t; UI.page={kind:'task',id:t.id,isNew:true,back:'Задачи'}; go(); const n=$view.querySelector('[data-tf="name"]'); if(n&&!t.name) n.focus(); }
-  else if(a==='taskDel'){ const i=S.tasks.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить задачу?')) return; S.tasks.splice(i,1); persist('tasks'); backFromTask(); go(); }
+  else if(a==='trashBack') trashRestore(b.dataset.id);
+  else if(a==='trashDel'){ const e=S.trash.find(x=>x.id===b.dataset.id); if(!e||!confirm('Стереть «'+e.name+'» навсегда?')) return; S.trash=S.trash.filter(x=>x!==e); persist('trash'); render(); }
+  else if(a==='trashEmpty'){ if(!S.trash.length||!confirm('Стереть всё из корзины навсегда?')) return; S.trash=[]; persist('trash'); render(); }
+  else if(a==='moreOpen'){ UI.page={kind:b.dataset.v,off:0}; render(); window.scrollTo(0,0); }
+  else if(a==='weekNav'){ UI.page={kind:'week',off:Math.min(0,(UI.page&&UI.page.off||0)+(+b.dataset.d))}; render(); }
+  else if(a==='weekOpen'){ UI.section='more'; UI.page={kind:'week',off:+b.dataset.off||0}; UI.detail=null; render(); window.scrollTo(0,0); }
+  else if(a==='weekHide'){ try{ localStorage.setItem(WEEK_SEEN,b.dataset.k); }catch(e){} render(); }
+  else if(a==='taskDel'){ const i=S.tasks.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить задачу?')) return; const t=S.tasks[i]; trashed(['tasks'],t.name,'Задача',()=>S.tasks.splice(i,1)); persist('tasks'); backFromTask(); go(); toast('Задача в корзине — её можно вернуть'); }
   else if(a==='tView'){ UI.sub.tasks=b.dataset.v; UI.projOpen=false; UI.page=null; saveUI(); go(); }
   else if(a==='numPick') openNumPick(b.dataset.k,b.dataset.ph);
   else if(a==='numPickOk') numPickOk();
@@ -5171,7 +5309,7 @@ document.addEventListener('click',e=>{
     if(r.planned) planRecipe(r); persist('recipes'); UI.page=null; UI.sub.food='recipes'; go(); }
   else if(a==='recipeCancel'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r&&UI.page&&UI.page.isNew){ S.recipes=S.recipes.filter(x=>x!==r); persist('recipes'); } UI.page=null; go(); }
   else if(a==='recipeDel'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(!r||!confirm('Удалить рецепт «'+(r.name||'без названия')+'»?')) return;
-    if(r.planned) unplanRecipe(r,false); S.recipes=S.recipes.filter(x=>x!==r); persist('recipes'); UI.page=null; go(); }
+    trashed(['recipes','tasks'],r.name||'рецепт','Рецепт',()=>{ if(r.planned) unplanRecipe(r,false); S.recipes=S.recipes.filter(x=>x!==r); }); persist('recipes'); UI.page=null; go(); }
   else if(a==='recipePlan'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r&&planRecipe(r)){ render(); const m=recMissing(r).length; toast(m?'В плане. Купить '+m+' '+plural(m,'продукт','продукта','продуктов')+' — Задачи → «Список покупок»':'В плане. Все продукты есть дома'); } }
   else if(a==='recipeUnplan'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r){ unplanRecipe(r,false); render(); toast('Убрано из плана, список покупок для блюда удалён'); } }
   else if(a==='recipeCooked'){ const r=S.recipes.find(x=>x.id===b.dataset.id); if(r){ const was=clone(S.pantry), c=consumeRecipe(r); if(r.planned) unplanRecipe(r,true); else syncShop(); render();
@@ -5189,7 +5327,7 @@ document.addEventListener('click',e=>{
   else if(a==='ideaToggle'){ const gg=S.gifts.find(x=>x.id===b.dataset.id), it=gg&&gg.ideas[+b.dataset.j]; if(!it) return; it.done=!it.done; it.doneAt=it.done?todayK():''; persist('gifts'); render(); }
   else if(a==='ideaDel'){ const gg=S.gifts.find(x=>x.id===b.dataset.id); if(!gg||!gg.ideas[+b.dataset.j]) return; gg.ideas.splice(+b.dataset.j,1); persist('gifts'); render(); }
   else if(a==='notePin'){ const n=S.notes.find(x=>x.id===b.dataset.id); if(!n) return; n.pinned=!n.pinned; persist('notes'); render(); }
-  else if(a==='noteDel'){ const i=S.notes.findIndex(x=>x.id===b.dataset.id); if(i<0) return; if((S.notes[i].body||S.notes[i].name)&&!confirm('Удалить заметку?')) return; S.notes.splice(i,1); persist('notes'); UI.page=null; go(); }
+  else if(a==='noteDel'){ const i=S.notes.findIndex(x=>x.id===b.dataset.id); if(i<0) return; const n=S.notes[i], has=n.body||n.name; if(has&&!confirm('Удалить заметку?')) return; if(has&&!noteEmpty(n)) trashed(['notes'],n.name||firstLine(noteText(n.body))||'заметка','Заметка',()=>S.notes.splice(i,1)); else S.notes.splice(i,1); persist('notes'); UI.page=null; go(); }
   // тренировки
   else if(a==='wStart') startWorkout(b.dataset.id);
   else if(a==='wFinish') finishWorkout();
@@ -5216,11 +5354,11 @@ document.addEventListener('click',e=>{
   else if(a==='routineNew'){ const r={id:uid(),name:'Новая программа',items:[]}; S.routines.push(r); persist('routines'); UI.page={kind:'routine',id:r.id,isNew:true}; go(); }
   else if(a==='routineSave'){ const r=UI.page&&S.routines.find(x=>x.id===UI.page.id); if(r&&!r.items.length&&UI.page.isNew){ toast('Добавьте хотя бы одно упражнение'); return; } const wasNew=UI.page&&UI.page.isNew; UI.page=null; go(); if(wasNew) toast('Программа сохранена'); }
   else if(a==='routineCancel'){ const i=S.routines.findIndex(x=>x.id===b.dataset.id); if(i>=0&&S.routines[i].items.length&&!confirm('Не сохранять новую программу?')) return; if(i>=0){ S.routines.splice(i,1); persist('routines'); } UI.page=null; go(); }
-  else if(a==='routineDel'){ const i=S.routines.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить программу «'+S.routines[i].name+'»?')) return; S.routines.splice(i,1); persist('routines'); UI.page=null; go(); }
+  else if(a==='routineDel'){ const i=S.routines.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить программу «'+S.routines[i].name+'»?')) return; trashed(['routines'],S.routines[i].name,'Программа тренировок',()=>S.routines.splice(i,1)); persist('routines'); UI.page=null; go(); }
   else if(a==='rMove'||a==='rDel'){ const r=S.routines.find(x=>x.id===UI.page.id), k=+b.dataset.k; if(!r) return;
     if(a==='rDel') r.items.splice(k,1); else if(k>0) [r.items[k-1],r.items[k]]=[r.items[k],r.items[k-1]]; persist('routines'); render(); }
   else if(a==='workoutOpen'){ UI.page={kind:'workout',id:b.dataset.id}; go(); }
-  else if(a==='wDel'){ const i=S.workouts.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить тренировку из истории?')) return; S.workouts.splice(i,1); persist('workouts'); UI.page=null; go(); }
+  else if(a==='wDel'){ const i=S.workouts.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить тренировку из истории?')) return; const w=S.workouts[i]; trashed(['workouts'],(w.name||'Тренировка')+', '+dRu(w.date),'Тренировка',()=>S.workouts.splice(i,1)); persist('workouts'); UI.page=null; go(); }
   else if(a==='export'){ document.getElementById('jsonBox').value=JSON.stringify(S,null,1); }
   else if(a==='copy'){ const t=document.getElementById('jsonBox'); if(!t.value) t.value=JSON.stringify(S,null,1); t.select(); try{ navigator.clipboard.writeText(t.value).then(()=>toast('Скопировано'),()=>{ document.execCommand('copy'); toast('Скопировано'); }); }catch(err){ document.execCommand('copy'); toast('Скопировано'); } }
   else if(a==='import'){ let d; try{ d=JSON.parse(document.getElementById('jsonBox').value); }catch(err){ toast('Это не JSON'); return; }
@@ -5242,7 +5380,7 @@ document.addEventListener('click',e=>{
     if(g) gsDropTok();
     REMOTE=null; dirtyAll=false; dirtyKeys.clear(); canSave=true; closeSheet(); setSync('ok','Данные из этого браузера'); toast(g?'Вы вышли из Google':'Таблица отключена'); nativeSync(); }
   else if(a==='reset'){ if(!confirm('Вернуть финансы к данным из Excel? Всё, что вводили здесь, пропадёт. Привычки останутся.')) return;
-    const keep={}; for(const k of ['habits','habitLog','tasks','goals','goalSteps','books','movies','noteFolders','recipes','pantry','notes','foodLog','waterLog','weightLog','exercises','routines','workouts','trainActive','projects','payments','payLog']) keep[k]=S[k];
+    const keep={}; for(const k of ['habits','habitLog','tasks','goals','goalSteps','books','movies','noteFolders','recipes','pantry','notes','foodLog','waterLog','weightLog','exercises','routines','workouts','trainActive','projects','payments','payLog','trash']) keep[k]=S[k];
     S=Object.assign(normalize(DEFAULT_DATA)[0],keep); closeSheet(); persist(); render(); toast('Данные из Excel восстановлены'); }
   else if(a==='theme'){ const v=b.dataset.v; if(v) document.documentElement.dataset.theme=v; else delete document.documentElement.dataset.theme; try{ localStorage.setItem('moyplan.theme',v); }catch(err){} openSettings(); }
 });
