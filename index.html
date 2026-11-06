@@ -459,6 +459,8 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .tfields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tfields label{display:block;font-size:12px;color:var(--text-2);margin-bottom:3px}
 .tfields select,.tfields input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.hsub{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2);margin:8px 0 2px}.hsub.neg{color:var(--neg)}
+.dwrap{display:flex;gap:4px;align-items:center}.dwrap input{flex:1;min-width:0}
 .cl-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
 .cl-row:first-child{border-top:0}
 .cl-text{flex:1;min-width:0;border:0;background:transparent;padding:4px 0;font-size:15px;outline:none}
@@ -484,6 +486,7 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .rich ul.nchk>li{position:relative;padding-left:28px;margin:4px 0}
 .rich ul.nchk>li::before{content:'';position:absolute;left:1px;top:.18em;width:18px;height:18px;box-sizing:border-box;border:2px solid var(--muted);border-radius:5px;cursor:pointer;font-size:12px;line-height:14px;text-align:center;color:var(--on-accent);font-weight:700}
 .rich ul.nchk>li[data-c="1"]{color:var(--muted);text-decoration:line-through}
+.rich ul.nchk>li[data-c="1"]>ul,.rich ul.nchk>li[data-c="1"]>ol{display:inline-block;width:100%;color:var(--text)}
 .rich ul.nchk>li[data-c="1"]::before{content:'✓';background:var(--accent);border-color:var(--accent)}
 .rich table.ntbl{border-collapse:collapse;width:calc(100% - 26px);margin:6px 0;table-layout:fixed}
 .rich .ntbl td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;overflow-wrap:anywhere}
@@ -579,6 +582,19 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .toast-act{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-decoration:underline;padding:2px 0}
 /* подкатегории факта */
 .fsubs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.qx h2{margin-bottom:6px}
+.qx-amt{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:10px 12px 12px;border-bottom:2px solid var(--sec,var(--accent));margin:0 0 4px}
+.qx-amt input{border:0;background:none;font-size:36px;font-weight:700;text-align:center;width:100%;min-width:0;color:var(--text);padding:0;outline:none}
+@supports (field-sizing:content){.qx-amt input{width:auto;field-sizing:content;min-width:1.2ch;max-width:85%}}
+.qx-amt span{font-size:24px;color:var(--text-2);font-weight:600}
+.qx-h{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2);margin:14px 0 6px}
+.qx-items{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.qx-it{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;padding:9px 11px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);min-width:0}
+.qx-it .fname{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qx-it.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.qx-it.more{align-items:center;justify-content:center;color:var(--accent);border-style:dashed;background:none}
+.qx-lim{margin-top:14px}
+.qx .actions .btn{flex:1}
 .fsubs .chip{padding:5px 12px;font-size:13.5px}
 .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .qbar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin:-2px 0 12px}
@@ -970,15 +986,26 @@ function habitStats(h,done,today){
   for(const k of done){ const d=parseD(k); if(d<created) created=d; }
   // день вне плана, в который всё-таки сделал, тоже засчитывается
   const on=d=>sched(d)||done.has(dkey(d));
-  const range=(from,to)=>{ let s=0,c=0; for(let d=from<created?created:from; d<=to; d=addDays(d,1)){ if(on(d)){ s++; if(done.has(dkey(d))) c++; } } return {s,c,pct:s?c/s:null}; };
-  let cur=0, d=today;
-  if(sched(d)&&!done.has(dkey(d))) d=addDays(d,-1);
-  for(; d>=created; d=addDays(d,-1)){ if(!on(d)) continue; if(done.has(dkey(d))) cur++; else break; }
-  let best=0, run=0;
-  for(let x=created; x<=today; x=addDays(x,1)){ if(!on(x)) continue; if(done.has(dkey(x))){ run++; if(run>best) best=run; } else if(dkey(x)!==dkey(today)) run=0; }
+  // не каждый день (пн, ср, пт): считается, сколько раз сделано, а не в какие дни — план «3 раза» выполнен 3 разами в любые дни
+  const nDays=String(h.days||'').split('').filter(c=>c==='1').length, weekly=nDays>0&&nDays<7;
+  const range=(from,to)=>{ let s=0,c=0,p=0,n=0; for(let d=from<created?created:from; d<=to; d=addDays(d,1)){ const dn=done.has(dkey(d)); if(sched(d)) p++; if(dn) n++; if(on(d)){ s++; if(dn) c++; } }
+    if(weekly){ const k=Math.min(n,p); return {s:p,c:k,pct:p?k/p:null}; } return {s,c,pct:s?c/s:null}; };
+  let cur=0, best=0, run=0;
+  if(weekly){
+    // неделя (пн–вс) засчитана, если сделано не меньше, чем запланировано; текущая неделя, пока не набрана, серию не рвёт
+    const wk=ws=>{ let p=0,n=0; for(let k=0;k<7;k++){ const d=addDays(ws,k); if(d>=created&&sched(d)) p++; if(done.has(dkey(d))) n++; } return {p,n}; };
+    const mon=addDays(today,-wd(today)), cm=addDays(created,-wd(created));
+    for(let k=0, ws=mon; ws>=cm; k++, ws=addDays(ws,-7)){ const w=wk(ws); if(!w.p) continue; if(w.n>=w.p) cur++; else if(k) break; }
+    for(let ws=cm; ws<=mon; ws=addDays(ws,7)){ const w=wk(ws); if(!w.p) continue; if(w.n>=w.p){ run++; if(run>best) best=run; } else if(ws<mon) run=0; }
+  } else {
+    let d=today;
+    if(sched(d)&&!done.has(dkey(d))) d=addDays(d,-1);
+    for(; d>=created; d=addDays(d,-1)){ if(!on(d)) continue; if(done.has(dkey(d))) cur++; else break; }
+    for(let x=created; x<=today; x=addDays(x,1)){ if(!on(x)) continue; if(done.has(dkey(x))){ run++; if(run>best) best=run; } else if(dkey(x)!==dkey(today)) run=0; }
+  }
   const weeks=[]; const mon=addDays(today,-wd(today));
   for(let k=11; k>=0; k--){ const ws=addDays(mon,-7*k), we=addDays(ws,6); weeks.push(Object.assign({start:ws},range(ws,we>today?today:we))); }
-  return {created,sched,cur,best,total:done.size,d7:range(addDays(today,-6),today),d30:range(addDays(today,-29),today),all:range(created,today),weeks};
+  return {created,sched,weekly,cur,best,total:done.size,d7:range(addDays(today,-6),today),d30:range(addDays(today,-29),today),all:range(created,today),weeks};
 }
 // ENGINE-END
 
@@ -1061,7 +1088,7 @@ const HELP={
   'fin.goal':['Цель — сколько и к какой дате накопить, и сколько реально откладываете по месяцам.'],
   bonds:['Подбор облигаций — все облигации Мосбиржи (ОФЗ, муниципальные, корпоративные) с ценой, доходностью к погашению (или к оферте), купоном и НКД. Данные с задержкой до 15 минут.','Надёжность: рейтингов на бирже нет, поэтому фильтр — по типу эмитента и уровню листинга. ОФЗ — самые надёжные, 1-й уровень — крупные компании с самыми строгими требованиями биржи. Пометка «высокий риск» — доходность больше ОФЗ на 8 п. п. и выше. Перед покупкой проверьте рейтинг эмитента (АКРА, Эксперт РА).','Оферта — дата, когда эмитент может выкупить облигацию или поменять купон; доходность тогда считается к оферте. Нажмите на облигацию — добавится в «Хочу купить».'],
   home:['Главная — всё важное на сегодня: задачи, привычки, деньги в этом месяце и что скоро (платежи, дни рождения, резервы, погашения облигаций).','Задачу можно добавить прямо здесь — срок пишите словами: «завтра в 10», «в пятницу». Без срока задача встанет на сегодня.','Остальные разделы — во вкладке «Ещё».'],
-  tasks:['Задачи — дела со сроком, повтором, проектами и чек-листами. «Сегодня» — что сделать сегодня и просроченное.','Срок можно писать словами: «завтра в 10», «в пятницу», «каждый понедельник».'],
+  tasks:['Задачи — дела со сроком, повтором, проектами и чек-листами. «Сегодня» — что сделать сегодня и просроченное.','У задачи может быть дата выполнения (на следующий день — просрочена) и крайний срок (до него задача каждый день в «Сегодня»). Без срока — просто лежит в проекте.','Срок можно писать словами: «завтра в 10», «в пятницу», «каждый понедельник».'],
   habits:['Привычки — отмечайте каждый день. Бывают «сделал / не сделал» и с количеством (стаканы воды, страницы). Статистика — по дням, неделям и по каждой привычке.'],
   goals:['Цели — что хотите достичь: шаги и задачи по цели, прогресс.'],
   notes:['Заметки — тексты и списки по папкам. Быстрые заметки из виджета попадают в папку «Быстрые заметки».'],
@@ -1271,7 +1298,7 @@ const GS_SCHEMA = [
     ['doneAt', 'Когда сделано', 'd'], ['note', 'Описание', 's'], ['created', 'Создана', 'd'],
     ['project', 'ID проекта', 's'], ['projectName', 'Проект', 's'], ['repeatDays', 'Дни повтора пн…вс', 's'], ['checklist', 'Чек-лист (служебное)', 'j'],
     ['times', 'Сколько раз', 'n'], ['timesDone', 'Сделано раз', 'n'],
-    ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's']] },
+    ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's'], ['deadline', 'Крайний срок', 'd']] },
   { key: 'projects', sheet: 'Проекты', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Проект', 's'], ['parent', 'ID родительского проекта', 's'], ['created', 'Создан', 'd']] },
   { key: 'fundSpend', sheet: 'Фонды — траты', cols: [
@@ -1590,7 +1617,7 @@ function normalize(d){
     const inc=o.items.filter(it=>it.type==='Доход'||it.type==='Разовый доход'), mine=inc.filter(it=>(it.owner||'me')==='me');
     f.src=(f.who==='all'||mine.length===inc.length)?[]:mine.map(it=>it.id); f.once=AL0.base==='all'; delete f.who; });
   o.facts.forEach(f=>{ if(f.tags==null) f.tags=''; });
-  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
+  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; if(t.deadline==null) t.deadline=''; t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
   o.goals.forEach(g=>{ for(const k of ['specific','measure','achievable']) if(g[k]==null) g[k]=''; });
   o.habits.forEach(h=>{ if(!h.type) h.type='check'; });
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
@@ -1716,7 +1743,7 @@ function applyInbox(){
       const n=t.times||1, k=it.k==null?n:Math.max(0,Math.min(n,+it.k));
       if(k<n){ if(k>(t.timesDone||0)){ t.timesDone=k; keys.add('tasks'); } return; }
       t.done=true; t.doneAt=isDay(it.day)?it.day:todayK(); t.timesDone=n;
-      if(t.repeat&&t.repeat!=='none') S.tasks.push(Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nextDue(t.due,t.repeat,t.repeatDays),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))}));
+      if(t.repeat&&t.repeat!=='none'){ const nx=nextDue(t.due,t.repeat,t.repeatDays); S.tasks.push(Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nx,deadline:nextDeadline(t,nx),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))})); }
       keys.add('tasks'); nd++; }
     else { if(S.tasks.some(t=>t.id===it.id)) return;
       const day=isDay(it.created)?it.created:todayK(), pt=parseTaskText(text,day), t=newTask(pt.name); t.id=it.id;
@@ -1766,11 +1793,11 @@ let nativeT=null;
 function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=setTimeout(()=>{ try{
   NATIVE.schedule(JSON.stringify(notifPlan()));
   const wk=dkey(addDays(TODAY(),7));
-  NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&x.due&&x.due<=wk).map(x=>({id:x.id,name:x.name,due:x.due,time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
+  NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&(x.deadline||x.due&&x.due<=wk)).map(x=>({id:x.id,name:x.name,due:x.due,deadline:x.deadline||'',time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
     projects:S.projects.map(p=>({id:p.id,name:p.name,parent:p.parent||''})),
     habits:S.habits.map(h=>({id:h.id,name:h.name,type:h.type==='count'?'count':'check',target:numOr(h.target,1),unit:h.unit||'',days:h.days||'1111111',created:h.created||''})),
     hday:todayK(),hlog:Object.fromEntries(S.habitLog.filter(l=>l.date===todayK()).map(l=>[l.habit,numOr(l.value,1)])),
-    exp:expItems().map(it=>{ const L=limitOf(it,todayK().slice(0,7)); return {id:it.id,name:it.name,subs:itemSubs(it),limit:L?L.lim:0,spent:L?L.spent:0}; }),emonth:todayK().slice(0,7)}));
+    exp:expItems().map(it=>{ const L=limitOf(it,todayK().slice(0,7)); return {id:it.id,name:it.name,plan:numOr(it.amount,0),subs:itemSubs(it),limit:L?L.lim:0,spent:L?L.spent:0}; }),emonth:todayK().slice(0,7)}));
   NATIVE.setRemote(REMOTE?(REMOTE.g?'google':REMOTE.url):'',REMOTE&&!REMOTE.g?REMOTE.key:'');
 }catch(e){} },800); }
 function nativeBox(){
@@ -1970,6 +1997,7 @@ function viewSummary(){
   ${nowNextCard()}
   <section class="card"><h3>Прибыль по месяцам${QH}</h3><p class="hint qtip" hidden>Доходы − расходы − накопления. Там, где введён факт, — по факту.</p><div class="chart" data-chart="free"></div></section>
   ${avgCard()}
+  ${incYear()}
   <section class="card"><h3>Накопленный капитал${QH}</h3><p class="hint qtip" hidden>Свободные деньги — прибыль нарастающим итогом с начала плана. Накопления — отложенное (статьи «Накопление») плюс вклады и инвестиции по текущей стоимости.</p>
     <div class="legend"><span><i style="--c:var(--series)"></i>свободные</span><span><i style="--c:var(--t3)"></i>накопления</span></div><div class="chart" data-chart="cum"></div></section>
   <div class="kpis">
@@ -1998,6 +2026,20 @@ function nowNextCard(){
     <table class="nn num"><thead><tr><th></th>${js.map(j=>{ const n=factCount(j); return `<th>${MN[C.months[j]%12]}<small>${n?'факт по '+n+' стат.':'только план'}</small></th>`; }).join('')}</tr></thead>
     <tbody>${row('Доходы',B.inc,P.inc)}${row('Расходы',B.exp,P.exp)}${row('Накопления',B.sav,P.sav)}${row('Свободно',B.free,P.free,'key')}</tbody></table></section>`;
 }
+// средний доход в месяц за выбранный год: факт, где введён, иначе план
+function incYear(){ const B=C.B, ms=C.months, years=[...new Set(ms.map(m=>Math.floor(m/12)))];
+  if(!S.items.some(it=>TYPE_CAT[it.type]==='inc')) return '';
+  let y=UI.incY; if(!years.includes(y)) y=Math.floor(C.curM/12); if(!years.includes(y)) y=years[0];
+  const js=ms.map((m,j)=>j).filter(j=>Math.floor(ms[j]/12)===y), n=js.length||1, sum=k=>js.reduce((s,j)=>s+B[k][j],0);
+  const tot=sum('inc'), reg=sum('Доход'), once=sum('Разовый доход'), inv=tot-reg-once;
+  const incIds=new Set(S.items.filter(it=>TYPE_CAT[it.type]==='inc').map(it=>it.id));
+  const fm=js.filter(j=>ms[j]<=C.curM&&S.facts.some(f=>incIds.has(f.item)&&f.month===C.keys[j]&&String(f.value||'').trim())).length;
+  return `<section class="card"><div class="row-between" style="flex-wrap:wrap;gap:6px"><h3>Средний доход в месяц${QH}</h3>
+    ${years.length>1?`<select class="capm" data-incy="1" aria-label="Год">${years.map(x=>`<option value="${x}" ${x===y?'selected':''}>${x}</option>`).join('')}</select>`:`<span class="fsub">${y}</span>`}</div>
+    <p class="hint qtip" hidden>Все доходы за ${y} год (там, где введён факт, — по факту, иначе по плану), делённые на число месяцев года в плане.</p>
+    <b class="num" style="display:block;font-size:26px;margin:2px 0">${rub(tot/n)}</b>
+    <div class="hero-s"><span>За ${js.length===12?'год':js.length+' '+plural(js.length,'месяц','месяца','месяцев')} <b class="num">${rub(tot)}</b></span><span>Регулярные <b class="num">${rub(reg/n)}</b></span>${Math.round(once)?`<span>Разовые <b class="num">${rub(once/n)}</b></span>`:''}${Math.round(inv)?`<span>От вложений <b class="num">${rub(inv/n)}</b></span>`:''}</div>
+    <div class="fsub" style="margin-top:6px">${fm?'по факту — '+fm+' '+plural(fm,'месяц','месяца','месяцев')+', остальное по плану':'пока по плану — факт доходов не введён'}</div></section>`; }
 function avgCard(){
   const a=C.avg;
   if(!a.tracked.length) return `<section class="card"><h3>Средние траты к плану</h3><p class="hint">Появится, когда введёте факт хотя бы за один месяц.</p></section>`;
@@ -2128,23 +2170,26 @@ function addFactTerm(id,month,txt,sub){
   const g=S.facts.find(x=>x.item===id&&x.month===month);
   if(g){ const n=(factTerms(g.value)||[]).length; g.tags=factTagList({tags:tg.join('|')},n).join('|').replace(/\|+$/,''); }
 }
-const expItems=()=>{ let last=''; try{ last=localStorage.getItem('moyplan.lastexp')||''; }catch(e){}
-  return S.items.filter(it=>EXP_TYPES.includes(it.type)).sort((a,b)=>(b.id===last)-(a.id===last)||(a.type==='Необязательный расход'?0:1)-(b.type==='Необязательный расход'?0:1)); };
+// статьи для траты: сверху — с большей плановой суммой (обычно самые частые)
+const expItems=()=>S.items.filter(it=>EXP_TYPES.includes(it.type)).map((it,i)=>[it,i]).sort((a,b)=>numOr(b[0].amount,0)-numOr(a[0].amount,0)||a[1]-b[1]).map(x=>x[0]);
 // окно «Трата»: сумма, статья, подкатегория — без перехода в финансы
 function openQuickExp(){ const l=expItems(); if(!l.length){ UI.section='fin'; UI.tab='items'; render(); toast('Сначала добавьте статьи расходов'); return; }
-  UI.qx={item:l[0].id,sub:'',amt:''}; drawQuickExp(true); }
+  UI.qx={item:l[0].id,sub:'',amt:'',all:false}; drawQuickExp(true); }
 function drawQuickExp(focus){ const q=UI.qx, l=expItems(), it=S.items.find(x=>x.id===q.item)||l[0], subs=itemSubs(it), L=limitOf(it,todayK().slice(0,7));
-  openSheet(`<h2>Трата</h2>
-    <div class="qa-row"><input class="inline-in num" id="qxAmt" inputmode="decimal" enterkeyhint="done" placeholder="Сумма" value="${esc(q.amt)}" autocomplete="off" aria-label="Сумма" style="font-size:22px"><span class="fsub" style="align-self:center">₽</span></div>
-    <div class="field" style="margin-top:10px"><label>Статья</label><select id="qxItem">${l.map(x=>`<option value="${esc(x.id)}" ${x===it?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
-    ${subs.length?`<div class="fsubs" role="group" aria-label="Подкатегория"><button class="chip ${!q.sub?'on':''}" data-act="qxSub" data-v="">Без подкатегории</button>${subs.map(c=>`<button class="chip ${q.sub===c?'on':''}" data-act="qxSub" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:''}
-    ${L?`<div class="fsub num" style="margin-top:10px">Лимит ${fmt(L.lim)} · потрачено ${fmt(L.spent)} · ${L.left>=0?'осталось '+fmt(L.left):'<span class="neg">превышен на '+fmt(-L.left)+'</span>'}</div>${limitBar(L)}`:''}
-    <div class="actions"><span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="qxSave">Записать</button></div>`);
+  const MAX=8, shown=q.all||l.length<=MAX+1?l:l.slice(0,MAX).concat(l.indexOf(it)>=MAX?[it]:[]);
+  openSheet(`<div class="qx"><h2>Трата</h2>
+    <label class="qx-amt"><input class="num" id="qxAmt" inputmode="decimal" enterkeyhint="done" placeholder="0" value="${esc(q.amt)}" autocomplete="off" aria-label="Сумма"><span>₽</span></label>
+    <div class="qx-h">Статья</div>
+    <div class="qx-items" role="group" aria-label="Статья">${shown.map(x=>`<button class="qx-it ${x===it?'on':''}" data-act="qxItem" data-v="${esc(x.id)}" aria-pressed="${x===it}"><span class="fname">${esc(x.name)}</span>${numOr(x.amount,0)?`<span class="fsub num">план ${fmt(x.amount)}</span>`:''}</button>`).join('')}
+      ${shown.length<l.length?`<button class="qx-it more" data-act="qxAll">Все статьи · ${l.length}</button>`:''}</div>
+    ${subs.length?`<div class="qx-h">Подкатегория</div><div class="fsubs" style="margin-top:0" role="group" aria-label="Подкатегория"><button class="chip ${!q.sub?'on':''}" data-act="qxSub" data-v="">Без подкатегории</button>${subs.map(c=>`<button class="chip ${q.sub===c?'on':''}" data-act="qxSub" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:''}
+    ${L?`<div class="qx-lim"><div class="row-between fsub num"><span>Лимит ${fmt(L.lim)}</span><span>${L.left>=0?'осталось '+fmt(L.left):'<span class="neg">превышен на '+fmt(-L.left)+'</span>'}</span></div>${limitBar(L)}</div>`:''}
+    <div class="actions"><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary qx-save" data-act="qxSave">Записать</button></div></div>`);
   if(focus) setTimeout(()=>{ const n=document.getElementById('qxAmt'); if(n) n.focus(); },30); }
 function qxSave(){ const q=UI.qx, inp=document.getElementById('qxAmt'), txt=(inp.value||'').trim().replace(/\s+/g,'').replace(/,/g,'.').replace(/−/g,'-'), v=evalExpr(txt);
   if(v==null||isNaN(v)||!v){ toast('Впишите сумму'); inp.focus(); return; }
-  const it=S.items.find(x=>x.id===(document.getElementById('qxItem')||{}).value)||S.items.find(x=>x.id===q.item); if(!it) return;
-  const month=todayK().slice(0,7); addFactTerm(it.id,month,txt,q.sub); try{ localStorage.setItem('moyplan.lastexp',it.id); }catch(e){}
+  const it=S.items.find(x=>x.id===q.item)||expItems()[0]; if(!it) return;
+  const month=todayK().slice(0,7); addFactTerm(it.id,month,txt,q.sub);
   closeSheet(); persist('facts'); render(); const w=limitWarn(it,month); toast(w||('Записано: '+rub(v)+' · '+it.name+(q.sub?' / '+q.sub:''))); }
 
 /* ---- Статьи (с перетаскиванием между группами) ---- */
@@ -2471,8 +2516,7 @@ function viewBonds(){
 document.addEventListener('change',e=>{ const el=e.target;
   if(el.dataset&&el.dataset.capm){ UI.capM=+el.value; render(); return; }
   if(el.dataset&&el.dataset.bal){ const v=+el.value; if(el.dataset.bal==='from'){ UI.balFrom=v; if(UI.balTo!=null&&UI.balTo<v) UI.balTo=v; } else { UI.balTo=v; if(UI.balFrom!=null&&UI.balFrom>v) UI.balFrom=v; } render(); return; } });
-document.addEventListener('change',e=>{ const el=e.target; if(el.id!=='qxItem'||!UI.qx) return;
-  UI.qx.item=el.value; UI.qx.sub=''; UI.qx.amt=(document.getElementById('qxAmt')||{}).value||''; drawQuickExp(false); });
+document.addEventListener('change',e=>{ const el=e.target; if(!el.dataset||!el.dataset.incy) return; UI.incY=+el.value; render(); });
 document.addEventListener('change',e=>{ const el=e.target; if(!el.dataset||el.dataset.bf==null||!UI.bf) return;
   UI.bf[el.dataset.bf]=el.type==='checkbox'?el.checked:el.value; UI.bf.n=40; render(); });
 
@@ -2863,7 +2907,7 @@ function habitsToday(){
     <div class="thermo"><i class="${due.length&&doneN===due.length?'done':''}" style="width:${due.length?(doneN/due.length*100).toFixed(1):0}%"></i></div>
     <p class="hint" style="margin:0">${!due.length?'На сегодня ничего не запланировано.':doneN===due.length?'Всё на сегодня сделано.':'Осталось '+(due.length-doneN)+'.'}</p></section>
   <section class="card"><div class="hgrid head">${days.map(d=>`<span class="${dkey(d)===dkey(today)?'t':''}">${WD[wd(d)]}<b>${d.getDate()}</b></span>`).join('')}</div>
-    ${S.habits.map(h=>{ const st=HS[h.id]; return `<div class="hrow"><button class="namebtn" data-act="habit" data-id="${h.id}"><span class="fname">${esc(h.name)}</span><span class="fsub">${h.type==='count'?'цель '+fmtN(h.target)+' '+esc(h.unit||'')+' · ':''}${st.cur?'серия '+st.cur+' · ':''}${pct(st.d30.pct)} за 30 дн.</span></button>
+    ${S.habits.map(h=>{ const st=HS[h.id]; return `<div class="hrow"><button class="namebtn" data-act="habit" data-id="${h.id}"><span class="fname">${esc(h.name)}</span><span class="fsub">${h.type==='count'?'цель '+fmtN(h.target)+' '+esc(h.unit||'')+' · ':''}${st.cur?'серия '+serTxt(st,st.cur)+' · ':''}${pct(st.d30.pct)} за 30 дн.</span></button>
       <div class="hgrid">${days.map(d=>hCell(h,d,today)).join('')}</div></div>`; }).join('')}
   </section>
   <div class="actions" style="margin-top:0"><button class="btn primary" data-act="add" data-kind="habit">+ Привычка</button><span class="sp"></span><span class="fsub">Пунктир — день не по плану</span></div>`;
@@ -2877,12 +2921,12 @@ function habitsStats(){
   const due=S.habits.filter(h=>HS[h.id].sched(today)||HL[h.id].has(dkey(today))), doneN=due.filter(h=>HL[h.id].has(dkey(today))).length;
   const bestNow=S.habits.reduce((b,h)=>(!b||HS[h.id].cur>HS[b.id].cur)?h:b,null);
   const ranked=S.habits.slice().sort((a,b)=>(HS[b.id].d30.pct??-1)-(HS[a.id].d30.pct??-1));
-  return `<div class="kpis">${kpiT('Сегодня',doneN+' из '+due.length)}${kpiT('За 7 дней',pct(agg('d7')))}${kpiT('За 30 дней',pct(agg('d30')))}${kpiT('Лучшая серия сейчас',bestNow?HS[bestNow.id].cur+' дн.':'—',bestNow?esc(bestNow.name):'')}</div>
+  return `<div class="kpis">${kpiT('Сегодня',doneN+' из '+due.length)}${kpiT('За 7 дней',pct(agg('d7')))}${kpiT('За 30 дней',pct(agg('d30')))}${kpiT('Лучшая серия сейчас',bestNow?serTxt(HS[bestNow.id],HS[bestNow.id].cur):'—',bestNow?esc(bestNow.name):'')}</div>
   <section class="card"><h3>Выполнение по дням${QH}</h3><p class="hint qtip" hidden>Доля сделанных из запланированных на день, последние 30 дней.</p><div class="chart" data-chart="hday"></div>
     <div class="legend" style="margin-top:8px"><span><i style="--c:var(--good)"></i>всё выполнено</span><span><i style="--c:var(--serious)"></i>не всё</span></div></section>
   <section class="card"><h3>По привычкам${QH}</h3><p class="hint qtip" hidden>За 30 дней. Нажмите, чтобы открыть статистику привычки.</p>
     ${ranked.map(h=>{ const st=HS[h.id]; return `<button class="pbar" data-act="habit" data-id="${h.id}"><div class="m"><div class="row-between"><span class="fname">${esc(h.name)}</span><b class="num">${pct(st.d30.pct)}</b></div>
-      <div class="thermo"><i style="width:${((st.d30.pct||0)*100).toFixed(1)}%"></i></div><div class="fsub">${st.d30.c} из ${st.d30.s} · серия ${st.cur}, лучшая ${st.best}</div></div>${CHEV}</button>`; }).join('')}
+      <div class="thermo"><i style="width:${((st.d30.pct||0)*100).toFixed(1)}%"></i></div><div class="fsub">${st.d30.c} из ${st.d30.s} · серия ${serTxt(st,st.cur)}, лучшая ${serTxt(st,st.best)}</div></div>${CHEV}</button>`; }).join('')}
   </section>`;
 }
 function viewHabit(h){
@@ -2898,9 +2942,9 @@ function viewHabit(h){
   return `<button class="back" data-act="back">‹ Все привычки</button>
   <div class="detail-title"><h2>${esc(h.name)}</h2><button class="btn small" data-act="edit" data-kind="habit" data-i="${i}">Изменить</button></div>
   <p class="hint" style="margin-top:-6px">${daysText(h.days)} · с ${st.created.getDate()} ${MG[st.created.getMonth()]} ${st.created.getFullYear()}</p>
-  <div class="kpis">${kpiT('Текущая серия',st.cur+' дн.')}${kpiT('Лучшая серия',st.best+' дн.')}${kpiT('За 30 дней',pct(st.d30.pct),st.d30.c+' из '+st.d30.s)}${kpiT('Всего выполнено',String(st.total)+' дн.','выполнение '+pct(st.all.pct))}
+  <div class="kpis">${kpiT('Текущая серия',serTxt(st,st.cur),st.weekly?'недель подряд с планом':'')}${kpiT('Лучшая серия',serTxt(st,st.best))}${kpiT('За 30 дней',pct(st.d30.pct),st.d30.c+' из '+st.d30.s)}${kpiT('Всего выполнено',String(st.total)+' дн.','выполнение '+pct(st.all.pct))}
     ${h.type==='count'?kpiT('В среднем',vals.length?fmtN(vals.reduce((a,b)=>a+b,0)/vals.length)+' '+esc(h.unit||''):'—','за день с записью, цель '+fmtN(h.target)):''}${h.type==='count'?kpiT('Перевыполнено',String(vals.filter(v=>v>habitTarget(h)).length)+' дн.','больше цели'):''}</div>
-  <section class="card"><h3>По неделям${QH}</h3><p class="hint qtip" hidden>Доля выполненных дней за неделю, последние 12 недель.</p><div class="chart" data-chart="hweek"></div>
+  <section class="card"><h3>По неделям${QH}</h3><p class="hint qtip" hidden>${st.weekly?'Сколько раз сделано из запланированных за неделю — в любые дни. Последние 12 недель.':'Доля выполненных дней за неделю, последние 12 недель.'}</p><div class="chart" data-chart="hweek"></div>
     <div class="legend" style="margin-top:8px"><span><i style="--c:var(--good)"></i>неделя без пропусков</span><span><i style="--c:var(--serious)"></i>были пропуски</span></div></section>
   <section class="card"><div class="monthbar" style="margin-bottom:8px"><button class="nav-btn" data-act="hcal" data-d="-1" aria-label="Предыдущий месяц">‹</button><div class="t"><b>${monthTitle(cm)}</b></div><button class="nav-btn" data-act="hcal" data-d="1" ${cm>=todayM?'disabled':''} aria-label="Следующий месяц">›</button></div>
     <div class="cal">${WD.map(w=>`<span class="wd">${w}</span>`).join('')}${cells.join('')}</div><p class="hint" style="margin:8px 0 0">Нажмите на день, чтобы отметить или снять отметку.</p></section>`;
@@ -2915,6 +2959,8 @@ function dayLabel(k){
   if(n===0) return 'Сегодня'; if(n===1) return 'Завтра'; if(n===-1) return 'Вчера';
   return d.getDate()+' '+MG[d.getMonth()]+(d.getFullYear()!==t.getFullYear()?' '+d.getFullYear():'')+', '+WDS[d.getDay()];
 }
+// серия: у привычки на каждый день — в днях, у «пн, ср, пт» — в неделях
+const serTxt=(st,n)=>st.weekly?n+' '+plural(n,'неделя','недели','недель'):n+' дн.';
 const pageBack=l=>`<button class="back" data-act="back">‹ ${l}</button>`;
 const emptyCard=(t,p)=>`<section class="card empty">${t?`<h3>${t}</h3>`:''}<p>${p}</p></section>`;
 const stars=n=>{ n=Math.round(numOr(n,0)); return n?`<span class="stars-s" aria-label="оценка ${n} из 5">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span>`:''; };
@@ -2942,10 +2988,11 @@ function viewHome(){
   <div class="quick"><button style="--sec:var(--s-fin)" data-act="quickExp">${icon('fin')}Трата</button><button style="--sec:var(--s-notes)" data-act="homeGo" data-v="note">${icon('notes')}Заметка</button><button style="--sec:var(--s-pay)" data-act="homeGo" data-v="pay">${icon('pay')}Платежи</button></div>`;
   // задачи: просроченные и на сегодня
   const onDay=t=>repOk(today,t.repeat,t.repeatDays);
-  const open=S.tasks.filter(t=>!t.done&&t.due&&t.due<=tk&&onDay(t)).sort((a,b)=>(a.due<tk?0:1)-(b.due<tk?0:1)||sortT(a,b));
+  const open=S.tasks.filter(t=>tNow(t,tk)).sort((a,b)=>(tOver(a,tk)?0:1)-(tOver(b,tk)?0:1)||(a.deadline&&a.deadline>tk?1:0)-(b.deadline&&b.deadline>tk?1:0)||sortT(a,b));
   const doneN=S.tasks.filter(t=>t.done&&t.doneAt===tk).length, LIM=6;
   const add=`<div class="qa-row" style="margin:2px 0 4px"><input class="inline-in" id="homeTask" placeholder="Новая задача на сегодня…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача"><button class="btn primary" data-act="homeTask" aria-label="Добавить задачу">+</button></div>`;
-  const tl=open.length?`<div class="hlist">${open.slice(0,LIM).map(t=>taskRow(t)).join('')}</div>${open.length>LIM?`<button class="more" data-act="section" data-id="tasks">Ещё ${open.length-LIM} ›</button>`:''}`
+  const sh=open.slice(0,LIM), nOver=sh.filter(t=>tOver(t,tk)).length;
+  const tl=open.length?`<div class="hlist">${nOver?'<div class="hsub neg">Просрочено</div>':''}${sh.map((t,i)=>(nOver&&i===nOver?'<div class="hsub">Сегодня</div>':'')+taskRow(t)).join('')}</div>${open.length>LIM?`<button class="more" data-act="section" data-id="tasks">Ещё ${open.length-LIM} ›</button>`:''}`
     :`<p class="hint" style="margin:6px 0 0">${doneN?'На сегодня всё сделано.':S.tasks.length?'На сегодня задач нет.':'Здесь будут задачи на сегодня. Срок можно писать словами: «завтра в 10», «в пятницу».'}</p>`;
   html+=homeCard('tasks','Задачи на сегодня'+(open.length?` <span class="fsub num">${open.length}</span>`:''),add+tl,'Все');
   // привычки на сегодня — отметка одним касанием
@@ -3043,10 +3090,19 @@ const projColor=id=>{ const p=projById(id); const root=p&&p.parent&&projById(p.p
 const projOpts=()=>[['','Без проекта']].concat(projTree().flatMap(({p,kids})=>[[p.id,p.name]].concat(kids.map(k=>[k.id,'   — '+k.name]))));
 const inInbox=t=>!t.project||!projById(t.project);
 
+// Просрочено: крайний срок прошёл; без крайнего срока — дата выполнения прошла (со следующего дня).
+// На сегодня: дата выполнения сегодня; с крайним сроком — каждый день от даты выполнения (или сразу) до крайнего срока.
+const tOver=(t,tk)=>!t.done&&(t.deadline?t.deadline<tk:!!t.due&&t.due<tk);
+const tToday=(t,tk)=>!t.done&&(t.deadline?t.deadline>=tk&&(!t.due||t.due<=tk):t.due===tk);
+const tNow=(t,tk)=>(tOver(t,tk)||tToday(t,tk))&&repOk(TODAY(),t.repeat,t.repeatDays);
+const dDay=k=>{ const d=parseD(k); return d.getDate()+' '+MG[d.getMonth()]+(d.getFullYear()!==TODAY().getFullYear()?' '+d.getFullYear():''); };
+function deadlineTxt(t,tk){ const n=daysTo(t.deadline);
+  return n<0?'срок был '+dDay(t.deadline):n===0?'крайний срок сегодня':'до '+dDay(t.deadline)+' · осталось '+n+' '+plural(n,'день','дня','дней'); }
 function taskRow(t,hideProj){
-  const tk=todayK(), over=!t.done&&t.due&&t.due<tk, g=t.goal&&S.goals.find(x=>x.id===t.goal), pr=+t.priority||0, cl=t.checklist||[];
+  const tk=todayK(), over=tOver(t,tk), g=t.goal&&S.goals.find(x=>x.id===t.goal), pr=+t.priority||0, cl=t.checklist||[];
   const parts=[];
-  if(t.due) parts.push(`<span class="${over?'neg':''}">${over?'просрочено · ':''}${dayLabel(t.due)}${t.time?' '+esc(t.time):''}</span>`);
+  if(t.deadline){ parts.push(`<span class="${over?'neg':''}">${over?'просрочено · ':''}${deadlineTxt(t,tk)}</span>`); if(t.due&&t.due>tk) parts.push('начать '+dayLabel(t.due).toLowerCase()); }
+  else if(t.due) parts.push(`<span class="${over?'neg':''}">${over?'просрочено · ':''}${dayLabel(t.due)}${t.time?' '+esc(t.time):''}</span>`);
   if(t.repeat&&t.repeat!=='none') parts.push('↻ '+repeatText(t));
   if(!hideProj&&t.project&&projById(t.project)) parts.push(`<span class="ptag"><span class="dot" style="--c:var(${projColor(t.project)});display:inline-block;width:7px;height:7px"></span> ${esc(projName(t.project))}</span>`);
   if(g) parts.push('цель: '+esc(g.name));
@@ -3071,7 +3127,7 @@ function tBlock(title,list,hideProj,extra,drop){ return list.length||extra?`<sec
 function projSide(v){
   const tk=todayK(), cnt=f=>S.tasks.filter(t=>!t.done&&f(t)).length;
   const item=(val,label,count,cls,dot)=>`<button class="side-item ${cls||''} ${v===val?'on':''}" data-act="tView" data-v="${val}"${val==='inbox'?' data-tdrop=""':val.startsWith('p:')?` data-tdrop="${val.slice(2)}"`:''}>${dot?`<span class="dot" style="--c:var(${dot})"></span>`:''}<span class="fname">${esc(label)}</span>${count?`<span class="cnt">${count}</span>`:''}</button>`;
-  return `<div class="side-h">Списки</div>${item('today','Сегодня',cnt(t=>t.due&&t.due<=tk&&repOk(TODAY(),t.repeat,t.repeatDays)))}${item('cal','Календарь',0)}${item('upcoming','Предстоящие',cnt(t=>t.due&&t.due>tk))}${item('all','Все задачи',cnt(()=>true))}${item('done','Готово',0)}
+  return `<div class="side-h">Списки</div>${item('today','Сегодня',cnt(t=>tNow(t,tk)))}${item('cal','Календарь',0)}${item('upcoming','Предстоящие',cnt(t=>t.due&&t.due>tk))}${item('all','Все задачи',cnt(()=>true))}${item('done','Готово',0)}
     <div class="side-h">Проекты <button class="side-add" data-act="projNew" aria-label="Новый проект">+</button></div>
     ${item('inbox','Без проекта',cnt(inInbox))}
     ${projTree().map(({p,kids})=>item('p:'+p.id,p.name,cnt(t=>t.project===p.id||kids.some(k=>k.id===t.project)),'',projColor(p.id))+kids.map(k=>item('p:'+k.id,k.name,cnt(t=>t.project===k.id),'sub')).join('')).join('')}
@@ -3096,11 +3152,13 @@ function tasksBody(v){
   if(v==='today'){
     // повторяющиеся задачи не показываем в нерабочие для них дни (у «по будням» — в выходные)
     const onDay=t=>repOk(TODAY(),t.repeat,t.repeatDays);
-    const over=open.filter(t=>t.due&&t.due<tk&&onDay(t)).sort(sortT), tod=open.filter(t=>t.due===tk&&onDay(t)).sort(sortT), doneT=S.tasks.filter(t=>t.done&&t.doneAt===tk);
-    const inbox=open.filter(t=>!t.due&&inInbox(t)), anyPart=tod.some(t=>tPart(t));
+    const over=open.filter(t=>tOver(t,tk)&&onDay(t)).sort(sortT), doneT=S.tasks.filter(t=>t.done&&t.doneAt===tk);
+    const tod=open.filter(t=>tToday(t,tk)&&onDay(t)&&(!t.deadline||t.deadline===tk)).sort(sortT);
+    const dl=open.filter(t=>tToday(t,tk)&&onDay(t)&&t.deadline&&t.deadline>tk).sort((a,b)=>a.deadline.localeCompare(b.deadline)||(+b.priority||0)-(+a.priority||0));
+    const inbox=open.filter(t=>!t.due&&!t.deadline&&inInbox(t)), anyPart=tod.some(t=>tPart(t));
     const todH=anyPart?PARTS.map(([k,l])=>tBlock(l,tod.filter(t=>tPart(t)===k))).join('')+tBlock('В любое время',tod.filter(t=>!tPart(t))):tBlock('Сегодня',tod);
-    return (over.length||tod.length?tBlock('<span class="neg">Просрочено</span>',over)+todH:emptyCard('На сегодня всё чисто','Добавьте задачу выше или загляните в «Предстоящие».'))
-      +(inbox.length?tBlock('Без проекта и без срока',inbox):'')+tBlock('Сделано сегодня',doneT);
+    return (over.length||tod.length?tBlock('<span class="neg">Просрочено</span>',over)+todH:dl.length?'':emptyCard('На сегодня всё чисто','Добавьте задачу выше или загляните в «Предстоящие».'))
+      +tBlock('В работе — до крайнего срока',dl)+(inbox.length?tBlock('Без проекта и без срока',inbox):'')+tBlock('Сделано сегодня',doneT);
   }
   if(v==='upcoming'){
     const by={}; open.filter(t=>t.due&&t.due>tk).sort(sortT).forEach(t=>{ const k=daysTo(t.due)<=14?t.due:'later'; (by[k]||(by[k]=[])).push(t); });
@@ -3137,8 +3195,9 @@ function taskOccs(fromK,toK){
   const out=[], tk=todayK();
   S.tasks.forEach(t=>{
     if(t.done){ if(t.doneAt&&t.doneAt>=fromK&&t.doneAt<=toK) out.push({t,k:t.doneAt,done:true}); return; }
+    const k0=t.deadline||t.due; if(!k0) return;
+    if(k0>=fromK&&k0<=toK) out.push({t,k:k0,over:tOver(t,tk)});
     if(!t.due) return;
-    if(t.due>=fromK&&t.due<=toK) out.push({t,k:t.due,over:t.due<tk});
     if(t.repeat&&t.repeat!=='none'){ let g=nextDue(t.due,t.repeat,t.repeatDays), n=0;
       while(g<=tk&&n++<800) g=nextDue(g,t.repeat,t.repeatDays);
       while(g<=toK&&n++<800){ if(g>=fromK) out.push({t,k:g,ghost:true}); g=nextDue(g,t.repeat,t.repeatDays); } }
@@ -3178,7 +3237,8 @@ function viewTaskPage(t){
   <section class="card"><div style="display:flex;gap:10px;align-items:flex-start">${isNew?'':`<button class="tcheck p${+t.priority||0}" data-act="taskToggle" data-id="${t.id}" aria-pressed="${!!t.done}" aria-label="Выполнить" style="margin-top:9px">${t.done?'✓':''}</button>`}
     <input class="note-title" data-tf="name" value="${esc(t.name)}" placeholder="Что сделать" aria-label="Название задачи"></div>
     <div class="tfields" style="margin-top:10px">
-      <div><label>Срок</label><input type="date" data-tf="due" value="${esc(t.due||'')}"></div>
+      <div><label>Дата выполнения</label><div class="dwrap"><input type="date" data-tf="due" value="${esc(t.due||'')}" aria-label="Дата выполнения">${t.due?`<button class="xbtn" data-act="tClr" data-f="due" aria-label="Без даты">×</button>`:''}</div></div>
+      <div><label>Крайний срок</label><div class="dwrap"><input type="date" data-tf="deadline" value="${esc(t.deadline||'')}" aria-label="Крайний срок">${t.deadline?`<button class="xbtn" data-act="tClr" data-f="deadline" aria-label="Без крайнего срока">×</button>`:''}</div></div>
       <div><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
       <div><label>Приоритет</label>${sel('priority',PRIOS,t.priority||'0')}</div>
       <div><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
@@ -3188,6 +3248,7 @@ function viewTaskPage(t){
       <div><label>Сколько раз выполнить</label><input type="number" min="1" max="12" step="1" inputmode="numeric" data-tf="times" value="${n}" aria-label="Сколько раз выполнить"></div>
       ${t.repeat==='days'?`<div class="days" style="grid-column:1/-1">${WD.map((w,d)=>`<button class="dbtn ${String(t.repeatDays||'')[d]==='1'?'on':''}" data-act="tRepDay" data-id="${t.id}" data-d="${d}" aria-pressed="${String(t.repeatDays||'')[d]==='1'}">${w}</button>`).join('')}</div>`:''}
     </div>
+    <p class="hint" style="margin:8px 0 0">${t.deadline?'Задача будет в «Сегодня» каждый день'+(t.due&&t.due>todayK()?' с '+dDay(t.due):'')+' до '+dDay(t.deadline)+', потом — просрочена.':t.due?'После '+dDay(t.due)+' задача станет просроченной. Длинная или не срочная — поставьте крайний срок: до него она просто будет в списке.':'Без срока — задача лежит в своём проекте и не просрочивается.'}</p>
     ${n>1?`<p class="hint" style="margin:8px 0 0">В списке у задачи будет ${n} ${plural(n,'кружок','кружка','кружков')}: задача выполнится, когда отмечены все.${isNew?'':' Сейчас сделано '+Math.min(n,t.done?n:t.timesDone||0)+' из '+n+'.'}</p>`:''}
     ${t.repeat&&t.repeat!=='none'?`<p class="hint" style="margin:8px 0 0">После выполнения задача появится снова (${repeatText(t)})${t.due?', следующая — '+dayLabel(nextDue(t.due,t.repeat,t.repeatDays)).toLowerCase():''}.</p>`:''}</section>
   <section class="card"><h3>Описание</h3><textarea class="note-body" style="min-height:110px" data-tf="note" placeholder="Подробности, ссылки, что важно учесть…" aria-label="Описание">${esc(t.note||'')}</textarea></section>
@@ -3279,13 +3340,16 @@ function tickTask(id,k){
   persist('tasks'); render();
 }
 function addTask(name,goal,project){ const t=newTask(name,goal,project); S.tasks.push(t); persist('tasks'); return t; }
+// следующая повторяющаяся: крайний срок сдвигается на столько же, на сколько дата выполнения
+function nextDeadline(t,nd){ if(!t.deadline) return ''; if(!t.due) return nextDue(t.deadline,t.repeat,t.repeatDays);
+  return dkey(addDays(parseD(t.deadline),Math.round((parseD(nd)-parseD(t.due))/864e5))); }
 function toggleTask(id){
   const t=S.tasks.find(x=>x.id===id); if(!t) return;
   if(!t.done){
     t.done=true; t.doneAt=todayK(); t.timesDone=t.times||1;
     (t.checklist||[]).forEach(c=>{ if(c.k&&!c.done){ c.done=true; shopTick(c); } });
-    if(t.repeat&&t.repeat!=='none'){ const n=Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nextDue(t.due,t.repeat,t.repeatDays),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))});
-      S.tasks.push(n); toast('Готово. Следующая — '+dayLabel(n.due).toLowerCase()); }
+    if(t.repeat&&t.repeat!=='none'){ const nd=nextDue(t.due,t.repeat,t.repeatDays), n=Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nd,deadline:nextDeadline(t,nd),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))});
+      S.tasks.push(n); toast('Готово. Следующая — '+dayLabel(n.due||n.deadline).toLowerCase()); }
     else toast('Готово');
   } else { t.done=false; t.doneAt=''; t.timesDone=Math.max(0,(t.times||1)-1); }
   persist('tasks'); render();
@@ -3790,6 +3854,12 @@ function noteTools(){
     ${b('removeFormat','<span class="sw-t" style="text-decoration:line-through">A</span>','Убрать оформление: цвет, выделение, жирный (без выделения — вся строка)')}</div>`;
 }
 const selEl=()=>{ const sl=document.getSelection&&document.getSelection(); if(!sl||!sl.anchorNode) return null; const n=sl.anchorNode; return n.nodeType===1?n:n.parentElement; };
+// зачёркивание у пункта чек-листа — только от галочки. Браузер, продолжая отмеченный пункт, переносит его тегом <s>/<strike>
+// или стилем — тогда снять галочку было нельзя: снимаем такое зачёркивание с пункта (вложенные пункты не трогаем)
+function unstrike(li){ const own=x=>x.closest('li')===li;
+  li.querySelectorAll('s,strike').forEach(x=>{ if(own(x)) x.replaceWith(...x.childNodes); });
+  li.querySelectorAll('[style]').forEach(x=>{ if(!own(x)) return; x.style.removeProperty('text-decoration'); x.style.removeProperty('text-decoration-line'); if(!(x.getAttribute('style')||'').trim()) x.removeAttribute('style'); });
+  if(li.style){ li.style.removeProperty('text-decoration'); li.style.removeProperty('text-decoration-line'); if(!(li.getAttribute('style')||'').trim()) li.removeAttribute('style'); } }
 function saveRich(ed){
   const n=S.notes[+ed.dataset.rich]; if(!n) return;
   const html=noteHtml(ed.innerHTML); n.body=noteText(html).trim()||/<(table|ul|ol)\b/i.test(html)?html:'';
@@ -4791,7 +4861,8 @@ document.addEventListener('change',e=>{
     t[f]=el.value; if(f==='name') t.name=el.value.trim();
     if(f==='repeat'&&t.repeat==='days'&&!String(t.repeatDays||'').includes('1')&&t.due){ const m='0000000'.split(''); m[wd(parseD(t.due))]='1'; t.repeatDays=m.join(''); }
     if((f==='repeat'||f==='due')&&alignTask(t)) toast('Срок перенесён на '+dayLabel(t.due).toLowerCase()+' — '+repeatText(t));
-    persist('tasks'); if(['repeat','priority','due','project','goal'].includes(f)) setTimeout(render,0); return; }
+    if(f==='deadline'&&t.deadline&&t.due&&t.deadline<t.due) toast('Крайний срок раньше даты выполнения');
+    persist('tasks'); if(['repeat','priority','due','deadline','project','goal'].includes(f)) setTimeout(render,0); return; }
   if(el.dataset.cl){ const t=curTask(); if(!t) return; const c=t.checklist[+el.dataset.cl]; if(c){ c.text=el.value.trim()||c.text; persist('tasks'); } return; }
   if(el.dataset.factraw){ const v=el.value.trim(); if(v&&isNaN(evalExpr(v))){ toast('Не разобрал выражение'); return; } setFactRaw(v); return; }
   if(el.dataset.alloc){ S.settings.alloc[el.dataset.alloc]=el.value; persist('settings'); setTimeout(render,0); return; }
@@ -4816,7 +4887,7 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
   const el=e.target; if(!S) return;
   if(el.dataset&&el.dataset.rich!=null){
-    if(e.inputType==='insertParagraph'){ const li=selEl()&&selEl().closest('li'); if(li&&li.getAttribute('data-c')) li.removeAttribute('data-c'); }
+    if(e.inputType==='insertParagraph'){ const li=selEl()&&selEl().closest('li'); if(li&&li.getAttribute('data-c')) li.removeAttribute('data-c'); if(li&&li.closest('ul.nchk')) unstrike(li); }
     saveRich(el); if(tblCur) placeTblAdd(tblCur.isConnected?tblCur:caretTable()); return; }
   if(el.dataset.note){ const [i,f]=el.dataset.note.split('|'), n=S.notes[+i]; if(!n) return; n[f]=el.value; n.updated=new Date().toISOString(); persist('notes');
     const u=document.getElementById('noteUpd'); if(u) u.textContent='изменено '+noteDate(n.updated,true); return; }
@@ -4869,7 +4940,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('click',e=>{
   // галочка пункта чек-листа в заметке
   const cli=S&&e.target.closest&&e.target.closest('[data-rich] ul.nchk > li');
-  if(cli&&e.clientX-cli.getBoundingClientRect().left<26){ e.preventDefault(); if(cli.getAttribute('data-c')==='1') cli.removeAttribute('data-c'); else cli.setAttribute('data-c','1'); saveRich(cli.closest('[data-rich]')); return; }
+  if(cli&&e.clientX-cli.getBoundingClientRect().left<26){ e.preventDefault(); if(cli.getAttribute('data-c')==='1') cli.removeAttribute('data-c'); else cli.setAttribute('data-c','1'); unstrike(cli); saveRich(cli.closest('[data-rich]')); return; }
   const ta=S&&e.target.closest&&e.target.closest('.tbl-add'); if(ta){ tblAdd(ta.classList.contains('row')?'row':'col'); return; }
   const b=e.target.closest('[data-act]'); if(!b||!S) return;
   const a=b.dataset.act;
@@ -4954,6 +5025,8 @@ document.addEventListener('click',e=>{
     const n0=(factTerms(raw)||[]).length, tg=factTagList(f,n0), add=factTerms(txt)||[txt]; add.forEach(()=>tg.push(UI.factSub||''));
     setFactRaw(raw?raw+'+'+txt:txt,tg); const w=limitWarn(S.items.find(x=>x.id===id),month); if(w) toast(w); }
   else if(a==='factSub'){ UI.factSub=b.dataset.v; drawFact(true); }
+  else if(a==='qxItem'){ UI.qx.amt=(document.getElementById('qxAmt')||{}).value||''; UI.qx.item=b.dataset.v; UI.qx.sub=''; drawQuickExp(false); }
+  else if(a==='qxAll'){ UI.qx.amt=(document.getElementById('qxAmt')||{}).value||''; UI.qx.all=true; drawQuickExp(false); }
   else if(a==='qxSub'){ UI.qx.amt=(document.getElementById('qxAmt')||{}).value||''; UI.qx.sub=b.dataset.v; drawQuickExp(true); }
   else if(a==='qxSave') qxSave();
   else if(a==='quickExp') openQuickExp();
@@ -4981,6 +5054,7 @@ document.addEventListener('click',e=>{
   else if(a==='allocOn'){ S.settings.alloc=defaultAlloc(); persist('settings'); render(); }
   else if(a==='editId'){ const F=FORMS[b.dataset.kind], i=F.list().findIndex(x=>x.id===b.dataset.id); if(i>=0) openEditor(b.dataset.kind,i); }
   // задачи
+  else if(a==='tClr'){ const t=curTask(); if(!t) return; t[b.dataset.f]=''; persist('tasks'); render(); }
   else if(a==='qaDue'){ UI.qaDue=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='taskQuick'){ const inp=document.getElementById('qaTitle'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
     const v=UI.sub.tasks||'', proj=v.startsWith('p:')?v.slice(2):'';
