@@ -474,6 +474,21 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 @keyframes chP{from{transform:rotate(var(--a)) translateY(-8px);opacity:1}to{transform:rotate(var(--a)) translateY(-54px) scale(.5);opacity:0}}
 .pulse{animation:pulse .35s ease-out}@keyframes pulse{50%{transform:scale(1.04)}}
 @media (prefers-reduced-motion: reduce){.cheer,.pulse{animation:none!important}.cheer{display:none}}
+.mcols{display:grid;gap:4px}@media (min-width:640px){.mcols{grid-template-columns:1fr 1fr;gap:14px;align-items:start}}
+.mk-film{--mc:var(--s-movies)}.mk-ser{--mc:var(--s-pay)}
+.mhead{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mc);margin:4px 2px 8px}.mhead .fsub{margin-left:auto}
+.mdot{width:10px;height:10px;border-radius:50%;background:var(--mc)}
+.mcol .card{border-left:3px solid var(--mc)}
+.tag.mk-film,.tag.mk-ser{color:var(--mc);background:color-mix(in srgb, var(--mc) 12%, transparent)}
+.mseason{width:auto;max-width:130px;padding:4px 6px;font-size:13px;border-radius:8px;margin-right:6px}
+.swatches{display:flex;flex-wrap:wrap;gap:10px}.sw-c{width:34px;height:34px;border-radius:50%;border:3px solid var(--surface);background:var(--c);box-shadow:0 0 0 1px var(--line)}
+.sw-c.on{box-shadow:0 0 0 2px var(--c)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .sw-c{background:var(--cd)}}:root[data-theme="dark"] .sw-c{background:var(--cd)}
+.secpick{display:flex;flex-wrap:wrap;gap:6px}.secpick button{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 7px;border-radius:18px;border:1px dashed var(--line);background:transparent;color:var(--muted);font-size:13.5px}
+.secpick button .ic{width:20px;height:20px;display:flex;opacity:.5}.secpick button svg{width:18px;height:18px}
+.secpick button.on{border:1px solid var(--sec);color:var(--text);background:color-mix(in srgb, var(--sec) 10%, transparent)}.secpick button.on .ic{opacity:1;color:var(--sec)}
+.tgroup{grid-column:1/-1;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2);margin:8px 2px -2px}.tgroup:first-child{margin-top:0}
+.linkbtn{border:0;background:none;color:var(--accent);padding:0;font-size:inherit;text-decoration:underline}
 .trashrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.trashrow:first-child{border-top:0}.trashrow .m{flex:1;min-width:0}
 .wk-nav{display:flex;align-items:center;gap:8px;margin:2px 0 10px}.wk-nav b{flex:1;text-align:center;font-size:15px}
 .wk-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 4px}.wk-kpis>div{background:var(--surface-2);border-radius:12px;padding:10px 8px;text-align:center;min-width:0}
@@ -598,6 +613,7 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .sw-row{position:relative;z-index:1;background:var(--surface);transition:transform .2s ease}
 .sw-bin{position:absolute;right:0;top:0;bottom:0;width:76px;border:0;background:var(--critical);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:18px}
 .sw-bin small{font-size:11px}
+.sw-later{right:76px;background:var(--accent)}
 .toast.has-act{display:flex;align-items:center;gap:14px}
 .toast.has-act.on{pointer-events:auto}
 .toast-act{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-decoration:underline;padding:2px 0}
@@ -1391,7 +1407,8 @@ const GS_SETTINGS = [
   ['settings.waterGoal', 'Вода — стаканов в день', 'n'],
   ['trainActive', 'Тренировка в процессе (служебное)', 'j'],
   ['settings.alloc', 'Фонды: проценты и правила (служебное)', 'j'],
-  ['settings.people', 'Чей доход: другие люди (служебное)', 'j']
+  ['settings.people', 'Чей доход: другие люди (служебное)', 'j'],
+  ['settings.hidden', 'Скрытые разделы (служебное)', 'j']
 ];
 /*schema@@*/
 const GS_FMT={n:{type:'NUMBER',pattern:'#,##0.##'},d:{type:'DATE',pattern:'dd.mm.yyyy'},s:{type:'TEXT',pattern:'@'}};
@@ -1650,6 +1667,7 @@ function normalize(d){
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
   o.projects.forEach(p=>{ if(p.parent==null) p.parent=''; });
   if(!Array.isArray(o.settings.people)) o.settings.people=[];
+  if(!Array.isArray(o.settings.hidden)) o.settings.hidden=[];
   o.insurance.forEach(x=>{ x.repeat=(x.repeat==null||x.repeat==='')?12:(+x.repeat||0); if(x.paid==null) x.paid=''; });
   for(const list of [o.items,o.insurance,o.invGroups,o.invPositions,o.invContribs,o.habits,o.tasks,o.goals,o.goalSteps,o.books,o.notes,o.foodLog,o.exercises,o.routines,o.workouts]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
   for(const k of ['readGoal','kcalGoal','waterGoal']) if(o.settings[k]===undefined) o.settings[k]=null;
@@ -3023,7 +3041,7 @@ function viewHome(){
   const hello=h<5?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
   const WDF=['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'];
   let html=`<div class="hello"><b>${hello}</b><span>${WDF[wd(today)]}, ${today.getDate()} ${MG[today.getMonth()]}</span></div>
-  <div class="quick"><button style="--sec:var(--s-fin)" data-act="quickExp">${icon('fin')}Трата</button><button style="--sec:var(--s-notes)" data-act="homeGo" data-v="note">${icon('notes')}Заметка</button><button style="--sec:var(--s-pay)" data-act="homeGo" data-v="pay">${icon('pay')}Платежи</button></div>`;
+  <div class="quick">${secOn('fin')?`<button style="--sec:var(--s-fin)" data-act="quickExp">${icon('fin')}Трата</button>`:''}<button style="--sec:var(--s-notes)" data-act="homeGo" data-v="note">${icon('notes')}Заметка</button>${secOn('pay')?`<button style="--sec:var(--s-pay)" data-act="homeGo" data-v="pay">${icon('pay')}Платежи</button>`:''}</div>`;
   html+=weekHomeCard();
   // задачи: просроченные и на сегодня
   const onDay=t=>repOk(today,t.repeat,t.repeatDays);
@@ -3035,28 +3053,29 @@ function viewHome(){
     :`<p class="hint" style="margin:6px 0 0">${doneN?'На сегодня всё сделано.':S.tasks.length?'На сегодня задач нет.':'Здесь будут задачи на сегодня. Срок можно писать словами: «завтра в 10», «в пятницу».'}</p>`;
   html+=homeCard('tasks','Задачи на сегодня'+(open.length?` <span class="fsub num">${open.length}</span>`:''),add+tl,'Все');
   // привычки на сегодня — отметка одним касанием
-  const due=S.habits.filter(x=>HS[x.id].sched(today)||HL[x.id].has(tk));
+  const due=secOn('habits')?S.habits.filter(x=>HS[x.id].sched(today)||HL[x.id].has(tk)):[];
   if(due.length){ const dn=due.filter(x=>HL[x.id].has(tk)).length;
     html+=homeCard('habits',`Привычки <span class="fsub num">${dn} из ${due.length}</span>`,`<div class="hpills">${due.map(x=>{ const on=HL[x.id].has(tk), v=x.type==='count'?HV[x.id].get(tk):null;
       return `<button class="hpill ${on?'on':''}" data-act="hToggle" data-h="${x.id}" data-d="${tk}" aria-pressed="${on}"><i>${on?'✓':v!=null?fmtN(v):''}</i><span>${ico(x)}${esc(x.name)}</span></button>`; }).join('')}</div>`,'Все'); }
   // деньги в этом месяце
   const j=C.months.indexOf(C.curM);
-  html+=homeCard('fin','Деньги',!S.items.length
+  if(secOn('fin')) html+=homeCard('fin','Деньги',!S.items.length
     ?firstStep('fin','Начните с плана','Добавьте доходы и обычные расходы — здесь появится, сколько остаётся каждый месяц.',`<button class="btn small" data-act="goto" data-sec="fin" data-tab="items">Открыть «Статьи»</button>`)
     :j<0?`<p class="hint" style="margin:0">Сегодняшний месяц вне периода плана — продлите план в настройках.</p>`:moneyHero(j),'Финансы');
   // лимиты по статьям в этом месяце
   const lims=S.items.map(it=>({it,L:limitOf(it,tk.slice(0,7))})).filter(x=>x.L).sort((a,b)=>b.L.pct-a.L.pct);
-  if(lims.length) html+=homeCard('fin','Лимиты',lims.map(({it,L})=>`<div class="limrow"><div class="row-between"><span class="fname">${esc(it.name)}</span><span class="num fsub">${fmt(L.spent)} из ${fmt(L.lim)}</span></div>${limitBar(L)}<div class="fsub">${L.left>=0?'осталось '+rub(L.left):'<span class="neg">превышен на '+rub(-L.left)+'</span>'}</div></div>`).join(''));
+  if(lims.length&&secOn('fin')) html+=homeCard('fin','Лимиты',lims.map(({it,L})=>`<div class="limrow"><div class="row-between"><span class="fname">${esc(it.name)}</span><span class="num fsub">${fmt(L.spent)} из ${fmt(L.lim)}</span></div>${limitBar(L)}<div class="fsub">${L.left>=0?'осталось '+rub(L.left):'<span class="neg">превышен на '+rub(-L.left)+'</span>'}</div></div>`).join(''));
   // скоро: платежи, дни рождения, резервы, погашения — на неделю вперёд
   const wk=dkey(addDays(today,7)), rows=[];
-  const pays=payOcc(dkey(addDays(today,-31)),wk).filter(o=>!o.paid&&(o.due>=tk||o.due>=(o.p.created||'')));
-  S.gifts.forEach(g=>{ const n=bdNext(g); if(n&&bdDays(n)<=7) rows.push({k:dkey(n),html:`<button class="soonrow" style="--sec:var(--s-bdays)" data-act="section" data-id="bdays"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">День рождения: ${esc(g.name)}</span><span class="w">${bdWhen(n)}</span></button>`}); });
-  C.ins.filter(r=>insDue(r)&&daysTo(r.x.pay)<=14).forEach(r=>rows.push({k:r.x.pay,html:`<button class="soonrow" style="--sec:var(--s-fin)" data-act="goto" data-sec="fin" data-tab="funds"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">Платёж из резерва: ${esc(r.x.name)}</span><span class="w">${daysTo(r.x.pay)<0?'<span class="neg">просрочен</span>':dayLabel(r.x.pay)}</span></button>`}));
-  freeList().filter(f=>f.d<=wk).forEach(f=>rows.push({k:f.d,html:`<button class="soonrow" style="--sec:var(--s-fin)" data-act="homeGo" data-v="invest"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">${({mat:'Погашение',am:'Частичное погашение',offer:'Оферта',end:'Закрытие'})[f.kind]||'Возврат'}: ${esc(f.p.name)}</span><span class="w">${dayLabel(f.d)} · ${rub(f.amt)}</span></button>`}));
+  const pays=secOn('pay')?payOcc(dkey(addDays(today,-31)),wk).filter(o=>!o.paid&&(o.due>=tk||o.due>=(o.p.created||''))):[];
+  if(secOn('bdays')) S.gifts.forEach(g=>{ const n=bdNext(g); if(n&&bdDays(n)<=7) rows.push({k:dkey(n),html:`<button class="soonrow" style="--sec:var(--s-bdays)" data-act="section" data-id="bdays"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">День рождения: ${esc(g.name)}</span><span class="w">${bdWhen(n)}</span></button>`}); });
+  if(secOn('fin')) C.ins.filter(r=>insDue(r)&&daysTo(r.x.pay)<=14).forEach(r=>rows.push({k:r.x.pay,html:`<button class="soonrow" style="--sec:var(--s-fin)" data-act="goto" data-sec="fin" data-tab="funds"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">Платёж из резерва: ${esc(r.x.name)}</span><span class="w">${daysTo(r.x.pay)<0?'<span class="neg">просрочен</span>':dayLabel(r.x.pay)}</span></button>`}));
+  if(secOn('fin')) freeList().filter(f=>f.d<=wk).forEach(f=>rows.push({k:f.d,html:`<button class="soonrow" style="--sec:var(--s-fin)" data-act="homeGo" data-v="invest"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">${({mat:'Погашение',am:'Частичное погашение',offer:'Оферта',end:'Закрытие'})[f.kind]||'Возврат'}: ${esc(f.p.name)}</span><span class="w">${dayLabel(f.d)} · ${rub(f.amt)}</span></button>`}));
   rows.sort((a,b)=>a.k.localeCompare(b.k));
   if(pays.length||rows.length) html+=homeCard('pay','Скоро',`${pays.map(payRow).join('')}${rows.map(r=>r.html).join('')}`);
   return html;
 }
+const MORE_GROUPS=[['Деньги',['fin','pay']],['Цели и привычки',['habits','goals']],['Здоровье',['train','food']],['Досуг',['books','movies']],['Люди',['bdays']]];
 function viewMore(){
   if(UI.page&&UI.page.kind==='trash') return viewTrash();
   if(UI.page&&UI.page.kind==='week') return viewWeek(UI.page.off||0);
@@ -3072,10 +3091,13 @@ function viewMore(){
     food:'сегодня '+fmt(S.foodLog.filter(f=>f.date===tk).reduce((s,f)=>s+numOr(f.kcal,0),0))+' ккал',
     pay:(()=>{ const n=payOcc(tk,dkey(addDays(TODAY(),7))).filter(o=>!o.paid).length; return S.payments.length?(n?'на неделе: '+n:'на неделе платежей нет'):'регулярные платежи'; })(),
     bdays:(()=>{ const x=S.gifts.map(g=>({g,n:bdNext(g)})).filter(x=>x.n).sort((a,b)=>a.n-b.n)[0]; return x?esc(x.g.name)+' · '+bdWhen(x.n).toLowerCase():'кого поздравить'; })()};
-  return `<div class="tiles">${SECTIONS.filter(s=>!s.nav).map(s=>s.id).map(id=>{ const s=SECTIONS.find(x=>x.id===id);
-    return `<button class="tile" style="--sec:var(--s-${id})" data-act="section" data-id="${id}"><span class="ic">${icon(id)}</span><b>${s.title}</b><span class="fsub">${esc(info[id])}</span></button>`; }).join('')}
+  const tile=id=>{ const s=SECTIONS.find(x=>x.id===id); return `<button class="tile" style="--sec:var(--s-${id})" data-act="section" data-id="${id}"><span class="ic">${icon(id)}</span><b>${s.title}</b><span class="fsub">${esc(info[id])}</span></button>`; };
+  const grp=MORE_GROUPS.map(([t,ids])=>{ const v=ids.filter(secOn); return v.length?`<div class="tgroup">${t}</div>`+v.map(tile).join(''):''; }).join('');
+  const hid=(S.settings.hidden||[]).length;
+  return `<div class="tiles">${grp}<div class="tgroup">Сервис</div>
   <button class="tile" style="--sec:var(--s-week)" data-act="moreOpen" data-v="week"><span class="ic">${icon('week')}</span><b>Итоги недели</b><span class="fsub">${weekLine(weekData(0))}</span></button>
-    <button class="tile" style="--sec:var(--s-trash)" data-act="moreOpen" data-v="trash"><span class="ic">${icon('trash')}</span><b>Корзина</b><span class="fsub">${S.trash.length?S.trash.length+' '+plural(S.trash.length,'запись','записи','записей'):'пусто'}</span></button></div>`;
+    <button class="tile" style="--sec:var(--s-trash)" data-act="moreOpen" data-v="trash"><span class="ic">${icon('trash')}</span><b>Корзина</b><span class="fsub">${S.trash.length?S.trash.length+' '+plural(S.trash.length,'запись','записи','записей'):'пусто'}</span></button></div>
+  <p class="hint" style="text-align:center;margin-top:14px">${hid?'Скрыто разделов: '+hid+'. ':''}<button class="linkbtn" data-act="settings">Настроить разделы</button></p>`;
 }
 
 /* ======== Итоги недели: сделано, привычки, тренировки, деньги и что впереди ======== */
@@ -3373,7 +3395,7 @@ function viewTaskPage(t){
     ${cl.map((c,i)=>`<div class="cl-row ${c.done?'done':''}"><button class="tcheck sm" data-act="clToggle" data-i="${i}" aria-pressed="${!!c.done}" aria-label="Пункт ${i+1}">${c.done?'✓':''}</button><input class="cl-text" data-cl="${i}" value="${esc(c.text)}" aria-label="Пункт ${i+1}"><button class="xbtn" data-act="clDel" data-i="${i}" aria-label="Удалить пункт">×</button></div>`).join('')}
     <div class="qa-row" style="margin-top:8px"><input class="inline-in" id="clNew" placeholder="Новый пункт…" enterkeyhint="done" autocomplete="off" aria-label="Новый пункт"><button class="btn" data-act="clAdd">Добавить</button></div></section>
   ${isNew?`<div class="actions sticky-ok"><span class="sp"></span><button class="btn" data-act="taskCancel">Отмена</button><button class="btn primary" data-act="taskOk">ОК</button></div>`
-    :`<div class="actions"><span class="fsub">${t.created?'создана '+dRu(t.created):''}${t.done&&t.doneAt?' · выполнена '+dRu(t.doneAt):''}</span><span class="sp"></span><button class="btn small danger" data-act="taskDel" data-id="${t.id}">Удалить задачу</button></div>
+    :`<div class="actions"><span class="fsub">${t.created?'создана '+dRu(t.created):''}${t.done&&t.doneAt?' · выполнена '+dRu(t.doneAt):''}</span><span class="sp"></span>${t.due||t.deadline?`<button class="btn small" data-act="taskCal" data-id="${t.id}">В Google Календарь</button>`:''}<button class="btn small danger" data-act="taskDel" data-id="${t.id}">Удалить задачу</button></div>
     <div class="actions sticky-ok"><span class="sp"></span><button class="btn primary" data-act="back">Готово</button></div>`}`;
 }
 // новая задача из «Подробнее…» живёт черновиком, пока не нажали «ОК»
@@ -3604,7 +3626,14 @@ function setMovieStatus(m,v){
   if(v==='done'&&!m.finished) m.finished=todayK();
   if(v!=='done') m.finished=v==='want'?'':m.finished;
 }
-const mTag=m=>`<span class="tag">${m.kind==='series'?'Сериал':'Фильм'}</span>`;
+const mTag=m=>`<span class="tag mk-${m.kind==='series'?'ser':'film'}">${m.kind==='series'?'Сериал':'Фильм'}</span>`;
+// в «Хочу посмотреть»: какой сезон (пусто — весь сериал)
+const mSeason=m=>numOr(m.season,0)?numOr(m.season,0)+' сезон':'весь сериал';
+const mSeasonSel=m=>{ const n=Math.max(20,numOr(m.season,0)); return `<select class="mseason" data-mseason="${m.id}" aria-label="Какой сезон"><option value="">Весь сериал</option>${Array.from({length:n},(_,k)=>`<option value="${k+1}" ${numOr(m.season,0)===k+1?'selected':''}>${k+1} сезон</option>`).join('')}</select>`; };
+// фильмы и сериалы — двумя списками рядом (на телефоне — один под другим)
+const mCols=(list,one,emptyF,emptyS)=>{ const f=list.filter(m=>m.kind!=='series'), sr=list.filter(m=>m.kind==='series');
+  const col=(cls,t,l,e)=>`<div class="mcol ${cls}"><div class="mhead"><span class="mdot"></span>${t}<span class="fsub num">${l.length||''}</span></div>${l.length?one(l):`<p class="hint" style="margin:0 0 12px">${e}</p>`}</div>`;
+  return `<div class="mcols">${col('mk-film','Фильмы',f,emptyF)}${col('mk-ser','Сериалы',sr,emptyS)}</div>`; };
 const mSub=m=>[m.year?String(m.year):'',m.where||''].filter(Boolean).map(esc).join(' · ');
 function epCtl(m){
   return `<div class="ep"><div class="ep-l"><span class="fsub">Сезон</span><div class="wctl"><button class="step" data-act="movieSeason" data-id="${m.id}" data-d="-1" aria-label="Предыдущий сезон" ${numOr(m.season,1)<=1?'disabled':''}>−</button><b class="num">${numOr(m.season,1)}</b><button class="step" data-act="movieSeason" data-id="${m.id}" data-d="1" aria-label="Следующий сезон">+</button></div></div>
@@ -3622,10 +3651,11 @@ function viewMovies(){
   const tab=UI.sub.movies||'watching', y=TODAY().getFullYear(), list=S.movies.filter(m=>m.status===tab);
   const add=`<div class="actions" style="margin:0 0 12px"><button class="btn primary small" data-act="add" data-kind="movie">+ Фильм или сериал</button></div>`;
   let body;
-  if(tab==='watching') body=list.map(movieCard).join('')||emptyCard('Сейчас ничего не смотрите','Возьмите что-нибудь из «Хочу посмотреть» или добавьте новое. У сериала здесь будут сезон и серия, на которых остановились.');
+  if(tab==='watching') body=list.length?mCols(list,l=>l.map(movieCard).join(''),'Фильмов сейчас нет','Сериалов сейчас нет'):emptyCard('Сейчас ничего не смотрите','Возьмите что-нибудь из «Хочу посмотреть» или добавьте новое. У сериала здесь будут сезон и серия, на которых остановились.');
   else if(tab==='want'){ const sorted=list.slice().sort((a,b)=>String(b.created).localeCompare(String(a.created)));
-    body=`<section class="card">${sorted.map(m=>`<div class="trow"><button class="tmain" data-act="movieOpen" data-id="${m.id}"><div class="fname">${esc(m.name)} ${mTag(m)}</div>${mSub(m)?`<div class="fsub">${mSub(m)}</div>`:''}</button>${m.kind==='series'?`<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="watching">Начать</button>`:`<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="done">Посмотрел</button>`}</div>`).join('')
-      ||'<p class="hint" style="margin:0">Сюда — всё, что посоветовали или захотелось посмотреть.</p>'}</section>`; }
+    const row=m=>`<div class="trow"><button class="tmain" data-act="movieOpen" data-id="${m.id}"><div class="fname">${esc(m.name)}</div>${mSub(m)?`<div class="fsub">${mSub(m)}</div>`:''}</button>${m.kind==='series'?`${mSeasonSel(m)}<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="watching">Начать</button>`:`<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="done">Посмотрел</button>`}</div>`;
+    body=sorted.length?mCols(sorted,l=>`<section class="card">${l.map(row).join('')}</section>`,'Фильмов в списке нет','Сериалов в списке нет')
+      :'<section class="card"><p class="hint" style="margin:0">Сюда — всё, что посоветовали или захотелось посмотреть. У сериала можно выбрать сезон.</p></section>'; }
   else { const sorted=list.slice().sort((a,b)=>String(b.finished).localeCompare(String(a.finished))), nY=list.filter(m=>m.finished&&+m.finished.slice(0,4)===y);
     body=`<p class="hint" style="margin:0 0 10px">В ${y} году: ${nY.filter(m=>m.kind==='film').length} ${plural(nY.filter(m=>m.kind==='film').length,'фильм','фильма','фильмов')}, ${nY.filter(m=>m.kind==='series').length} ${plural(nY.filter(m=>m.kind==='series').length,'сериал','сериала','сериалов')}</p>
     <section class="card">${sorted.map(m=>`<button class="list-row" data-act="movieOpen" data-id="${m.id}"><div class="m"><div class="fname">${esc(m.name)} ${mTag(m)}</div><div class="fsub">${[m.finished?dRu(m.finished):'',mSub(m)].filter(Boolean).join(' · ')}</div></div><div class="a">${stars(m.rating)}</div></button>`).join('')
@@ -3637,6 +3667,7 @@ function viewMoviePage(m){
   return `${pageBack('Кино')}<div class="detail-title"><h2>${esc(m.name)}</h2><button class="btn small" data-act="edit" data-kind="movie" data-i="${i}">Изменить</button></div>
   <p class="hint" style="margin-top:-6px">${ser?'Сериал':'Фильм'}${mSub(m)?' · '+mSub(m):''}</p>
   <div class="seg" style="margin-bottom:12px">${MSTAT.map(([v,l])=>`<button class="${m.status===v?'on':''}" data-act="movieStatus" data-id="${m.id}" data-v="${v}">${l}</button>`).join('')}</div>
+  ${ser&&m.status==='want'?`<section class="card"><div class="row-between"><h3>Какой сезон хочу посмотреть</h3>${mSeasonSel(m)}</div><p class="hint" style="margin:6px 0 0">${numOr(m.season,0)?'Нажмёте «Смотрю» — начнётся с '+mSeason(m)+'а.':'Не выбран — значит, сериал целиком, с первого сезона.'}</p></section>`:''}
   ${ser&&m.status!=='want'?`<section class="card"><div class="row-between"><h3>Где остановился</h3><b class="num">${epText(m)}</b></div>${epCtl(m)}
     <div class="actions" style="margin-top:10px"><button class="btn small primary" data-act="movieEp" data-id="${m.id}" data-d="1">+1 серия</button><button class="btn small" data-act="movieNextS" data-id="${m.id}">Следующий сезон</button></div></section>`:''}
   <section class="card"><h3>Оценка</h3><div class="stars" role="group" aria-label="Оценка">${[1,2,3,4,5].map(n=>`<button class="${n<=numOr(m.rating,0)?'on':''}" data-act="movieRate" data-id="${m.id}" data-v="${n}" aria-label="${n} из 5">★</button>`).join('')}</div>
@@ -4639,7 +4670,7 @@ const FORMS={
     blank:()=>({id:uid(),name:'',kind:'film',status:UI.sub.movies||'want',season:null,episode:null,year:null,where:'',rating:null,note:'',started:'',finished:'',created:todayK()}),
     fields:[['name','Название','text'],['kind','Что это','select',MKIND],['status','Статус','select',MSTAT],['year','Год выхода','num'],
       ['where','Где смотреть','text',null,{ph:'Кинопоиск, Okko, кинотеатр…'}],
-      ['season','Сезон, на котором остановился','num',null,{only:r=>r.kind==='series'}],['episode','Серия','num',null,{only:r=>r.kind==='series'}]],
+      ['season','Сезон: в «Хочу посмотреть» — какой (пусто — весь сериал), в «Смотрю» — на котором остановился','num',null,{showIf:['kind','series']}],['episode','Серия, на которой остановился','num',null,{showIf:['kind','series']}]],
     note:'Сезон и серию у сериала удобно двигать кнопками «+1 серия» и «Следующий сезон» во вкладке «Смотрю».',
     onDelete:()=>{ UI.page=null; },after:m=>{ setMovieStatus(m,m.status); }},
   exercise:{title:'Упражнение',list:()=>S.exercises,keys:['exercises'],
@@ -4668,7 +4699,8 @@ function openSheet(html){ const s=document.getElementById('sheet'); s.innerHTML=
 function closeSheet(){ document.getElementById('sheet').hidden=true; document.getElementById('sheetBg').hidden=true; edit=null; }
 function openEditor(kind,i,preset){
   const F=FORMS[kind], rec=i==null?Object.assign(F.blank(),preset||{}):F.list()[i]; edit={kind,i};
-  const fld=([k,l,t,opts,fl])=>{ const v=rec[k]??'';
+  const fld=f=>{ const h=fld0(f), fl=f[4]; if(!fl||!fl.showIf||!h) return h; const [k,v]=fl.showIf; return `<div data-showif="${k}=${v}" ${String(rec[k])===v?'':'hidden'}>${h}</div>`; };
+  const fld0=([k,l,t,opts,fl])=>{ const v=rec[k]??'';
     if(fl&&fl.newOnly&&i!=null) return '';
     if(fl&&fl.only&&!fl.only(rec)) return '';
     if(typeof opts==='function') opts=opts();
@@ -4748,6 +4780,33 @@ async function rcConnect(){
   REMOTE={url,key}; clearTimeout(saveTimer); dirtyAll=false; dirtyKeys.clear(); closeSheet();
   setSync('pending','Загружаю из таблицы…'); await pullRemote(); toast('Таблица подключена');
 }
+/* оформление на этом устройстве: акцентный цвет и «разделы одним цветом» */
+const LOOK_KEY='moyplan.look.v1';
+const ACCENTS=[['blue','Синий','#2a78d6','#4a92ea'],['green','Зелёный','#159a6b','#2fc28c'],['violet','Фиолетовый','#6250d6','#9085e9'],['orange','Оранжевый','#d9622b','#f08250'],
+  ['pink','Розовый','#d9558c','#ec7aa8'],['teal','Бирюзовый','#0d93a3','#2ab7c7'],['red','Красный','#c8413b','#ef6b63'],['graphite','Графит','#4b4a46','#b8b7b0']];
+const SEC_IDS=['home','tasks','fin','habits','goals','notes','more','pay','bdays','train','books','movies','food','week','trash'];
+function lookGet(){ let L={}; try{ L=JSON.parse(localStorage.getItem(LOOK_KEY)||'{}')||{}; }catch(e){} return Object.assign({accent:'blue',mono:false},L); }
+function lookSet(L){ try{ localStorage.setItem(LOOK_KEY,JSON.stringify(L)); }catch(e){} lookApply(); if(S) render(); }
+function lookApply(){
+  const L=lookGet(), A=ACCENTS.find(a=>a[0]===L.accent)||ACCENTS[0]; let el=document.getElementById('lookCss');
+  if(A[0]==='blue'&&!L.mono){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('style'); el.id='lookCss'; document.head.appendChild(el); }
+  const vars=(c,soft)=>`--accent:${c};--accent-soft:${soft};--s-home:${c};--s-tasks:${c};--s-week:${c};`+(L.mono?SEC_IDS.map(id=>`--s-${id}:${c};`).join(''):'');
+  const lt=vars(A[2],`color-mix(in srgb, ${A[2]} 13%, #fff)`), dk=vars(A[3],`color-mix(in srgb, ${A[3]} 20%, #1c1f24)`);
+  el.textContent=`:root{${lt}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dk}}}:root[data-theme="dark"]{${dk}}`;
+  const m=document.querySelector('meta[name="theme-color"]'); if(m&&A[0]!=='blue') m.setAttribute('content',A[2]);
+}
+function lookBox(){
+  const L=lookGet();
+  return `<div class="field"><label>Цвет оформления</label><div class="swatches">${ACCENTS.map(([id,n,c,d])=>`<button class="sw-c ${L.accent===id?'on':''}" style="--c:${c};--cd:${d}" data-act="lookAcc" data-v="${id}" aria-label="${n}" title="${n}" aria-pressed="${L.accent===id}"></button>`).join('')}</div></div>
+    <div class="field"><label>Цвета разделов</label><div class="seg"><button class="${L.mono?'':'on'}" data-act="lookSec" data-v="0">У каждого свой</button><button class="${L.mono?'on':''}" data-act="lookSec" data-v="1">Как оформление</button></div></div>`;
+}
+// какие разделы показывать в «Ещё» и на главной
+function secBox(){
+  const h=new Set(S.settings.hidden||[]);
+  return `<div class="field"><label>Разделы</label><p class="hint" style="margin:0 0 6px">Ненужное можно убрать — данные останутся, раздел вернётся одним нажатием.</p><div class="secpick">${SECTIONS.filter(s=>!s.nav).map(s=>`<button class="${h.has(s.id)?'':'on'}" style="--sec:var(--s-${s.id})" data-act="secHide" data-id="${s.id}" aria-pressed="${!h.has(s.id)}"><span class="ic">${icon(s.id)}</span>${s.title}</button>`).join('')}</div></div>`;
+}
+const secOn=id=>!(S&&S.settings.hidden||[]).includes(id);
 function openSettings(){
   openSheet(`<h2>Настройки</h2><div class="form">
     ${storageBox()}
@@ -4755,6 +4814,7 @@ function openSettings(){
     <div class="actions" style="margin-top:0"><button class="btn small" data-act="export">Выгрузить</button><button class="btn small" data-act="copy">Скопировать</button><button class="btn small" data-act="import">Загрузить</button></div>
     ${nativeBox()}
     <div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
+    ${lookBox()}${secBox()}
     </div><div class="actions"><span class="sp"></span><button class="btn primary" data-act="sheetClose">Готово</button></div>`);
 }
 
@@ -4929,16 +4989,33 @@ function delRecord(sp){
   toast('Удалено: '+sp.name,{label:'Вернуть',fn:()=>{ snap.forEach(([k,v])=>{ S[k]=JSON.parse(v); }); if(tr){ S.trash=S.trash.filter(x=>x!==tr); persist('trash'); } persist(...sp.keys); render(); }});
 }
 // меню по правой кнопке
+// отложить: на день позже (просроченная или сегодняшняя — на завтра); крайний срок не раньше новой даты
+// событие в Google Календаре (откроется готовая форма): весь день — по дате, со временем — на час
+function calUrl(t){
+  const k=t.due||t.deadline, ymd=x=>x.replace(/-/g,''), p=new URLSearchParams({action:'TEMPLATE',text:t.name||'Задача'});
+  if(t.time&&t.due){ const [h,m]=t.time.split(':').map(Number), d=parseD(t.due), a=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h||0,m||0), b=new Date(a.getTime()+36e5),
+      f=x=>dkey(x).replace(/-/g,'')+'T'+String(x.getHours()).padStart(2,'0')+String(x.getMinutes()).padStart(2,'0')+'00';
+    p.set('dates',f(a)+'/'+f(b)); try{ p.set('ctz',Intl.DateTimeFormat().resolvedOptions().timeZone); }catch(e){} }
+  else p.set('dates',ymd(k)+'/'+ymd(dkey(addDays(parseD(k),1))));
+  const det=[t.note||'', t.deadline&&t.deadline!==k?'Крайний срок: '+dRu(t.deadline):''].filter(Boolean).join('\n'); if(det) p.set('details',det);
+  return 'https://calendar.google.com/calendar/render?'+p.toString();
+}
+function postponeTask(t){
+  if(!t||t.done) return; const tk=todayK(), base=t.due&&t.due>tk?t.due:tk, nd=dkey(addDays(parseD(base),1)), old={due:t.due,deadline:t.deadline};
+  t.due=nd; if(t.deadline&&t.deadline<nd) t.deadline=nd; persist('tasks'); render(); buzz(false);
+  toast('Перенесено на '+dayLabel(nd).toLowerCase().replace(/^завтра$/,'завтра'),{label:'Вернуть',fn:()=>{ Object.assign(t,old); persist('tasks'); render(); }});
+}
+const openTask=sp=>sp&&sp.list===S.tasks&&sp.rec&&!sp.rec.done;
 function hideCtx(){ const m=document.getElementById('ctx'); if(m) m.remove(); }
 document.addEventListener('contextmenu',e=>{
   if(!S||!e.target.closest||e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
   const d=delTarget(e.target); if(!d) return;
   e.preventDefault(); hideCtx();
   const m=document.createElement('div'); m.className='ctx'; m.id='ctx'; m.setAttribute('role','menu');
-  m.innerHTML=`<div class="ctx-h">${esc(d.sp.name)}</div><button type="button" role="menuitem" data-cx="open">Открыть</button><button type="button" role="menuitem" class="danger" data-cx="del">Удалить</button>`;
+  m.innerHTML=`<div class="ctx-h">${esc(d.sp.name)}</div><button type="button" role="menuitem" data-cx="open">Открыть</button>${openTask(d.sp)?'<button type="button" role="menuitem" data-cx="later">Перенести на завтра</button>':''}<button type="button" role="menuitem" class="danger" data-cx="del">Удалить</button>`;
   document.body.appendChild(m); const r=m.getBoundingClientRect();
   m.style.left=Math.max(8,Math.min(e.clientX,innerWidth-r.width-8))+'px'; m.style.top=Math.max(8,Math.min(e.clientY,innerHeight-r.height-8))+'px';
-  m.addEventListener('click',ev=>{ const c=ev.target.closest('[data-cx]'); if(!c) return; ev.stopPropagation(); hideCtx(); if(c.dataset.cx==='open') d.btn.click(); else delRecord(d.sp); });
+  m.addEventListener('click',ev=>{ const c=ev.target.closest('[data-cx]'); if(!c) return; ev.stopPropagation(); hideCtx(); if(c.dataset.cx==='open') d.btn.click(); else if(c.dataset.cx==='later') postponeTask(d.sp.rec); else delRecord(d.sp); });
   const del=m.querySelector('[data-cx="del"]'); if(del) del.focus();
 });
 document.addEventListener('pointerdown',e=>{ if(!(e.target.closest&&e.target.closest('#ctx'))) hideCtx(); },true);
@@ -4952,32 +5029,35 @@ document.addEventListener('pointerdown',e=>{
   if(swOpen&&!swOpen.wrap.contains(e.target)) swClose();
   if(e.target.closest('input,textarea,select,[contenteditable="true"],[data-drag],[data-tdrag],.sw-bin,.hgrid,.tcal,.pcal,.cal,.sheet')) return;
   const d=delTarget(e.target); if(!d) return;
-  sw={x:e.clientX,y:e.clientY,id:e.pointerId,row:d.row,sp:d.sp,on:false,dx:0,base:swOpen&&swOpen.row===d.row?-76:0};
+  const W=openTask(d.sp)?152:76;
+  sw={x:e.clientX,y:e.clientY,id:e.pointerId,row:d.row,sp:d.sp,on:false,dx:0,W,base:swOpen&&swOpen.row===d.row?-W:0};
 },{passive:true});
 document.addEventListener('pointermove',e=>{
   if(!sw||e.pointerId!==sw.id) return; const dx=e.clientX-sw.x, dy=e.clientY-sw.y;
   if(!sw.on){ if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){ sw=null; return; }
     if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.4&&(dx<0||sw.base)){ sw.on=true; swStart(); } else return; }
-  sw.dx=Math.max(-120,Math.min(0,sw.base+dx)); sw.row.style.transform='translateX('+sw.dx+'px)';
+  sw.dx=Math.max(-sw.W-44,Math.min(0,sw.base+dx)); sw.row.style.transform='translateX('+sw.dx+'px)';
 },{passive:true});
 function swStart(){
   if(swOpen&&swOpen.row!==sw.row) swClose();
   let wrap=sw.row.parentElement;
   if(!wrap.classList.contains('sw-wrap')){ wrap=document.createElement('div'); wrap.className='sw-wrap'; sw.row.before(wrap);
     const bin=document.createElement('button'); bin.type='button'; bin.className='sw-bin'; bin.setAttribute('aria-label','Удалить: '+sw.sp.name); bin.innerHTML='<span aria-hidden="true">🗑</span><small>Удалить</small>';
-    wrap.append(bin,sw.row); }
+    wrap.append(bin);
+    if(sw.W>76){ const mv=document.createElement('button'); mv.type='button'; mv.className='sw-bin sw-later'; mv.setAttribute('aria-label','Перенести на завтра: '+sw.sp.name); mv.innerHTML='<span aria-hidden="true">→</span><small>Завтра</small>'; wrap.append(mv); }
+    wrap.append(sw.row); }
   sw.wrap=wrap; sw.row.classList.add('sw-row'); sw.row.style.transition='none';
 }
 function swEnd(){
   const s=sw; sw=null; if(!s||!s.on) return; swBlock=true; setTimeout(()=>{ swBlock=false; },400);
-  s.row.style.transition=''; const o={wrap:s.wrap,row:s.row,sp:s.sp};
-  if(s.dx<-44){ s.row.style.transform='translateX(-76px)'; swOpen=o; } else { swOpen=o; swClose(); }
+  s.row.style.transition=''; const o={wrap:s.wrap,row:s.row,sp:s.sp,W:s.W};
+  if(s.dx<-44){ s.row.style.transform='translateX(-'+s.W+'px)'; swOpen=o; } else { swOpen=o; swClose(); }
 }
 document.addEventListener('pointerup',swEnd); document.addEventListener('pointercancel',swEnd);
 // клик после свайпа строку не открывает; клик по корзине — удаляет
 document.addEventListener('click',e=>{
   const bin=e.target.closest&&e.target.closest('.sw-bin');
-  if(bin&&swOpen){ e.stopPropagation(); e.preventDefault(); const sp=swOpen.sp; swOpen=null; delRecord(sp); return; }
+  if(bin&&swOpen){ e.stopPropagation(); e.preventDefault(); const sp=swOpen.sp; swOpen=null; if(bin.classList.contains('sw-later')) postponeTask(sp.rec); else delRecord(sp); return; }
   if(swBlock){ e.stopPropagation(); e.preventDefault(); swBlock=false; return; }
   if(swOpen&&swOpen.wrap.contains(e.target)){ e.stopPropagation(); e.preventDefault(); swClose(); }
 },true);
@@ -5072,6 +5152,12 @@ document.addEventListener('input',e=>{
   if(el.id==='bLots'||el.id==='bPrice') buySum();
 });
 document.addEventListener('change',e=>{ if(S&&e.target.dataset&&e.target.dataset.pq) render(); });
+// окно записи: поля, видные только при нужном выборе
+document.addEventListener('change',e=>{ const el=e.target, f=el.closest&&el.closest('#edForm'); if(!f||!el.name) return;
+  f.querySelectorAll('[data-showif]').forEach(d=>{ const [k,v]=d.dataset.showif.split('='); if(k===el.name) d.hidden=el.value!==v; }); });
+// сезон сериала в «Хочу посмотреть»
+document.addEventListener('change',e=>{ const el=e.target; if(!S||!el.dataset||!el.dataset.mseason) return; const m=S.movies.find(x=>x.id===el.dataset.mseason); if(!m) return;
+  m.season=el.value?+el.value:null; if(m.status==='want') m.episode=null; persist('movies'); render(); });
 // пока печатаете, строка с курсором не уходит под нижнюю панель, кнопку «Готово» или клавиатуру
 function caretRect(el){
   if(el.isContentEditable){ const sl=document.getSelection&&document.getSelection(); if(sl&&sl.rangeCount){ const r=sl.getRangeAt(0).cloneRange(); r.collapse(false);
@@ -5264,6 +5350,10 @@ document.addEventListener('click',e=>{
   else if(a==='taskNew'){ const inp=document.getElementById('qaTitle'), v=UI.sub.tasks||''; const t=newTask(inp?inp.value.trim():'','',v.startsWith('p:')?v.slice(2):'');
     UI.draft=t; UI.page={kind:'task',id:t.id,isNew:true,back:'Задачи'}; go(); const n=$view.querySelector('[data-tf="name"]'); if(n&&!t.name) n.focus(); }
   else if(a==='trashBack') trashRestore(b.dataset.id);
+  else if(a==='taskCal'){ const t=S.tasks.find(x=>x.id===b.dataset.id); if(!t) return; const u=calUrl(t); if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }
+  else if(a==='lookAcc'){ const L=lookGet(); L.accent=b.dataset.v; lookSet(L); openSettings(); }
+  else if(a==='lookSec'){ const L=lookGet(); L.mono=b.dataset.v==='1'; lookSet(L); openSettings(); }
+  else if(a==='secHide'){ const h=new Set(S.settings.hidden||[]), id=b.dataset.id; if(h.has(id)) h.delete(id); else h.add(id); S.settings.hidden=[...h]; persist('settings'); render(); openSettings(); }
   else if(a==='trashDel'){ const e=S.trash.find(x=>x.id===b.dataset.id); if(!e||!confirm('Стереть «'+e.name+'» навсегда?')) return; S.trash=S.trash.filter(x=>x!==e); persist('trash'); render(); }
   else if(a==='trashEmpty'){ if(!S.trash.length||!confirm('Стереть всё из корзины навсегда?')) return; S.trash=[]; persist('trash'); render(); }
   else if(a==='moreOpen'){ UI.page={kind:b.dataset.v,off:0}; render(); window.scrollTo(0,0); }
@@ -5424,6 +5514,7 @@ document.addEventListener('click',e=>{
   else if(a==='theme'){ const v=b.dataset.v; if(v) document.documentElement.dataset.theme=v; else delete document.documentElement.dataset.theme; try{ localStorage.setItem('moyplan.theme',v); }catch(err){} openSettings(); }
 });
 try{ const t=localStorage.getItem('moyplan.theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+lookApply();
 
 boot();
 if(!IS_GAS&&!NATIVE&&'serviceWorker' in navigator&&/^(https:|http:\/\/localhost)/.test(location.href)) navigator.serviceWorker.register('sw.js').catch(()=>{});
