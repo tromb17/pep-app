@@ -458,6 +458,9 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .ptag{font-size:12px;color:var(--text-2)}
 .tfields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tfields label{display:block;font-size:12px;color:var(--text-2);margin-bottom:3px}
+/* главные поля задачи: срок, время, крайний срок, проект — подсвечены */
+.tfields .tkey{background:color-mix(in srgb,var(--accent) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:12px;padding:7px 9px 9px}
+.tfields .tkey label{color:var(--accent);font-weight:600}.tfields .tkey select,.tfields .tkey input{background:var(--surface)}
 .tfields select,.tfields input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
 .ico{margin-right:6px;font-style:normal}
 .emojis{display:flex;flex-wrap:wrap;gap:6px}.emo input{position:absolute;opacity:0;pointer-events:none}
@@ -3400,17 +3403,17 @@ function viewTaskPage(t){
   <section class="card"><div style="display:flex;gap:10px;align-items:flex-start">${isNew?'':`<button class="tcheck p${+t.priority||0}" data-act="taskToggle" data-id="${t.id}" aria-pressed="${!!t.done}" aria-label="Выполнить" style="margin-top:9px">${t.done?'✓':''}</button>`}
     <input class="note-title" data-tf="name" value="${esc(t.name)}" placeholder="Что сделать" aria-label="Название задачи"></div>
     <div class="tfields" style="margin-top:10px">
-      <div><label>Дата выполнения</label><div class="dwrap"><input type="date" data-tf="due" value="${esc(t.due||'')}" aria-label="Дата выполнения">${t.due?`<button class="xbtn" data-act="tClr" data-f="due" aria-label="Без даты">×</button>`:''}</div></div>
-      <div><label>Крайний срок</label><div class="dwrap"><input type="date" data-tf="deadline" value="${esc(t.deadline||'')}" aria-label="Крайний срок">${t.deadline?`<button class="xbtn" data-act="tClr" data-f="deadline" aria-label="Без крайнего срока">×</button>`:''}</div></div>
-      <div><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
-      <div><label>Приоритет</label>${sel('priority',PRIOS,t.priority||'0')}</div>
-      <div><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
+      <div class="tkey"><label>Дата выполнения</label><div class="dwrap"><input type="date" data-tf="due" value="${esc(t.due||'')}" aria-label="Дата выполнения">${t.due?`<button class="xbtn" data-act="tClr" data-f="due" aria-label="Без даты">×</button>`:''}</div></div>
+      <div class="tkey"><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
+      <div class="tkey"><label>Крайний срок</label><div class="dwrap"><input type="date" data-tf="deadline" value="${esc(t.deadline||'')}" aria-label="Крайний срок">${t.deadline?`<button class="xbtn" data-act="tClr" data-f="deadline" aria-label="Без крайнего срока">×</button>`:''}</div></div>
+      <div class="tkey"><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
       ${S.projects.length?`<div class="qa-chips" style="grid-column:1/-1;margin-top:0">${projChips(t.project&&projById(t.project)?t.project:'','tProj')}</div>`:''}
-      <div><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
       <div><label>Повтор</label>${sel('repeat',REPEATS,t.repeat||'none')}</div>
+      ${t.repeat==='days'?`<div class="days" style="grid-column:1/-1">${WD.map((w,d)=>`<button class="dbtn ${String(t.repeatDays||'')[d]==='1'?'on':''}" data-act="tRepDay" data-id="${t.id}" data-d="${d}" aria-pressed="${String(t.repeatDays||'')[d]==='1'}">${w}</button>`).join('')}</div>`:''}
       <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
       <div><label>Сколько раз выполнить</label><input type="number" min="1" max="12" step="1" inputmode="numeric" data-tf="times" value="${n}" aria-label="Сколько раз выполнить"></div>
-      ${t.repeat==='days'?`<div class="days" style="grid-column:1/-1">${WD.map((w,d)=>`<button class="dbtn ${String(t.repeatDays||'')[d]==='1'?'on':''}" data-act="tRepDay" data-id="${t.id}" data-d="${d}" aria-pressed="${String(t.repeatDays||'')[d]==='1'}">${w}</button>`).join('')}</div>`:''}
+      <div><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
+      <div><label>Приоритет</label>${sel('priority',PRIOS,t.priority||'0')}</div>
     </div>
     <p class="hint" style="margin:8px 0 0">${t.deadline?'Задача будет в «Сегодня» каждый день'+(t.due&&t.due>todayK()?' с '+dDay(t.due):'')+' до '+dDay(t.deadline)+', потом — просрочена.':t.due?'После '+dDay(t.due)+' задача станет просроченной. Длинная или не срочная — поставьте крайний срок: до него она просто будет в списке.':'Без срока — задача лежит в своём проекте и не просрочивается.'}</p>
     ${n>1?`<p class="hint" style="margin:8px 0 0">В списке у задачи будет ${n} ${plural(n,'кружок','кружка','кружков')}: задача выполнится, когда отмечены все.${isNew?'':' Сейчас сделано '+Math.min(n,t.done?n:t.timesDone||0)+' из '+n+'.'}</p>`:''}
