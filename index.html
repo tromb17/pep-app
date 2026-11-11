@@ -580,7 +580,12 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .tci.over{color:var(--critical)}
 .tmore{font-size:9.5px;color:var(--muted);padding-left:3px}
 .tlegend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:12.5px;color:var(--text-2)}
-.tlegend .lg{display:inline-flex;align-items:center;gap:6px}
+.tlegend .lg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font:inherit;color:inherit;cursor:pointer}
+.tlegend .lg.off{opacity:.55;text-decoration:line-through}.tlegend .lg.off .dot{background:transparent;box-shadow:0 0 0 1.5px var(--c) inset}
+.pchip{display:inline-flex;align-items:center;gap:6px}.pchip .dot{--c:var(--pc,var(--muted));width:8px;height:8px}
+.pchip.imp{background:color-mix(in srgb,var(--pc) 14%,var(--surface));border-color:color-mix(in srgb,var(--pc) 50%,transparent);color:var(--text);font-weight:600}
+.pchip.on{background:var(--pc,var(--accent));border-color:var(--pc,var(--accent));color:#fff;font-weight:600}.pchip.on .dot{--c:#fff}
+.emo span.csw::after{content:'';width:22px;height:22px;border-radius:50%;background:var(--c)}
 .trow.ghost{opacity:.7} .trow.ghost .tcheck{border-style:dashed;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:13px}
 @media (min-width:700px){.tcal{gap:5px}.tday{min-height:100px;padding:5px 4px}.tci{font-size:11.5px;padding:2px 5px}.tday b{font-size:13px}.tmore{font-size:11px}}
 /* барабан чисел */
@@ -1340,7 +1345,8 @@ const GS_SCHEMA = [
     ['times', 'Сколько раз', 'n'], ['timesDone', 'Сделано раз', 'n'],
     ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's'], ['deadline', 'Крайний срок', 'd']] },
   { key: 'projects', sheet: 'Проекты', cols: [
-    ['id', 'ID (не менять)', 's'], ['name', 'Проект', 's'], ['parent', 'ID родительского проекта', 's'], ['created', 'Создан', 'd']] },
+    ['id', 'ID (не менять)', 's'], ['name', 'Проект', 's'], ['parent', 'ID родительского проекта', 's'], ['created', 'Создан', 'd'],
+    ['color', 'Цвет (1–7, пусто — сам)', 's'], ['pin', 'Важный', 'b']] },
   { key: 'fundSpend', sheet: 'Фонды — траты', cols: [
     ['id', 'ID (не менять)', 's'], ['fund', 'ID фонда', 's'], ['date', 'Дата', 'd'], ['amount', 'Сумма', 'n'], ['note', 'На что', 's']] },
   { key: 'payments', sheet: 'Платежи', cols: [
@@ -1844,7 +1850,7 @@ function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=se
   NATIVE.schedule(JSON.stringify(notifPlan()));
   const wk=dkey(addDays(TODAY(),7));
   NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&(x.deadline||x.due&&x.due<=wk)).map(x=>({id:x.id,name:x.name,due:x.due,deadline:x.deadline||'',time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
-    projects:S.projects.map(p=>({id:p.id,name:p.name,parent:p.parent||''})),
+    projects:S.projects.filter(p=>p.pin).concat(S.projects.filter(p=>!p.pin)).map(p=>({id:p.id,name:p.name,parent:p.parent||''})),
     habits:S.habits.map(h=>({id:h.id,name:(h.icon?h.icon+' ':'')+h.name,type:h.type==='count'?'count':'check',target:numOr(h.target,1),unit:h.unit||'',days:h.days||'1111111',created:h.created||''})),
     hday:todayK(),hlog:Object.fromEntries(S.habitLog.filter(l=>l.date===todayK()).map(l=>[l.habit,numOr(l.value,1)])),
     exp:expItems().map(it=>{ const L=limitOf(it,todayK().slice(0,7)); return {id:it.id,name:it.name,plan:numOr(it.amount,0),subs:itemSubs(it),limit:L?L.lim:0,spent:L?L.spent:0}; }),emonth:todayK().slice(0,7)}));
@@ -1984,6 +1990,8 @@ function prepare(){
   const today=TODAY(); HS={}; S.habits.forEach(h=>HS[h.id]=habitStats(h,HL[h.id],today));
   for(const k in CH) delete CH[k];
 }
+// поля быстрого ввода: набранный текст переживает перерисовку; после «Добавить» поле очищает обработчик
+const KEEP_IN=['qaTitle','homeTask','tcalNew'];
 function render(){
   if(LAUNCH){ const a=LAUNCH; LAUNCH=null; setTimeout(()=>launch(a),0); }
   prepare(); nativeSync();
@@ -1996,7 +2004,9 @@ function render(){
   if(sec.tabs){ const cur=sec.id==='fin'?UI.tab:UI.sub[sec.id]; sub.hidden=false; sub.innerHTML=sec.tabs.map(([id,t])=>`<button class="chip ${id===cur?'on':''}" data-act="tab" data-id="${id}">${t}</button>`).join(''); }
   else sub.hidden=true;
   $view.classList.toggle('wide',UI.section==='tasks');
+  const keep={}; for(const id of KEEP_IN){ const e=document.getElementById(id); if(e&&e.value) keep[id]=e.value; }
   $view.innerHTML=viewHtml();
+  for(const id in keep){ const e=document.getElementById(id); if(e) e.value=keep[id]; }
   afterRender();
   renderAlerts();
 }
@@ -3224,7 +3234,15 @@ const repeatText=t=>{ if(!t.repeat||t.repeat==='none') return ''; if(t.repeat===
 const projById=id=>S.projects.find(p=>p.id===id);
 const projName=id=>{ const p=projById(id); if(!p) return ''; const par=p.parent&&projById(p.parent); return par?par.name+' / '+p.name:p.name; };
 const projTree=()=>S.projects.filter(p=>!p.parent||!projById(p.parent)).map(p=>({p,kids:S.projects.filter(c=>c.parent===p.id)}));
-const projColor=id=>{ const p=projById(id); const root=p&&p.parent&&projById(p.parent)?p.parent:id; const i=projTree().findIndex(x=>x.p.id===root); return '--t'+((i<0?0:i)%7+1); };
+const projColor=id=>{ const p=projById(id); if(p&&/^[1-7]$/.test(p.color||'')) return '--t'+p.color; const root=p&&p.parent&&projById(p.parent)?p.parent:id, r=projById(root);
+  if(r&&/^[1-7]$/.test(r.color||'')) return '--t'+r.color; const i=projTree().findIndex(x=>x.p.id===root); return '--t'+((i<0?0:i)%7+1); };
+// проекты кнопками при создании задачи: важные первыми и подсвечены цветом; проектов немного — все, иначе важные и верхнего уровня
+function projChips(cur,act){
+  const all=projTree().flatMap(({p,kids})=>[p,...kids]), few=all.length<=10;
+  let list=all.filter(p=>p.pin).concat(all.filter(p=>!p.pin&&(few||!p.parent||!projById(p.parent))));
+  if(cur&&projById(cur)&&!list.includes(projById(cur))) list.push(projById(cur));
+  return `<button class="chip pchip ${cur&&projById(cur)?'':'on'}" data-act="${act}" data-v="">Без проекта</button>`+list.map(p=>`<button class="chip pchip ${p.pin?'imp':''} ${p.id===cur?'on':''}" style="--pc:var(${projColor(p.id)})" data-act="${act}" data-v="${p.id}" aria-pressed="${p.id===cur}"><span class="dot"></span>${p.pin?'★ ':''}${esc(p.parent&&projById(p.parent)?projName(p.id):p.name)}</button>`).join('');
+}
 const projOpts=()=>[['','Без проекта']].concat(projTree().flatMap(({p,kids})=>[[p.id,p.name]].concat(kids.map(k=>[k.id,'   — '+k.name]))));
 const inInbox=t=>!t.project||!projById(t.project);
 
@@ -3260,7 +3278,8 @@ function taskRow(t,hideProj){
       ?`<div class="tcl-add"><input class="inline-in" id="tclNew" placeholder="Новый пункт" autocomplete="off" enterkeyhint="done" aria-label="Новый пункт чек-листа"><button class="btn small primary" data-act="tclAdd" data-id="${t.id}" aria-label="Добавить пункт">+</button></div>`
       :''}<div class="tcl-foot">${UI.tclAdd===t.id?'':`<button class="more tcl-open" data-act="tclPlus" data-id="${t.id}">+ пункт</button>`}<button class="more tcl-open" data-act="taskOpen" data-full="1" data-id="${t.id}">Открыть задачу ›</button></div></div>`:''}</div>${grip}</div>`;
 }
-const sortT=(a,b)=>(inInbox(a)?0:1)-(inInbox(b)?0:1)||(a.due||'9999').localeCompare(b.due||'9999')||(+b.priority||0)-(+a.priority||0);
+// по дате, в один день — по времени (без времени — после), потом без проекта выше, потом приоритет
+const sortT=(a,b)=>(a.due||a.deadline||'9999').localeCompare(b.due||b.deadline||'9999')||(a.time||'99:99').localeCompare(b.time||'99:99')||(inInbox(a)?0:1)-(inInbox(b)?0:1)||(+b.priority||0)-(+a.priority||0);
 function tBlock(title,list,hideProj,extra,drop){ return list.length||extra?`<section class="card"${drop!=null?` data-tdrop="${esc(drop)}"`:''}><div class="ghead">${title}<span class="sum fsub">${list.length||''}</span></div>${list.map(t=>taskRow(t,hideProj)).join('')}${extra||''}</section>`:''; }
 function projSide(v){
   const tk=todayK(), cnt=f=>S.tasks.filter(t=>!t.done&&f(t)).length;
@@ -3275,11 +3294,13 @@ function viewTasks(){
   if(UI.page&&UI.page.kind==='task'){ const t=curTask(); if(t) return viewTaskPage(t); UI.page=null; }
   const v=UI.sub.tasks||'today';
   if(v.startsWith('p:')&&!projById(v.slice(2))) UI.sub.tasks='inbox';
-  const target=v.startsWith('p:')?projName(v.slice(2)):'Без проекта';
+  if(UI.qaProj&&!projById(UI.qaProj)) UI.qaProj='';
+  const inProj=v.startsWith('p:'), target=inProj?projName(v.slice(2)):UI.qaProj?projName(UI.qaProj):'Без проекта';
   const qa=`<section class="card"><div class="qa-row"><input class="inline-in" id="qaTitle" placeholder="Новая задача…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача"><button class="btn primary" data-act="taskQuick">Добавить</button></div>
     <div class="qa-chips">${[['today','Сегодня'],['tomorrow','Завтра'],['none','Без срока']].map(([x,l])=>`<button class="chip ${UI.qaDue===x?'on':''}" data-act="qaDue" data-v="${x}">${l}</button>`).join('')}<button class="chip" data-act="taskNew">Подробнее…</button></div>
     ${UI.qaDue!=='none'?`<div class="qa-chips"><span class="fsub" style="align-self:center">Когда:</span>${[['','любое время']].concat(PARTS.map(([k])=>[k,PART_SHORT[k]])).map(([x,l])=>`<button class="chip ${(UI.qaPart||'')===x?'on':''}" data-act="qaPart" data-v="${x}">${l}</button>`).join('')}</div>`:''}
-    <p class="hint" style="margin:8px 0 0">Попадёт в «${esc(target)}»${v.startsWith('p:')?'':' — проект можно выбрать в «Подробнее…» или потом'}.</p></section>`;
+    ${!inProj&&S.projects.length?`<div class="qa-chips"><span class="fsub" style="align-self:center">Проект:</span>${projChips(UI.qaProj||'','qaProj')}</div>`:''}
+    <p class="hint" style="margin:8px 0 0">Попадёт в «${esc(target)}»${inProj||S.projects.length?'':' — проекты можно завести в «☰ Проекты»'}.</p></section>`;
   const head=v==='inbox'?'Без проекта':v.startsWith('p:')?projName(v.slice(2)):({today:'Сегодня',upcoming:'Предстоящие',all:'Все задачи',done:'Готово',cal:'Календарь'})[v]||'';
   const bar=`<div class="row-between" style="margin-bottom:10px"><button class="btn small proj-btn" data-act="projToggle">☰ Проекты</button><b class="fname" style="font-size:16px">${esc(head)}</b></div>`;
   return `<div class="tasks-layout"><aside class="proj-side ${UI.projOpen?'open':''}" aria-label="Проекты">${projSide(UI.sub.tasks)}</aside>${UI.projOpen?'<div class="side-bg" data-act="projToggle"></div>':''}
@@ -3342,25 +3363,29 @@ function taskOccs(fromK,toK){
   });
   return out;
 }
+const TCAL_HIDE='moyplan.tcalhide.v1';
+function tcalHidden(){ try{ const v=JSON.parse(localStorage.getItem(TCAL_HIDE)||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+const projRoot=id=>{ const p=projById(id); return p?(p.parent&&projById(p.parent)?p.parent:p.id):''; };
 const taskCol=t=>t.project&&projById(t.project)?'var('+projColor(t.project)+')':'var(--muted)';
 function tasksCal(){
   const t0=TODAY(), m=UI.tcalM!=null?UI.tcalM:t0.getFullYear()*12+t0.getMonth(), y=Math.floor(m/12), mo=m%12, tk=todayK();
-  const first=new Date(y,mo,1), last=new Date(y,mo+1,0), occ=taskOccs(dkey(first),dkey(last)), by={};
+  const first=new Date(y,mo,1), last=new Date(y,mo+1,0), occAll=taskOccs(dkey(first),dkey(last)), by={};
+  const hid=new Set(tcalHidden()), occ=occAll.filter(o=>!hid.has(projRoot(o.t.project)));
   occ.forEach(o=>(by[o.k]||(by[o.k]=[])).push(o));
-  Object.values(by).forEach(l=>l.sort((a,b)=>(a.done?1:0)-(b.done?1:0)||(a.ghost?1:0)-(b.ghost?1:0)||(+b.t.priority||0)-(+a.t.priority||0)));
+  Object.values(by).forEach(l=>l.sort((a,b)=>(a.done?1:0)-(b.done?1:0)||(a.ghost?1:0)-(b.ghost?1:0)||(a.t.time||'99:99').localeCompare(b.t.time||'99:99')||(+b.t.priority||0)-(+a.t.priority||0)));
   const sel=UI.tcalDay&&UI.tcalDay.startsWith(mKey(m))?UI.tcalDay:(tk.startsWith(mKey(m))?tk:dkey(first)); UI.tcalSel=sel;
   const cells=[];
   for(let k=0;k<wd(first);k++) cells.push('<span class="tday void"></span>');
   for(let d=1; d<=last.getDate(); d++){ const dt=new Date(y,mo,d), k=dkey(dt), l=by[k]||[], more=l.length-3;
     cells.push(`<button class="tday ${k===tk?'today':''} ${k===sel?'sel':''} ${wd(dt)>4?'we':''}" data-act="tcalDay" data-d="${k}" aria-label="${d} ${MG[mo]}${l.length?', задач: '+l.length:''}"><b>${d}</b>${l.slice(0,3).map(o=>`<span class="tci ${o.done?'done':''} ${o.ghost?'ghost':''} ${o.over?'over':''}" style="--c:${taskCol(o.t)}">${esc(o.t.name||'Без названия')}</span>`).join('')}${more>0?`<span class="tmore">ещё ${more}</span>`:''}</button>`); }
-  // легенда — только проекты, которые есть в этом месяце
-  const roots=[...new Set(occ.map(o=>{ const p=projById(o.t.project); return p?(p.parent&&projById(p.parent)?p.parent:p.id):''; }))];
-  const legend=roots.map(id=>`<span class="lg"><span class="dot" style="--c:${id?'var('+projColor(id)+')':'var(--muted)'}"></span>${esc(id?projById(id).name:'Без проекта')}</span>`).join('');
+  // легенда — проекты этого месяца и скрытые; нажатие скрывает или возвращает проект в календаре
+  const roots=[...new Set(occAll.map(o=>projRoot(o.t.project)).concat([...hid].filter(id=>id===''||projById(id))))];
+  const legend=roots.map(id=>`<button class="lg ${hid.has(id)?'off':''}" data-act="tcalHide" data-v="${id}" aria-pressed="${!hid.has(id)}" title="${hid.has(id)?'Показать в календаре':'Скрыть в календаре'}"><span class="dot" style="--c:${id?'var('+projColor(id)+')':'var(--muted)'}"></span>${esc(id?projById(id).name:'Без проекта')}</button>`).join('');
   const dl=by[sel]||[], real=dl.filter(o=>!o.ghost), ghosts=dl.filter(o=>o.ghost);
   return `<section class="card"><div class="row-between"><button class="btn small" data-act="tcalM" data-d="-1" aria-label="Предыдущий месяц">‹</button><h3>${MN[mo]} ${y}</h3><button class="btn small" data-act="tcalM" data-d="1" aria-label="Следующий месяц">›</button></div>
     <div class="tcal" style="margin-top:8px">${WD.map(w=>`<i>${w}</i>`).join('')}${cells.join('')}</div>
     ${legend?`<div class="tlegend">${legend}</div>`:''}
-    <p class="hint" style="margin:6px 0 0">Пунктир — будущие повторы. Нажмите на день, чтобы увидеть задачи и поставить новую на эту дату.</p></section>
+    <p class="hint" style="margin:6px 0 0">Пунктир — будущие повторы. Нажмите на день, чтобы увидеть задачи и поставить новую на эту дату.${legend?' Нажмите на проект внизу, чтобы скрыть его здесь'+(hid.size?' (скрыто: '+hid.size+')':'')+'.':''}</p></section>
   <section class="card" id="tcalSelCard"><div class="ghead">${dayLabel(sel)}<span class="sum fsub">${dl.length||''}</span></div>
     ${real.map(o=>taskRow(o.t)).join('')}
     ${ghosts.map(o=>`<div class="trow ghost"><span class="tcheck" aria-hidden="true">↻</span><button class="tmain" data-act="taskOpen" data-id="${o.t.id}"><div class="fname">${esc(o.t.name||'Без названия')}</div><div class="fsub">повтор · ${repeatText(o.t)}${o.t.project&&projById(o.t.project)?' · '+esc(projName(o.t.project)):''}</div></button></div>`).join('')}
@@ -3380,6 +3405,7 @@ function viewTaskPage(t){
       <div><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
       <div><label>Приоритет</label>${sel('priority',PRIOS,t.priority||'0')}</div>
       <div><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
+      ${S.projects.length?`<div class="qa-chips" style="grid-column:1/-1;margin-top:0">${projChips(t.project&&projById(t.project)?t.project:'','tProj')}</div>`:''}
       <div><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
       <div><label>Повтор</label>${sel('repeat',REPEATS,t.repeat||'none')}</div>
       <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
@@ -4685,7 +4711,8 @@ const FORMS={
     check:v=>(!v.amount?'Укажите сумму':!v.date?'Укажите дату':'')},
   project:{title:'Проект',list:()=>S.projects,keys:['projects','tasks'],
     blank:()=>({id:uid(),name:'',parent:UI.projParent||'',created:todayK()}),
-    fields:[['name','Название','text'],['parent','Внутри проекта','select',()=>[['','— верхний уровень —']].concat(S.projects.filter(p=>!p.parent&&!(edit&&edit.i!=null&&S.projects[edit.i]&&S.projects[edit.i].id===p.id)).map(p=>[p.id,p.name]))]],
+    fields:[['name','Название','text'],['parent','Внутри проекта','select',()=>[['','— верхний уровень —']].concat(S.projects.filter(p=>!p.parent&&!(edit&&edit.i!=null&&S.projects[edit.i]&&S.projects[edit.i].id===p.id)).map(p=>[p.id,p.name]))],
+      ['color','Цвет','color'],['pin','Важный: первым и с подсветкой, когда создаёте задачу','check']],
     onDelete:p=>{ S.projects.forEach(x=>{ if(x.parent===p.id) x.parent=p.parent||''; }); S.tasks.forEach(t=>{ if(t.project===p.id) t.project=''; }); if(UI.sub.tasks==='p:'+p.id) UI.sub.tasks='inbox'; },
     deleteText:p=>'Удалить проект «'+p.name+'»? Задачи из него перейдут в «Без проекта», подпроекты поднимутся на уровень выше.',
     after:(p,isNew)=>{ if(isNew){ UI.sub.tasks='p:'+p.id; UI.projOpen=false; } UI.projParent=''; }},
@@ -4709,6 +4736,7 @@ function openEditor(kind,i,preset){
     if(t==='period'){ const p=Math.round(numOr(v,0)), list=PERIODS.some(x=>x[0]===p)?PERIODS:PERIODS.concat([[p,'Раз в '+p+' мес.']]);
       return `<div class="field"><label>${l}</label><select name="${k}">${list.map(([val,lab])=>`<option value="${val}" ${val===p?'selected':''}>${lab}</option>`).join('')}</select></div>`; }
     if(t==='check') return `<label class="chk"><input type="checkbox" name="${k}" ${v?'checked':''}><span>${l}</span></label>`;
+    if(t==='color') return `<div class="field"><label>${l}</label><div class="emojis">${['','1','2','3','4','5','6','7'].map(x=>`<label class="emo"><input type="radio" name="${k}" value="${x}" ${String(v)===x?'checked':''} aria-label="${x?'Цвет '+x:'Сам'}"><span class="${x?'csw':'none'}"${x?` style="--c:var(--t${x})"`:''}>${x?'':'сам'}</span></label>`).join('')}</div></div>`;
     if(t==='emoji') return `<div class="field"><label>${l}</label><div class="emojis">${['',...opts].map(x=>`<label class="emo"><input type="radio" name="${k}" value="${esc(x)}" ${x===v?'checked':''}><span${x?'':' class="none"'}>${x?esc(x):'нет'}</span></label>`).join('')}</div></div>`;
     const ph=fl&&fl.ph?` placeholder="${esc(fl.ph)}"`:'';
     if(t==='textarea') return `<div class="field"><label>${l}</label><textarea name="${k}"${ph}>${esc(v)}</textarea></div>`;
@@ -4727,7 +4755,7 @@ function saveEditor(){
     if(fl&&fl.newOnly&&edit.i!=null) continue;
     if(t!=='days'&&!fEl(k)) continue;
     if(t==='check'){ vals[k]=fEl(k).checked; continue; }
-    if(t==='emoji'){ const c=form.querySelector(`[name="${k}"]:checked`); vals[k]=c?c.value:''; continue; }
+    if(t==='emoji'||t==='color'){ const c=form.querySelector(`[name="${k}"]:checked`); vals[k]=c?c.value:''; continue; }
     if(t==='days'){ vals[k]=WD.map((_,d)=>fEl(k+'_'+d).checked?'1':'0').join(''); if(!vals[k].includes('1')){ toast('Выберите хотя бы один день'); return; } continue; }
     let v=fEl(k).value.trim();
     if(t==='num'||t==='period'||t==='cperiod'){ v=v===''?null:(t==='num'?evalExpr(v):+v); if(v!=null&&isNaN(v)){ toast('Поле «'+l+'» — нужно число'); return; } }
@@ -5313,14 +5341,14 @@ document.addEventListener('click',e=>{
   else if(a==='tClr'){ const t=curTask(); if(!t) return; t[b.dataset.f]=''; persist('tasks'); render(); }
   else if(a==='qaDue'){ UI.qaDue=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='taskQuick'){ const inp=document.getElementById('qaTitle'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
-    const v=UI.sub.tasks||'', proj=v.startsWith('p:')?v.slice(2):'';
-    const pt=parseTaskText(name,todayK()), nt=addTask(pt.name,'',proj);
+    const v=UI.sub.tasks||'', proj=v.startsWith('p:')?v.slice(2):UI.qaProj&&projById(UI.qaProj)?UI.qaProj:'';
+    const pt=parseTaskText(name,todayK()), nt=addTask(pt.name,'',proj); inp.value='';
     if(pt.due) nt.due=pt.due; else if(pt.time&&!nt.due) nt.due=todayK(); if(pt.time) nt.time=pt.time;
     if(UI.qaDue!=='none'&&UI.qaPart){ nt.part=UI.qaPart; } persist('tasks'); render();
     toast((pt.due||pt.time?'Добавлено на '+dayLabel(nt.due).toLowerCase()+(pt.time?', '+pt.time:''):UI.qaDue==='none'?'Добавлено без срока':'Добавлено на '+(UI.qaDue==='today'?'сегодня':'завтра'))+' · '+(proj?projName(proj):'без проекта')); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='taskToggle') toggleTask(b.dataset.id);
   else if(a==='homeTask'){ const inp=document.getElementById('homeTask'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
-    const pt=parseTaskText(name,todayK()), nt=addTask(pt.name,'',''); nt.due=pt.due||todayK(); if(pt.time) nt.time=pt.time; persist('tasks'); render();
+    const pt=parseTaskText(name,todayK()), nt=addTask(pt.name,'',''); inp.value=''; nt.due=pt.due||todayK(); if(pt.time) nt.time=pt.time; persist('tasks'); render();
     toast('Добавлено на '+dayLabel(nt.due).toLowerCase()+(pt.time?', '+pt.time:'')); const q=document.getElementById('homeTask'); if(q) q.focus(); }
   else if(a==='homeGo') launch(b.dataset.v);
   else if(a==='goto'){ UI.section=b.dataset.sec; if(b.dataset.tab){ if(UI.section==='fin') UI.tab=b.dataset.tab; else UI.sub[UI.section]=b.dataset.tab; } UI.detail=null; UI.page=null; saveUI(); go(); }
@@ -5343,11 +5371,14 @@ document.addEventListener('click',e=>{
   else if(a==='taskOk'){ if(taskOk()) go(); }
   else if(a==='taskCancel'){ if(backFromTask()!==false) go(); }
   else if(a==='qaPart'){ UI.qaPart=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
+  else if(a==='qaProj'){ UI.qaProj=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
+  else if(a==='tProj'){ const t=curTask(); if(!t) return; t.project=b.dataset.v; persist('tasks'); render(); }
+  else if(a==='tcalHide'){ const h=new Set(tcalHidden()), v=b.dataset.v; if(h.has(v)) h.delete(v); else h.add(v); try{ localStorage.setItem(TCAL_HIDE,JSON.stringify([...h])); }catch(e){} render(); }
   else if(a==='taskOpen'&&!b.dataset.full&&UI.section==='tasks'&&!UI.page&&UI.tExp!==b.dataset.id&&((S.tasks.find(x=>x.id===b.dataset.id)||{}).checklist||[]).length&&!(S.tasks.find(x=>x.id===b.dataset.id)||{}).done){ UI.tExp=b.dataset.id; render(); }
   else if(a==='taskOpen'&&UI.section==='home'){ UI.tExp=null; UI.page={kind:'task',id:b.dataset.id,back:'Главная',from:'home'}; UI.section='tasks'; go(); }
   else if(a==='taskOpen'){ UI.tExp=null; const back=UI.section==='goals'?'Цель':(({today:'Сегодня',upcoming:'Предстоящие',all:'Все задачи',done:'Готово',inbox:'Без проекта'})[UI.sub.tasks]||projName(String(UI.sub.tasks).slice(2))||'Задачи');
     UI.page={kind:'task',id:b.dataset.id,back,from:UI.section==='goals'&&UI.page?UI.page:null}; if(UI.section!=='tasks'){ UI.section='tasks'; } go(); }
-  else if(a==='taskNew'){ const inp=document.getElementById('qaTitle'), v=UI.sub.tasks||''; const t=newTask(inp?inp.value.trim():'','',v.startsWith('p:')?v.slice(2):'');
+  else if(a==='taskNew'){ const inp=document.getElementById('qaTitle'), v=UI.sub.tasks||''; const t=newTask(inp?inp.value.trim():'','',v.startsWith('p:')?v.slice(2):UI.qaProj&&projById(UI.qaProj)?UI.qaProj:'');
     UI.draft=t; UI.page={kind:'task',id:t.id,isNew:true,back:'Задачи'}; go(); const n=$view.querySelector('[data-tf="name"]'); if(n&&!t.name) n.focus(); }
   else if(a==='trashBack') trashRestore(b.dataset.id);
   else if(a==='taskCal'){ const t=S.tasks.find(x=>x.id===b.dataset.id); if(!t) return; const u=calUrl(t); if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }
@@ -5367,7 +5398,7 @@ document.addEventListener('click',e=>{
   else if(a==='tcalM'){ const t0=TODAY(); UI.tcalM=(UI.tcalM!=null?UI.tcalM:t0.getFullYear()*12+t0.getMonth())+(+b.dataset.d); UI.tcalDay=null; render(); }
   else if(a==='tcalDay'){ UI.tcalDay=b.dataset.d; render(); const c=document.getElementById('tcalSelCard'); if(c&&c.getBoundingClientRect().top>innerHeight-160) c.scrollIntoView({block:'start',behavior:'smooth'}); }
   else if(a==='tcalAdd'){ const inp=document.getElementById('tcalNew'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
-    const t=newTask(name,'',''); t.due=UI.tcalSel||todayK(); S.tasks.push(t); persist('tasks'); toast('Задача на '+dayLabel(t.due).toLowerCase()); render();
+    const t=newTask(name,'',''); inp.value=''; t.due=UI.tcalSel||todayK(); S.tasks.push(t); persist('tasks'); toast('Задача на '+dayLabel(t.due).toLowerCase()); render();
     const n=document.getElementById('tcalNew'); if(n) n.focus(); }
   else if(a==='tcalMore'){ const inp=document.getElementById('tcalNew'); const t=newTask(inp?inp.value.trim():'','',''); t.due=UI.tcalSel||todayK();
     UI.draft=t; UI.page={kind:'task',id:t.id,isNew:true,back:'Календарь'}; go(); const n=$view.querySelector('[data-tf="name"]'); if(n&&!t.name) n.focus(); }
