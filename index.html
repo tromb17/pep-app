@@ -379,6 +379,25 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 @media (max-width:899px){body.tdragging .proj-side{display:block;position:fixed;left:0;top:0;bottom:0;width:min(58vw,240px);z-index:46;border-radius:0 18px 18px 0;padding:calc(14px + env(safe-area-inset-top)) 10px 16px;overflow:auto;box-shadow:4px 0 24px rgba(0,0,0,.25)}}
 .sticky-ok{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom));background:var(--page);padding:10px 0;margin-top:4px;z-index:5}
 .flag{font-weight:800}
+.ehist{align-items:center}.ehist>span{display:flex;align-items:baseline;gap:6px;min-width:0;flex-wrap:wrap}.ehist small{margin-left:auto;padding-left:6px}
+.tcheck.p1,.tcheck.p2,.tcheck.p3{--pc:var(--t1);border-color:var(--pc);background:color-mix(in srgb,var(--pc) 13%,transparent)}
+.tcheck.p2{--pc:var(--t4)}.tcheck.p3{--pc:var(--critical)}
+.prio{display:inline-flex;align-items:center;gap:3px;padding:0 7px 0 5px;border-radius:999px;font-size:11.5px;font-weight:600;line-height:18px;color:var(--pc);background:color-mix(in srgb,var(--pc) 13%,transparent);vertical-align:1px}
+.prio svg{width:11px;height:11px;fill:currentColor;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.prio.p1{--pc:var(--t1)}.prio.p2{--pc:var(--t4)}.prio.p3{--pc:var(--critical)}
+.prios{display:flex;gap:6px;flex-wrap:wrap}.prios .chip{display:inline-flex;align-items:center;gap:5px}
+.prios .chip svg{width:12px;height:12px;fill:currentColor;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.prios .chip.p1{--pc:var(--t1)}.prios .chip.p2{--pc:var(--t4)}.prios .chip.p3{--pc:var(--critical)}
+.prios .chip.p1.on,.prios .chip.p2.on,.prios .chip.p3.on{background:var(--pc);border-color:var(--pc);color:#fff}
+.tcheck.p1.on,.tcheck.p2.on,.tcheck.p3.on{background:var(--accent);border-color:var(--accent)}.tcheck.tring[class]{background:conic-gradient(var(--accent) var(--p),transparent 0)}
+body.tdragging .proj-side::before{content:'Отпустите на проекте';display:block;font-size:12px;font-weight:600;color:var(--accent);margin:2px 8px 8px}
+body.tdragging [data-tdrop].drop-ok{background:color-mix(in srgb,var(--accent) 9%,var(--surface));box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 60%,transparent) inset;animation:dropGlow 1.3s ease-in-out infinite}
+body.tdragging section[data-tdrop].drop-ok{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 45%,transparent) inset}
+body.tdragging [data-tdrop].drop-cur{opacity:.45}
+body.tdragging [data-tdrop].drop-on{animation:none}
+@keyframes dropGlow{50%{background:color-mix(in srgb,var(--accent) 20%,var(--surface))}}
+@media (prefers-reduced-motion:reduce){body.tdragging [data-tdrop].drop-ok{animation:none}}
+.logincard p{margin:4px 0 10px}.logincard .actions{margin-top:0;flex-wrap:wrap}
 .smart-row{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
 .smart-row:first-of-type{border-top:0}
 .smart-l{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-weight:700;background:var(--accent-soft);color:var(--accent)}
@@ -1399,7 +1418,9 @@ const GS_SCHEMA = [
     ['note', 'Заметка', 's'], ['started', 'Начал', 'd'], ['finished', 'Посмотрел', 'd'], ['created', 'Добавлен', 'd']] },
   // корзина: удалённое лежит 30 дней; в «Данных» — сами записи (по разделам), чтобы вернуть
   { key: 'trash', sheet: 'Корзина', cols: [
-    ['id', 'ID (не менять)', 's'], ['kind', 'Что', 's'], ['name', 'Название', 's'], ['deleted', 'Удалено', 'd'], ['data', 'Данные (служебное)', 'j']] }
+    ['id', 'ID (не менять)', 's'], ['kind', 'Что', 's'], ['name', 'Название', 's'], ['deleted', 'Удалено', 'd'], ['data', 'Данные (служебное)', 'j']] },
+  { key: 'expLog', sheet: 'История трат', cols: [
+    ['id', 'ID (не менять)', 's'], ['day', 'Дата', 'd'], ['time', 'Время', 's'], ['item', 'ID статьи', 's'], ['month', 'Месяц', 'm'], ['amount', 'Сумма', 'n']] }
 ];
 const GS_SETTINGS_SHEET = 'Настройки';
 const GS_SETTINGS = [
@@ -1577,7 +1598,7 @@ function normalize(d){
     foodLog:d.foodLog||[], waterLog:d.waterLog||[], weightLog:d.weightLog||[],
     exercises:d.exercises||[], routines:d.routines||[], workouts:d.workouts||[], trainActive:d.trainActive||null,
     projects:d.projects||[], fundSpend:d.fundSpend||[], payments:d.payments||[], payLog:d.payLog||[],
-    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[], trash:d.trash||[]};
+    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[], trash:d.trash||[], expLog:d.expLog||[]};
   let migrated=false;
   if(o.version<2){
     migrated=true;
@@ -1707,6 +1728,8 @@ function normalize(d){
   // корзина: старше 30 дней стирается
   const tOld=dkey(addDays(TODAY(),-TRASH_DAYS));
   o.trash=o.trash.filter(e=>e&&e.id).map(e=>Object.assign(e,{data:jsonOr(e.data)})).filter(e=>e.data&&String(e.deleted||'')>=tOld);
+  // история трат: последние ~14 месяцев
+  const eOld=dkey(addDays(TODAY(),-430)); o.expLog=o.expLog.filter(e=>e&&e.item&&String(e.day||'')>=eOld);
   return [o,migrated];
 }
 function jsonOr(v){ if(typeof v==='string'){ try{ v=v?JSON.parse(v):null; }catch(e){ v=null; } } return (v&&typeof v==='object')?v:null; }
@@ -1718,6 +1741,7 @@ const dirtyKeys=new Set();
 const isDirty=()=>dirtyAll||dirtyKeys.size>0;
 function persist(...keys){
   if(!canSave){ setSync('err','Не сохранено: нет связи с таблицей'); return; }
+  if(keys.includes('facts')&&!keys.includes('expLog')) keys.push('expLog');
   if(!keys.length) dirtyAll=true; else keys.forEach(k=>dirtyKeys.add(k));
   setSync('pending','Сохраняю…'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,(IS_GAS||REMOTE)?1200:150);
   if(REMOTE){ clearTimeout(cacheT); cacheT=setTimeout(keepLocal,150); }
@@ -1791,7 +1815,7 @@ function applyInbox(){
       else { if(i<0) return; S.habitLog.splice(i,1); }
       keys.add('habitLog'); nh++; return; }
     if(it.type==='expense'){ const ex=S.items.find(x=>x.id===it.item), v=numOr(it.amount,null); if(!ex||!(v>0)) return;
-      const month=isDay(it.day)?it.day.slice(0,7):todayK().slice(0,7); addFactTerm(ex.id,month,String(v),it.sub||''); keys.add('facts'); ne++; const w=limitWarn(ex,month); if(w) warns.push(w); return; }
+      const month=isDay(it.day)?it.day.slice(0,7):todayK().slice(0,7); factWhen=+it.at>0?new Date(+it.at):null; addFactTerm(ex.id,month,String(v),it.sub||''); factWhen=null; keys.add('facts'); ne++; const w=limitWarn(ex,month); if(w) warns.push(w); return; }
     if(it.type==='note'){ if(S.notes.some(n=>n.id===it.id)) return;
       let f=S.noteFolders.find(x=>x.name===QUICK_FOLDER); if(!f){ f={id:uid(),name:QUICK_FOLDER}; S.noteFolders.push(f); keys.add('noteFolders'); }
       S.notes.push({id:it.id,name:noteTitleFrom(text),body:esc(text).replace(/\n/g,'<br>'),pinned:false,updated:new Date(+it.at||Date.now()).toISOString(),folder:f.id,book:''});
@@ -1944,7 +1968,7 @@ function boot(){
   } else {
     let d=null; try{ const s=localStorage.getItem(LS_KEY); d=s?JSON.parse(s):null; }catch(e){}
     const [o,mig]=normalize(d||DEFAULT_DATA); S=o; setSync('ok',d?'Данные из этого браузера':'Новый план'); render(); if(d&&mig) persist(); applyInbox();
-    if(!d&&gOK()&&!welcomeSkipped()) showWelcome();
+    firstDay();
   }
 }
 
@@ -1962,6 +1986,19 @@ function showWelcome(){
     <p class="hint" style="margin-top:6px">Без входа данные хранятся только на этом устройстве. Войти можно позже в настройках.</p></div>`;
   w.hidden=false;
 }
+// Первый вход — сразу в приложение, без входа. Через LOGIN_AFTER дней на главной — карточка «Сохраните план в Google»
+// («Позже» — через неделю, «Не предлагать» — больше никогда). Окно showWelcome осталось, но само не открывается.
+const FIRST_KEY='moyplan.first.v1', LOGIN_ASK='moyplan.loginask.v1', LOGIN_AFTER=3;
+function firstDay(){ try{ let v=localStorage.getItem(FIRST_KEY); if(!v){ v=todayK(); localStorage.setItem(FIRST_KEY,v); } return v; }catch(e){ return todayK(); } }
+function loginAsk(){
+  if(!gOK()||REMOTE||IS_GAS) return false;
+  let a=''; try{ a=localStorage.getItem(LOGIN_ASK)||''; }catch(e){}
+  if(a==='never'||(a&&a>todayK())) return false;
+  return -daysTo(firstDay())>=LOGIN_AFTER;
+}
+function loginCard(){ if(!loginAsk()) return '';
+  return `<section class="card logincard"><h3>Сохраните план в Google</h3><p class="hint">Сейчас всё хранится только на этом устройстве. Войдите через Google — приложение заведёт таблицу на вашем Google Диске: данные не пропадут при смене телефона и будут на всех устройствах. Таблицу видите только вы.</p>
+    <div class="actions"><button class="btn primary" data-act="welcomeLogin">Войти через Google</button><button class="btn small" data-act="loginLater" data-v="week">Позже</button><button class="btn small" data-act="loginLater" data-v="never">Не предлагать</button></div></section>`; }
 function hideWelcome(){ const w=document.getElementById('welcome'); if(w){ w.hidden=true; w.innerHTML=''; } }
 
 /* Ярлык на значке приложения: сразу открыть нужное окно */
@@ -2146,6 +2183,7 @@ function viewMonth(){
   }
   if(hidden.length) html+=`<button class="more" data-act="showAll">Ещё ${hidden.length} стат. без плана в этом месяце — показать</button>`;
   else if(UI.showAll) html+=`<button class="more" data-act="showAll">Скрыть статьи без плана</button>`;
+  html+=expHistCard(C.keys[j]);
   html+=`<section class="card" style="margin-top:12px"><h3>Резервы и инвестиции${QH}</h3><p class="hint qtip" hidden>Вносятся на вкладках «Фонды» (резервы и подарки) и «Инвестиции».</p>
     <div data-live="mres"><div class="ro"><span>Страхование (взносы)</span><b class="num">${rub(B.ins[j])}</b></div>
     <div class="ro"><span>Подарки</span><b class="num">${rub(B.gifts[j])}</b></div>
@@ -3055,7 +3093,7 @@ function viewHome(){
   const WDF=['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'];
   let html=`<div class="hello"><b>${hello}</b><span>${WDF[wd(today)]}, ${today.getDate()} ${MG[today.getMonth()]}</span></div>
   <div class="quick">${secOn('fin')?`<button style="--sec:var(--s-fin)" data-act="quickExp">${icon('fin')}Трата</button>`:''}<button style="--sec:var(--s-notes)" data-act="homeGo" data-v="note">${icon('notes')}Заметка</button>${secOn('pay')?`<button style="--sec:var(--s-pay)" data-act="homeGo" data-v="pay">${icon('pay')}Платежи</button>`:''}</div>`;
-  html+=weekHomeCard();
+  html+=weekHomeCard()+loginCard();
   // задачи: просроченные и на сегодня
   const onDay=t=>repOk(today,t.repeat,t.repeatDays);
   const open=S.tasks.filter(t=>tNow(t,tk)).sort((a,b)=>(tOver(a,tk)?0:1)-(tOver(b,tk)?0:1)||(a.deadline&&a.deadline>tk?1:0)-(b.deadline&&b.deadline>tk?1:0)||sortT(a,b));
@@ -3212,6 +3250,8 @@ function backfillTrain(st,h){
 
 /* ======== Задачи ======== */
 const PRIOS=[['0','Без приоритета'],['1','Низкий'],['2','Средний'],['3','Высокий']];
+const FLAG_SVG='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 14V2.5M3.5 2.5h8l-1.6 3 1.6 3h-8"/></svg>';
+const prioTag=p=>`<span class="prio p${p}" title="Приоритет: ${PRIOS[p][1].toLowerCase()}">${FLAG_SVG}${PRIOS[p][1]}</span>`;
 // когда делать: порядок групп на «Сегодня»; задачи «несколько раз в день» без отметки — в «В течение дня»
 const PARTS=[['morning','В первой половине дня'],['during','В течение дня'],['day','Днём'],['evening','Во второй половине дня']];
 const PART_SHORT={morning:'1-я половина',during:'в течение дня',day:'днём',evening:'2-я половина'};
@@ -3276,7 +3316,7 @@ function taskRow(t,hideProj){
     ?`<button class="tcheck tring p${pr}" style="--p:${(dn/n*360).toFixed(0)}deg" data-act="taskTick" data-id="${t.id}" aria-label="Отметить ещё раз: ${esc(t.name)}, сделано ${dn} из ${n}"></button>`
     :`<button class="tcheck p${pr}" data-act="taskToggle" data-id="${t.id}" aria-pressed="${!!t.done}" aria-label="${t.done?'Вернуть':'Выполнить'}: ${esc(t.name)}">${t.done?'✓':''}</button>`;
   return `<div class="trow ${t.done?'done':''}" data-tid="${t.id}">${left}
-    <div class="tcol"><button class="tmain" data-act="taskOpen" data-id="${t.id}"><div class="fname">${pr===3?'<span class="flag neg">!!! </span>':pr===2?'<span class="flag" style="color:var(--t4)">!! </span>':''}${esc(t.name||'Без названия')}</div>${parts.length?`<div class="fsub">${parts.join(' · ')}</div>`:''}</button>${multi}
+    <div class="tcol"><button class="tmain" data-act="taskOpen" data-id="${t.id}"><div class="fname">${esc(t.name||'Без названия')}${pr&&!t.done?` ${prioTag(pr)}`:''}</div>${parts.length?`<div class="fsub">${parts.join(' · ')}</div>`:''}</button>${multi}
     ${exp?`<div class="tcl">${cl.map((c,i)=>`<button class="tcl-i ${c.done?'done':''}" data-act="clRowToggle" data-id="${t.id}" data-i="${i}" aria-pressed="${!!c.done}"><span class="tcheck sm">${c.done?'✓':''}</span><span class="tcl-t">${esc(c.text)}</span></button>`).join('')}${UI.tclAdd===t.id
       ?`<div class="tcl-add"><input class="inline-in" id="tclNew" placeholder="Новый пункт" autocomplete="off" enterkeyhint="done" aria-label="Новый пункт чек-листа"><button class="btn small primary" data-act="tclAdd" data-id="${t.id}" aria-label="Добавить пункт">+</button></div>`
       :''}<div class="tcl-foot">${UI.tclAdd===t.id?'':`<button class="more tcl-open" data-act="tclPlus" data-id="${t.id}">+ пункт</button>`}<button class="more tcl-open" data-act="taskOpen" data-full="1" data-id="${t.id}">Открыть задачу ›</button></div></div>`:''}</div>${grip}</div>`;
@@ -3413,7 +3453,7 @@ function viewTaskPage(t){
       <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
       <div><label>Сколько раз выполнить</label><input type="number" min="1" max="12" step="1" inputmode="numeric" data-tf="times" value="${n}" aria-label="Сколько раз выполнить"></div>
       <div><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
-      <div><label>Приоритет</label>${sel('priority',PRIOS,t.priority||'0')}</div>
+      <div style="grid-column:1/-1"><label>Приоритет</label><div class="prios" role="group" aria-label="Приоритет">${PRIOS.map(([v,l])=>`<button class="chip p${v} ${String(t.priority||'0')===v?'on':''}" data-act="tPrio" data-v="${v}" aria-pressed="${String(t.priority||'0')===v}">${v!=='0'?FLAG_SVG:''}${v==='0'?'Нет':l}</button>`).join('')}</div></div>
     </div>
     <p class="hint" style="margin:8px 0 0">${t.deadline?'Задача будет в «Сегодня» каждый день'+(t.due&&t.due>todayK()?' с '+dDay(t.due):'')+' до '+dDay(t.deadline)+', потом — просрочена.':t.due?'После '+dDay(t.due)+' задача станет просроченной. Длинная или не срочная — поставьте крайний срок: до него она просто будет в списке.':'Без срока — задача лежит в своём проекте и не просрочивается.'}</p>
     ${n>1?`<p class="hint" style="margin:8px 0 0">В списке у задачи будет ${n} ${plural(n,'кружок','кружка','кружков')}: задача выполнится, когда отмечены все.${isNew?'':' Сейчас сделано '+Math.min(n,t.done?n:t.timesDone||0)+' из '+n+'.'}</p>`:''}
@@ -4896,6 +4936,8 @@ document.addEventListener('pointerdown',e=>{
   const row=h.closest('.trow'), r=row.getBoundingClientRect();
   const ghost=document.createElement('div'); ghost.className='tghost'; ghost.textContent=t.name||'Без названия';
   document.body.appendChild(ghost); row.classList.add('dragging'); document.body.classList.add('is-dragging','tdragging');
+  const cur=t.project&&projById(t.project)?t.project:'';
+  document.querySelectorAll('[data-tdrop]').forEach(g=>g.classList.add((g.getAttribute('data-tdrop')||'')===cur?'drop-cur':'drop-ok'));
   tdrag={t,row,ghost,x:e.clientX,y:e.clientY,target:null};
   try{ h.setPointerCapture(e.pointerId); }catch(err){}
   tdrag.timer=setInterval(()=>{ if(!tdrag) return; const H=innerHeight; if(tdrag.y<110) scrollBy(0,-12); else if(tdrag.y>H-130) scrollBy(0,12); else return; tdragMove(); },16);
@@ -4910,7 +4952,7 @@ function tdragMove(){
 function tdragEnd(){
   if(!tdrag) return; const D=tdrag; tdrag=null;
   clearInterval(D.timer); D.ghost.remove(); D.row.classList.remove('dragging'); document.body.classList.remove('is-dragging','tdragging');
-  document.querySelectorAll('.drop-on').forEach(g=>g.classList.remove('drop-on'));
+  document.querySelectorAll('.drop-on,.drop-ok,.drop-cur').forEach(g=>g.classList.remove('drop-on','drop-ok','drop-cur'));
   if(D.target){ const to=D.target.getAttribute('data-tdrop')||'';
     if(to!==(D.t.project&&projById(D.t.project)?D.t.project:'')){ D.t.project=to; persist('tasks'); toast('Перенесено в «'+(to?projName(to):'Без проекта')+'»'); } }
   render();
@@ -5116,7 +5158,34 @@ function setListFact(list,idKey,id,month,val){
   val=String(val).trim().replace(/^=/,'').replace(/\s+/g,'');
   const i=list.findIndex(f=>(idKey?f[idKey]===id:true)&&f.month===month);
   const rec=idKey?{[idKey]:id,month,value:val}:{month,value:val};
+  const was=i>=0?list[i].value:'';
   if(val===''){ if(i>=0) list.splice(i,1); } else if(i>=0) list[i].value=val; else list.push(rec);
+  if(list===S.facts&&idKey==='item') logFact(id,month,was,val);
+}
+// история трат: каждая новая сумма в факте — запись с датой и временем (factWhen — время из виджета)
+let factWhen=null;
+function logFact(item,month,was,now){
+  const a=factTerms(was)||[], b=factTerms(now); if(!b) return;
+  const d=factWhen||new Date(), day=dkey(d), time=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  b.forEach(v=>{ const k=a.indexOf(v); if(k>=0){ a.splice(k,1); return; } S.expLog.push({id:uid(),day,time,item,month,amount:v}); });
+}
+// суммы расходов месяца с датой: сумма факта ↔ запись истории той же статьи и суммы (по порядку); записанное раньше истории — без даты
+function expHist(month){
+  const log=S.expLog.filter(e=>e.month===month), out=[];
+  S.facts.filter(f=>f.month===month).forEach(f=>{ const it=S.items.find(x=>x.id===f.item); if(!it||!EXP_TYPES.includes(it.type)) return;
+    const t=factTerms(f.value), tg=t?factTagList(f,t.length):[], pool=log.filter(e=>e.item===f.item);
+    (t||[evalExpr(f.value)]).forEach((v,k)=>{ if(!v||isNaN(v)) return; const m=t?pool.findIndex(e=>+e.amount===v):-1, e=m>=0?pool.splice(m,1)[0]:null;
+      out.push({it,v,sub:tg[k]||'',day:e?e.day:'',time:e?e.time||'':'',n:out.length}); }); });
+  return out.sort((a,b)=>(b.day+' '+b.time).localeCompare(a.day+' '+a.time)||b.n-a.n);
+}
+function expHistCard(month){
+  const L=expHist(month); if(!L.length) return '';
+  let body='';
+  if(UI.histOpen){ let last=null;
+    L.slice(0,300).forEach(x=>{ if(x.day!==last){ last=x.day; body+=`<div class="hsub">${x.day?dayLabel(x.day):'Записано раньше — без даты'}</div>`; }
+      body+=`<div class="ro ehist"><span><span class="fname">${esc(x.it.name)}</span>${x.sub?` <span class="tag">${esc(x.sub)}</span>`:''}${x.time?`<small class="fsub num">${x.time}</small>`:''}</span><b class="num">${rub(x.v)}</b></div>`; }); }
+  return `<section class="card"><div class="row-between"><h3>История трат${QH}</h3><button class="btn small" data-act="histToggle" aria-expanded="${!!UI.histOpen}">${UI.histOpen?'Свернуть':'Показать · '+L.length}</button></div>
+    <p class="hint qtip" hidden>Все суммы расходов за месяц — новые сверху, с датой и временем записи. Удобно проверить, записали ли трату.</p>${body}</section>`;
 }
 let toastT; function toast(t,act){ const el=document.getElementById('toast'); el.textContent=t;
   if(act){ const btn=document.createElement('button'); btn.type='button'; btn.className='toast-act'; btn.textContent=act.label; btn.onclick=()=>{ el.classList.remove('on','has-act'); act.fn(); }; el.appendChild(btn); }
@@ -5375,6 +5444,9 @@ document.addEventListener('click',e=>{
   else if(a==='taskCancel'){ if(backFromTask()!==false) go(); }
   else if(a==='qaPart'){ UI.qaPart=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='qaProj'){ UI.qaProj=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
+  else if(a==='histToggle'){ UI.histOpen=!UI.histOpen; render(); }
+  else if(a==='loginLater'){ try{ localStorage.setItem(LOGIN_ASK,b.dataset.v==='never'?'never':dkey(addDays(TODAY(),7))); }catch(err){} render(); }
+  else if(a==='tPrio'){ const t=curTask(); if(!t) return; t.priority=b.dataset.v; persist('tasks'); render(); }
   else if(a==='tProj'){ const t=curTask(); if(!t) return; t.project=b.dataset.v; persist('tasks'); render(); }
   else if(a==='tcalHide'){ const h=new Set(tcalHidden()), v=b.dataset.v; if(h.has(v)) h.delete(v); else h.add(v); try{ localStorage.setItem(TCAL_HIDE,JSON.stringify([...h])); }catch(e){} render(); }
   else if(a==='taskOpen'&&!b.dataset.full&&UI.section==='tasks'&&!UI.page&&UI.tExp!==b.dataset.id&&((S.tasks.find(x=>x.id===b.dataset.id)||{}).checklist||[]).length&&!(S.tasks.find(x=>x.id===b.dataset.id)||{}).done){ UI.tExp=b.dataset.id; render(); }
