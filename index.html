@@ -1220,6 +1220,7 @@ function server(fn,arg){
   if(IS_GAS) return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](arg));
   const rc=server.rc||REMOTE; if(!rc) return Promise.reject(new Error('Таблица не подключена'));
   if(rc.g) return gsServer(fn,arg);
+  if(rc.y) return ysServer(fn,arg);
   const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),60000);
   return fetch(rc.url,{method:'POST',body:JSON.stringify({key:rc.key,fn,arg}),signal:ctl.signal,redirect:'follow',cache:'no-store'})
     .then(r=>{ if(!r.ok) throw new Error('скрипт ответил '+r.status); return r.text(); })
@@ -1228,7 +1229,7 @@ function server(fn,arg){
       e=>{ throw e&&e.name==='AbortError'?new Error('скрипт не ответил за минуту'):(e&&e.message==='Failed to fetch'?new Error('нет связи'):e); })
     .finally(()=>clearTimeout(t));
 }
-const viaScript=()=>!!(IS_GAS||(REMOTE&&!REMOTE.g));
+const viaScript=()=>!!(IS_GAS||(REMOTE&&!REMOTE.g&&!REMOTE.y));
 const errText=e=>(e&&e.message)||String(e||'');
 /* ---------- Вход через Google: своя таблица «Мой план» на Диске человека, без скрипта ----------
    Права узкие (drive.file): приложение видит только таблицы, которые создало само.
@@ -1243,6 +1244,10 @@ const GS_TITLE='Мой план', GS_BK_FOLDER='Мой план — резерв
 const SHEETS_API='https://sheets.googleapis.com/v4/spreadsheets', DRIVE_API='https://www.googleapis.com/drive/v3/files';
 let GTOK=null, GAUTH_RET=null, gsAutoUntil=0;
 try{ GTOK=JSON.parse(localStorage.getItem(GTOK_KEY)||'null'); }catch(e){}
+// пропуск Яндекса (вход через Яндекс — ниже); объявлен здесь: его ставит разбор адреса после возврата со страницы входа
+const YTOK_KEY='moyplan.ytok.v1', YBK_KEY='moyplan.ybackup.v1', Y_FILE='app:/moyplan.json', Y_BK='app:/backups', DISK_API='https://cloud-api.yandex.net/v1/disk';
+let YTOK=null;
+try{ YTOK=JSON.parse(localStorage.getItem(YTOK_KEY)||'null'); }catch(e){}
 const gRedirectUri=()=>location.origin==='https://tromb17.github.io'?SITE:location.origin+location.pathname;
 const gOK=()=>!!G_CLIENT&&!IS_GAS&&(NATIVE?typeof NATIVE.googleAuth==='function':/^https:/.test(location.href));
 function gsSetTok(t,sec){ GTOK={t,exp:Date.now()+sec*1000}; try{ localStorage.setItem(GTOK_KEY,JSON.stringify(GTOK)); }catch(e){} }
@@ -1253,6 +1258,9 @@ function gsDropTok(){ GTOK=null; try{ localStorage.removeItem(GTOK_KEY); }catch(
   try{ st=JSON.parse(localStorage.getItem(GAUTH_KEY)||'null'); localStorage.removeItem(GAUTH_KEY); }catch(e){}
   history.replaceState(null,'',location.pathname);
   if(!st||p.get('state')!==st.n) return;
+  if(st.p==='y'){ if(p.get('access_token')){ ysSetTok(p.get('access_token'),+p.get('expires_in')||31536000); GAUTH_RET={ok:true,first:st.first,p:'y'}; }
+    else GAUTH_RET={err:p.get('error')||'ошибка',first:st.first,p:'y'};
+    if(st.action&&!LAUNCH) LAUNCH=st.action; return; }
   if(p.get('access_token')){ gsSetTok(p.get('access_token'),+p.get('expires_in')||3600); GAUTH_RET={ok:true,first:st.first}; }
   else GAUTH_RET={err:p.get('error')||'ошибка',first:st.first};
   if(st.action&&!LAUNCH) LAUNCH=st.action;
@@ -1562,12 +1570,92 @@ async function gsLogin(){
   if(!NATIVE){ gsRedirect({interactive:true,first:true}); return; }
   try{ gsDropTok(); await gsAuth(true); await gsSetup(); }catch(e){ setSync('err','Вход не удался'); toast('Не удалось войти: '+errText(e)); }
 }
+/* ---------- Вход через Яндекс: данные одним файлом в папке приложения на Яндекс Диске ----------
+   Права узкие (cloud_api:disk.app_folder): приложение видит только свою папку «Приложения/…» на Диске.
+   REMOTE={y:1, login}: дальше всё как у Google — копия на устройстве, очередь неотправленного.
+   Пропуск Яндекса живёт около года; кончился или отозван — просим войти снова (правки лежат на устройстве).
+   Сохраняется всё целиком (файл небольшой); раз в неделю — копия в backups/, 3 последние.
+   В браузере — переход на oauth.yandex.ru и обратно на сайт; в Android — так же внутри приложения (allowNavigation),
+   обратно на https://localhost/. Оба адреса возврата должны быть в настройках приложения на oauth.yandex.ru. */
+const Y_CLIENT=''; // ClientID приложения с oauth.yandex.ru (не секрет); пусто — кнопки «Войти через Яндекс» нет
+const yOK=()=>!!Y_CLIENT&&!IS_GAS&&(!!NATIVE||/^https:/.test(location.href));
+const isY=()=>!!(REMOTE&&REMOTE.y);
+function ysSetTok(t,sec){ YTOK={t,exp:Date.now()+sec*1000}; try{ localStorage.setItem(YTOK_KEY,JSON.stringify(YTOK)); }catch(e){} }
+function ysDropTok(){ YTOK=null; try{ localStorage.removeItem(YTOK_KEY); }catch(e){} }
+function ysNeed(){ const e=new Error('нужно снова войти в Яндекс'); e.need=true; return e; }
+const yRedirectUri=()=>NATIVE?'https://localhost/':gRedirectUri();
+// переход на страницу входа Яндекса (страница перезагрузится; неотправленное лежит на устройстве)
+function ysRedirect(o){
+  const n=Math.random().toString(36).slice(2)+Date.now().toString(36);
+  try{ localStorage.setItem(GAUTH_KEY,JSON.stringify({n,first:!!o.first,action:LAUNCH||'',p:'y'})); }catch(e){}
+  if(REMOTE) keepLocal();
+  const q=new URLSearchParams({response_type:'token',client_id:Y_CLIENT,redirect_uri:yRedirectUri(),state:n});
+  if(o.first) q.set('force_confirm','yes');
+  location.assign('https://oauth.yandex.ru/authorize?'+q);
+  return new Promise(()=>{});
+}
+async function ysApi(path,o={}){
+  if(!YTOK||YTOK.exp<Date.now()+60000) throw ysNeed();
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),60000);
+  let r;
+  try{ r=await fetch(DISK_API+path,{method:o.method||'GET',signal:ctl.signal,cache:'no-store',headers:{Authorization:'OAuth '+YTOK.t,Accept:'application/json'}}); }
+  catch(e){ throw e&&e.name==='AbortError'?new Error('Яндекс Диск не ответил за минуту'):new Error('нет связи'); }
+  finally{ clearTimeout(t); }
+  if(r.status===401){ ysDropTok(); throw ysNeed(); }
+  const txt=await r.text(); let j={}; try{ j=txt?JSON.parse(txt):{}; }catch(e){}
+  if(!r.ok&&!(o.ok||[]).includes(r.status)){ const e=new Error('Яндекс Диск: '+(j.message||j.description||'ошибка '+r.status)); e.status=r.status; throw e; }
+  return j;
+}
+async function ysLoad(){
+  let l; try{ l=await ysApi('/resources/download?path='+encodeURIComponent(Y_FILE)); }catch(e){ if(e.status===404) return ''; throw e; }
+  let r; try{ r=await fetch(l.href,{cache:'no-store'}); }catch(e){ throw new Error('нет связи'); }
+  if(!r.ok) throw new Error('Яндекс Диск: файл не скачался ('+r.status+')');
+  return r.text();
+}
+async function ysSave(){
+  const l=await ysApi('/resources/upload?path='+encodeURIComponent(Y_FILE)+'&overwrite=true');
+  let r; try{ r=await fetch(l.href,{method:'PUT',body:JSON.stringify(S)}); }catch(e){ throw new Error('нет связи'); }
+  if(!r.ok) throw new Error('Яндекс Диск: файл не записался ('+r.status+')');
+  return 'ok';
+}
+// раз в неделю — копия файла в backups/, хранятся 3 последние
+async function ysBackup(){
+  let last=0; try{ last=+localStorage.getItem(YBK_KEY)||0; }catch(e){}
+  if(Date.now()-last<7*864e5) return;
+  await ysApi('/resources?path='+encodeURIComponent(Y_BK),{method:'PUT',ok:[409]});
+  await ysApi('/resources/copy?from='+encodeURIComponent(Y_FILE)+'&path='+encodeURIComponent(Y_BK+'/moyplan-'+todayK()+'.json')+'&overwrite=true',{method:'POST'});
+  try{ localStorage.setItem(YBK_KEY,String(Date.now())); }catch(e){}
+  const list=((await ysApi('/resources?path='+encodeURIComponent(Y_BK)+'&limit=100&sort=-created'))._embedded||{}).items||[];
+  for(const x of list.slice(3)) await ysApi('/resources?path='+encodeURIComponent(x.path)+'&permanently=true',{method:'DELETE',ok:[202,204]});
+}
+function ysServer(fn,arg){
+  if(fn==='ping') return Promise.resolve('ok');
+  if(fn==='loadState') return ysLoad().then(r=>{ if(r) ysBackup().catch(()=>{}); return r; });
+  if(fn==='saveState') return ysSave();
+  return Promise.reject(new Error('без скрипта эта функция недоступна'));
+}
+/* Первый вход: свой файл на Диске есть — данные из него; нет — в него уйдёт всё, что сейчас на устройстве (копия остаётся). */
+async function ysSetup(){
+  setSync('pending','Подключаю Яндекс Диск…');
+  const u=await ysApi('/');
+  const rc={y:1,login:(u.user&&(u.user.login||u.user.display_name))||''};
+  try{ if(S) localStorage.setItem('moyplan.backup.local.v1',JSON.stringify(S)); if(REMOTE&&!REMOTE.g&&!REMOTE.y) localStorage.setItem('moyplan.remote.old.v1',JSON.stringify(REMOTE));
+    localStorage.setItem(RC_KEY,JSON.stringify(rc)); localStorage.removeItem(PEND_KEY); }catch(e){}
+  REMOTE=rc; clearTimeout(saveTimer); dirtyAll=false; dirtyKeys.clear(); canSave=true;
+  if(!document.getElementById('sheet').hidden) closeSheet();
+  hideWelcome(); await pullRemote(); nativeSync();
+  toast('Вход через Яндекс выполнен — данные хранятся на вашем Яндекс Диске');
+}
+function ysLogin(){ ysRedirect({first:true}); }
+// где хранятся данные — для подписей «Сохранено …» / «Загружено …»
+const storeIn=()=>isY()?'на Яндекс Диске':'в Google Таблице', storeFrom=()=>isY()?'с Яндекс Диска':'из Google Таблицы';
 // пропуск кончился, а продлить молча нельзя: правки лежат на устройстве, просим войти (не чаще раза в 10 минут)
 function gsNeedNotice(e){
   if(!e||!e.need) return false;
-  setSync('pending','Нужно снова войти в Google — правки сохранены на устройстве');
+  const who=isY()?'Яндекс':'Google';
+  setSync('pending','Нужно снова войти в '+who+' — правки сохранены на устройстве');
   if(Date.now()-(gsNeedNotice.t||0)>600000){ gsNeedNotice.t=Date.now();
-    toast('Вход в Google нужно подтвердить',{label:'Войти',fn:()=>{ if(NATIVE) gsAuth(true).then(()=>{ if(isDirty()) flush(); else pullRemote(); },x=>toast('Не удалось войти: '+errText(x))); else gsRedirect({interactive:true}); }}); }
+    toast('Вход в '+who+' нужно подтвердить',{label:'Войти',fn:()=>{ if(isY()) ysRedirect({interactive:true}); else if(NATIVE) gsAuth(true).then(()=>{ if(isDirty()) flush(); else pullRemote(); },x=>toast('Не удалось войти: '+errText(x))); else gsRedirect({interactive:true}); }}); }
   return true;
 }
 let S=null, C=null, HL=null, HV=null, HS=null, canSave=true;
@@ -1781,7 +1869,7 @@ function flush(){
   const keys=dirtyAll?null:[...dirtyKeys];
   dirtyAll=false; dirtyKeys.clear(); saving=true;
   const body=payload(keys);
-  server('saveState',body).then(()=>{ saving=false; if(REMOTE) keepLocal(); if(!isDirty()) setSync('ok','Сохранено в Google Таблице'); },
+  server('saveState',body).then(()=>{ saving=false; if(REMOTE) keepLocal(); if(!isDirty()) setSync('ok','Сохранено '+storeIn()); },
     err=>{ saving=false; if(keys) keys.forEach(k=>dirtyKeys.add(k)); else dirtyAll=true;
       if(REMOTE){ keepLocal(); if(!gsNeedNotice(err)) setSync('pending','Нет связи с таблицей — сохранено в телефоне, отправлю позже');
         clearTimeout(retryT); retryT=setTimeout(()=>{ if(isDirty()) flush(); },30000); }
@@ -1881,7 +1969,7 @@ function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=se
     habits:S.habits.map(h=>({id:h.id,name:(h.icon?h.icon+' ':'')+h.name,type:h.type==='count'?'count':'check',target:numOr(h.target,1),unit:h.unit||'',days:h.days||'1111111',created:h.created||''})),
     hday:todayK(),hlog:Object.fromEntries(S.habitLog.filter(l=>l.date===todayK()).map(l=>[l.habit,numOr(l.value,1)])),
     exp:expItems().map(it=>{ const L=limitOf(it,todayK().slice(0,7)); return {id:it.id,name:it.name,plan:numOr(it.amount,0),subs:itemSubs(it),limit:L?L.lim:0,spent:L?L.spent:0}; }),emonth:todayK().slice(0,7)}));
-  NATIVE.setRemote(REMOTE?(REMOTE.g?'google':REMOTE.url):'',REMOTE&&!REMOTE.g?REMOTE.key:'');
+  NATIVE.setRemote(REMOTE?(REMOTE.g||REMOTE.y?'google':REMOTE.url):'',REMOTE&&!REMOTE.g&&!REMOTE.y?REMOTE.key:'');
 }catch(e){} },800); }
 function nativeBox(){
   if(!NATIVE) return ''; const c=notifCfg(), ck=(k,l)=>`<label class="chk"><input type="checkbox" data-ncfg="${k}" ${c[k]?'checked':''}><span>${l}</span></label>`;
@@ -1930,8 +2018,8 @@ function pullRemote(){
     let d=null; try{ d=json?JSON.parse(json):null; }catch(e){}
     canSave=true;
     if(d){ const [o,mig]=normalize(d), same=S&&JSON.stringify(o)===JSON.stringify(S); S=o; keepLocal();
-      setSync('ok','Загружено из Google Таблицы'); if(!same) render(); if(mig) persist(); applyInbox(); }
-    else { if(!S) S=normalize(DEFAULT_DATA)[0]; render(); persist(); toast('Таблица была пустой — отправил в неё данные с этого устройства'); }
+      setSync('ok','Загружено '+storeFrom()); if(!same) render(); if(mig) persist(); applyInbox(); }
+    else { if(!S) S=normalize(DEFAULT_DATA)[0]; render(); persist(); toast(isY()?'На Яндекс Диске данных ещё не было — отправил туда данные с этого устройства':'Таблица была пустой — отправил в неё данные с этого устройства'); }
   }, err=>{
     if(!S){ canSave=false; S=normalize(DEFAULT_DATA)[0]; render();
       setSync('err','Нет связи с таблицей — правки не сохранятся'); toast('Не удалось загрузить: '+errText(err)); }
@@ -1946,9 +2034,11 @@ function boot(){
   if(GAUTH_RET&&GAUTH_RET.first&&!IS_GAS){
     if(GAUTH_RET.ok){ let d=null; try{ const s=localStorage.getItem(LS_KEY); d=s?JSON.parse(s):null; }catch(e){}
       S=normalize(d||DEFAULT_DATA)[0]; render();
-      gsSetup().catch(e=>{ setSync('err','Вход не удался'); toast('Не удалось войти через Google: '+errText(e)); });
+      const yx=GAUTH_RET.p==='y';
+      (yx?ysSetup():gsSetup()).catch(e=>{ setSync('err','Вход не удался'); toast('Не удалось войти через '+(yx?'Яндекс':'Google')+': '+errText(e)); });
       return; }
-    setTimeout(()=>toast(GAUTH_RET.err==='access_denied'?'Вход через Google отменён':'Вход через Google не удался: '+GAUTH_RET.err),500);
+    const who=GAUTH_RET.p==='y'?'Яндекс':'Google';
+    setTimeout(()=>toast(GAUTH_RET.err==='access_denied'?'Вход через '+who+' отменён':'Вход через '+who+' не удался: '+GAUTH_RET.err),500);
   }
   if(IS_GAS){
     setSync('pending','Загружаю из таблицы…');
@@ -1991,14 +2081,15 @@ function showWelcome(){
 const FIRST_KEY='moyplan.first.v1', LOGIN_ASK='moyplan.loginask.v1', LOGIN_AFTER=3;
 function firstDay(){ try{ let v=localStorage.getItem(FIRST_KEY); if(!v){ v=todayK(); localStorage.setItem(FIRST_KEY,v); } return v; }catch(e){ return todayK(); } }
 function loginAsk(){
-  if(!gOK()||REMOTE||IS_GAS) return false;
+  if(!(gOK()||yOK())||REMOTE||IS_GAS) return false;
   let a=''; try{ a=localStorage.getItem(LOGIN_ASK)||''; }catch(e){}
   if(a==='never'||(a&&a>todayK())) return false;
   return -daysTo(firstDay())>=LOGIN_AFTER;
 }
 function loginCard(){ if(!loginAsk()) return '';
-  return `<section class="card logincard"><h3>Сохраните план в Google</h3><p class="hint">Сейчас всё хранится только на этом устройстве. Войдите через Google — приложение заведёт таблицу на вашем Google Диске: данные не пропадут при смене телефона и будут на всех устройствах. Таблицу видите только вы.</p>
-    <div class="actions"><button class="btn primary" data-act="welcomeLogin">Войти через Google</button><button class="btn small" data-act="loginLater" data-v="week">Позже</button><button class="btn small" data-act="loginLater" data-v="never">Не предлагать</button></div></section>`; }
+  const y=yOK(), g=gOK();
+  return `<section class="card logincard"><h3>Сохраните план в облаке</h3><p class="hint">Сейчас всё хранится только на этом устройстве. Войдите — данные не пропадут при смене телефона и будут на всех устройствах. ${y?'Через Яндекс — на вашем Яндекс Диске (работает без VPN)':''}${y&&g?'; ':''}${g?'через Google — в таблице на вашем Google Диске':''}. Видите их только вы.</p>
+    <div class="actions">${y?'<button class="btn primary" data-act="ysLogin">Войти через Яндекс</button>':''}${g?`<button class="btn ${y?'':'primary'}" data-act="welcomeLogin">Войти через Google</button>`:''}<button class="btn small" data-act="loginLater" data-v="week">Позже</button><button class="btn small" data-act="loginLater" data-v="never">Не предлагать</button></div></section>`; }
 function hideWelcome(){ const w=document.getElementById('welcome'); if(w){ w.hidden=true; w.innerHTML=''; } }
 
 /* Ярлык на значке приложения: сразу открыть нужное окно */
@@ -4828,11 +4919,15 @@ function storageBox(){
   if(IS_GAS) return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">В Google Таблице, к которой подключён скрипт. Каждая правка сохраняется сама.</div></div>`;
   if(REMOTE&&REMOTE.g) return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">В вашей Google Таблице «${GS_TITLE}»${REMOTE.email?' — '+esc(REMOTE.email):''}. Копия лежит на этом устройстве: без интернета приложение работает, правки уйдут в таблицу, когда появится связь. На другом устройстве просто войдите через Google с этой же почтой. Раз в неделю копия таблицы кладётся в папку «${GS_BK_FOLDER}» на Диске.</div>
     <div class="actions" style="margin-top:6px"><button class="btn small" data-act="rcPull">Обновить из таблицы</button><button class="btn small" data-act="gsOpen">Открыть таблицу</button><span class="sp"></span><button class="btn small danger" data-act="rcOff">Выйти</button></div></div>`;
-  const gb=gOK()?`<div class="field"><label>Вход через Google</label><div class="hint" style="margin:0">Данные будут в вашей таблице «${GS_TITLE}» на Google Диске — приложение создаст её само, скрипт не нужен. На другом устройстве достаточно войти с той же почтой. Если таблица новая, в неё перенесётся всё, что сейчас здесь.</div>
-    <div class="actions" style="margin-top:6px"><button class="btn small primary" data-act="gsLogin">Войти через Google</button></div></div>`:'';
+  if(isY()) return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">На вашем Яндекс Диске, в папке «Приложения»${REMOTE.login?' — '+esc(REMOTE.login):''}. Копия лежит на этом устройстве: без интернета приложение работает, правки уйдут на Диск, когда появится связь. На другом устройстве просто войдите через Яндекс с тем же аккаунтом. Раз в неделю копия кладётся в ту же папку (backups).</div>
+    <div class="actions" style="margin-top:6px"><button class="btn small" data-act="rcPull">Обновить с Диска</button><span class="sp"></span><button class="btn small danger" data-act="rcOff">Выйти</button></div></div>`;
+  const yb=yOK()?`<div class="field"><label>Вход через Яндекс</label><div class="hint" style="margin:0">Данные будут храниться на вашем Яндекс Диске, в папке приложения — другие ваши файлы приложение не видит. Работает без VPN. На другом устройстве достаточно войти с тем же аккаунтом. Если на Диске ещё ничего нет, туда перенесётся всё, что сейчас здесь.</div>
+    <div class="actions" style="margin-top:6px"><button class="btn small primary" data-act="ysLogin">Войти через Яндекс</button></div></div>`:'';
+  const gb=yb+(gOK()?`<div class="field"><label>Вход через Google</label><div class="hint" style="margin:0">Данные будут в вашей таблице «${GS_TITLE}» на Google Диске — приложение создаст её само, скрипт не нужен. На другом устройстве достаточно войти с той же почтой. Если таблица новая, в неё перенесётся всё, что сейчас здесь.</div>
+    <div class="actions" style="margin-top:6px"><button class="btn small primary" data-act="gsLogin">Войти через Google</button></div></div>`:'');
   if(REMOTE) return gb+`<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">В Google Таблице через скрипт. Копия лежит на этом устройстве: без интернета приложение работает, правки уйдут в таблицу, когда появится связь.</div>
     <div class="actions" style="margin-top:6px"><button class="btn small" data-act="rcPull">Обновить из таблицы</button><button class="btn small" data-act="rcLink">Ссылка для другого устройства</button><span class="sp"></span><button class="btn small danger" data-act="rcOff">Отключить</button></div></div>`;
-  return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">Сейчас — только в этом браузере. ${gb?'Войдите через Google':'Подключите Google Таблицу'}, чтобы данные были на всех устройствах.</div></div>`+gb+`
+  return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">Сейчас — только в этом браузере. ${gb?(gOK()&&yOK()?'Войдите через Яндекс или Google':yOK()?'Войдите через Яндекс':'Войдите через Google'):'Подключите Google Таблицу'}, чтобы данные были на всех устройствах.</div></div>`+gb+`
     ${gb?'<div class="hint" style="margin:4px 0 8px">Или по-старому — свой скрипт в таблице:</div>':''}
     <div class="field"><label>Ссылка на скрипт</label><input id="rcUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"><div class="hint" style="margin:4px 0 0">Или вставьте сюда «Ссылку для другого устройства» — ключ тогда не нужен.</div></div>
     <div class="field"><label>Ключ доступа</label><input id="rcKey" autocomplete="off" spellcheck="false" placeholder="из журнала функции createApiKey"></div>
@@ -5602,6 +5697,7 @@ document.addEventListener('click',e=>{
   else if(a==='rcConnect'){ rcConnect(); }
   else if(a==='gsLogin'){ gsLogin(); }
   else if(a==='welcomeLogin'){ gsLogin(); }
+  else if(a==='ysLogin'){ ysLogin(); }
   else if(a==='welcomeSkip'){ try{ localStorage.setItem(WELCOME_KEY,'1'); }catch(err){} hideWelcome(); }
   else if(a==='gsOpen'){ const u='https://docs.google.com/spreadsheets/d/'+REMOTE.sheet+'/edit'; if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }
   else if(a==='apkCheck'){ checkApk(true); }
@@ -5609,11 +5705,11 @@ document.addEventListener('click',e=>{
   else if(a==='rcPull'){ if(isDirty()){ flush(); toast('Сначала отправляю свои правки'); return; } closeSheet(); setSync('pending','Загружаю из таблицы…'); pullRemote().then(()=>toast('Обновлено')); }
   else if(a==='rcLink'){ const link=(NATIVE||!/^https:/.test(location.href)?SITE:location.origin+location.pathname)+'#connect='+btoa(REMOTE.url+'|'+REMOTE.key);
     try{ navigator.clipboard.writeText(link).then(()=>toast('Ссылка скопирована. В ней ключ — отправляйте только себе'),()=>prompt('Ссылка для другого устройства (в ней ключ):',link)); }catch(err){ prompt('Ссылка для другого устройства (в ней ключ):',link); } }
-  else if(a==='rcOff'){ const g=!!(REMOTE&&REMOTE.g); if(!confirm(g?'Выйти из Google на этом устройстве? Данные останутся в вашей таблице, а здесь — их копия.':'Отключить Google Таблицу на этом устройстве? Данные останутся в таблице, а здесь — их копия.')) return;
+  else if(a==='rcOff'){ const yx=isY(), g=!!(REMOTE&&REMOTE.g)||yx; if(!confirm(yx?'Выйти из Яндекса на этом устройстве? Данные останутся на вашем Яндекс Диске, а здесь — их копия.':g?'Выйти из Google на этом устройстве? Данные останутся в вашей таблице, а здесь — их копия.':'Отключить Google Таблицу на этом устройстве? Данные останутся в таблице, а здесь — их копия.')) return;
     if(isDirty()&&!confirm('Часть правок ещё не дошла до таблицы и останется только здесь. Всё равно отключить?')) return;
     try{ localStorage.removeItem(RC_KEY); localStorage.removeItem(PEND_KEY); localStorage.setItem(LS_KEY,JSON.stringify(S)); }catch(err){}
-    if(g) gsDropTok();
-    REMOTE=null; dirtyAll=false; dirtyKeys.clear(); canSave=true; closeSheet(); setSync('ok','Данные из этого браузера'); toast(g?'Вы вышли из Google':'Таблица отключена'); nativeSync(); }
+    if(yx) ysDropTok(); else if(g) gsDropTok();
+    REMOTE=null; dirtyAll=false; dirtyKeys.clear(); canSave=true; closeSheet(); setSync('ok','Данные из этого браузера'); toast(yx?'Вы вышли из Яндекса':g?'Вы вышли из Google':'Таблица отключена'); nativeSync(); }
   else if(a==='reset'){ if(!confirm('Вернуть финансы к данным из Excel? Всё, что вводили здесь, пропадёт. Привычки останутся.')) return;
     const keep={}; for(const k of ['habits','habitLog','tasks','goals','goalSteps','books','movies','noteFolders','recipes','pantry','notes','foodLog','waterLog','weightLog','exercises','routines','workouts','trainActive','projects','payments','payLog','trash']) keep[k]=S[k];
     S=Object.assign(normalize(DEFAULT_DATA)[0],keep); closeSheet(); persist(); render(); toast('Данные из Excel восстановлены'); }
