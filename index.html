@@ -369,6 +369,13 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 .inline-in:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .qa-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .qa-chips .chip{padding:4px 11px;font-size:13px}
+/* строка меток в одну линию: листается вбок, у края — затухание; выбранная прокручивается в видимую часть (afterRender) */
+.qa-line{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:24px;align-items:center;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+.qa-line::-webkit-scrollbar{display:none}
+.qa-line>*{flex:none}
+.qa-line .chip{min-height:32px;padding:5px 12px;font-size:13.5px}
+.qa-l{font-size:12.5px;color:var(--muted);font-weight:600;margin-right:2px}
 .trow{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
 .trow:first-of-type{border-top:0}
 .tcheck{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--muted);background:transparent;display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--on-accent);padding:0;margin-top:1px}
@@ -792,12 +799,9 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .bond-y{text-align:right;white-space:nowrap}
 .bond-y b{font-size:17px}
 </style>
-<!-- новое оформление — отдельным слоем; «Настройки → Оформление → Прежнее» выключает его (moyplan.design.v1 = old) -->
+<!-- новое оформление — отдельным слоем (design.css) -->
 <link rel="stylesheet" id="designCss" href="design.css">
-<!-- пробный стиль «Телеграм» — поверх design.css (moyplan.design.v1 = tg) -->
-<link rel="stylesheet" id="tgCss" href="tg.css">
-<script>(function(){var v='';try{v=localStorage.getItem('moyplan.design.v1')||''}catch(e){}
-document.getElementById('designCss').disabled=v==='old';document.getElementById('tgCss').disabled=v!=='tg';})()</script>
+
 </head>
 <body>
 <header class="top">
@@ -2112,6 +2116,8 @@ function afterRender(){
   drawTimer();
   $view.querySelectorAll('input[data-fact],input[data-ifact],input[data-insf],input[data-gfact],input[data-posval]').forEach(inp=>inp.classList.toggle('bad',isNaN(evalExpr(inp.value))));
   if(UI.section==='fin') setTimeout(()=>refreshQuotes(false),0);
+  document.querySelectorAll('#subnav .chip.on,.qa-line .chip.on').forEach(c=>{ const p=c.parentElement, l=c.offsetLeft-p.offsetLeft;
+    if(l<p.scrollLeft||l+c.offsetWidth>p.scrollLeft+p.clientWidth-24) p.scrollLeft=Math.max(0,l-(p.clientWidth-c.offsetWidth)/2); });
 }
 
 function kpi(l,v,s,cls){ return `<div class="kpi ${cls||''}"><div class="l">${l}</div><div class="v num ${v<0?'neg':''}">${rub(v)}</div>${s?`<div class="s">${s}</div>`:''}</div>`; }
@@ -3379,9 +3385,9 @@ function viewTasks(){
   if(UI.qaProj&&!projById(UI.qaProj)) UI.qaProj='';
   const inProj=v.startsWith('p:'), target=inProj?projName(v.slice(2)):UI.qaProj?projName(UI.qaProj):'Без проекта';
   const qa=`<section class="card"><div class="qa-row"><input class="inline-in" id="qaTitle" placeholder="Новая задача…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача"><button class="btn primary" data-act="taskQuick">Добавить</button></div>
-    <div class="qa-chips">${[['today','Сегодня'],['tomorrow','Завтра'],['none','Без срока']].map(([x,l])=>`<button class="chip ${UI.qaDue===x?'on':''}" data-act="qaDue" data-v="${x}">${l}</button>`).join('')}<button class="chip" data-act="taskNew">Подробнее…</button></div>
-    ${UI.qaDue!=='none'?`<div class="qa-chips"><span class="fsub" style="align-self:center">Когда:</span>${[['','любое время']].concat(PARTS.map(([k])=>[k,PART_SHORT[k]])).map(([x,l])=>`<button class="chip ${(UI.qaPart||'')===x?'on':''}" data-act="qaPart" data-v="${x}">${l}</button>`).join('')}</div>`:''}
-    ${!inProj&&S.projects.length?`<div class="qa-chips"><span class="fsub" style="align-self:center">Проект:</span>${projChips(UI.qaProj||'','qaProj')}</div>`:''}
+    <div class="qa-chips qa-line">${[['today','Сегодня'],['tomorrow','Завтра'],['none','Без срока']].map(([x,l])=>`<button class="chip ${UI.qaDue===x?'on':''}" data-act="qaDue" data-v="${x}">${l}</button>`).join('')}<button class="chip" data-act="taskNew">Подробнее…</button></div>
+    ${UI.qaDue!=='none'?`<div class="qa-chips qa-line"><span class="qa-l">Когда</span>${[['','любое время']].concat(PARTS.map(([k])=>[k,PART_SHORT[k]])).map(([x,l])=>`<button class="chip ${(UI.qaPart||'')===x?'on':''}" data-act="qaPart" data-v="${x}">${l}</button>`).join('')}</div>`:''}
+    ${!inProj&&S.projects.length?`<div class="qa-chips qa-line"><span class="qa-l">Проект</span>${projChips(UI.qaProj||'','qaProj')}</div>`:''}
     <p class="hint" style="margin:8px 0 0">Попадёт в «${esc(target)}»${inProj||S.projects.length?'':' — проекты можно завести в «☰ Проекты»'}.</p></section>`;
   const head=v==='inbox'?'Без проекта':v.startsWith('p:')?projName(v.slice(2)):({today:'Сегодня',upcoming:'Предстоящие',all:'Все задачи',done:'Готово',cal:'Календарь'})[v]||'';
   const bar=`<div class="row-between" style="margin-bottom:10px"><button class="btn small proj-btn" data-act="projToggle">☰ Проекты</button><b class="fname" style="font-size:16px">${esc(head)}</b></div>`;
@@ -3486,7 +3492,7 @@ function viewTaskPage(t){
       <div class="tkey"><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
       <div class="tkey"><label>Крайний срок</label><div class="dwrap"><input type="date" data-tf="deadline" value="${esc(t.deadline||'')}" aria-label="Крайний срок">${t.deadline?`<button class="xbtn" data-act="tClr" data-f="deadline" aria-label="Без крайнего срока">×</button>`:''}</div></div>
       <div class="tkey"><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
-      ${S.projects.length?`<div class="qa-chips" style="grid-column:1/-1;margin-top:0">${projChips(t.project&&projById(t.project)?t.project:'','tProj')}</div>`:''}
+      ${S.projects.length?`<div class="qa-chips qa-line" style="grid-column:1/-1;margin-top:0">${projChips(t.project&&projById(t.project)?t.project:'','tProj')}</div>`:''}
       <div><label>Повтор</label>${sel('repeat',REPEATS,t.repeat||'none')}</div>
       ${t.repeat==='days'?`<div class="days" style="grid-column:1/-1">${WD.map((w,d)=>`<button class="dbtn ${String(t.repeatDays||'')[d]==='1'?'on':''}" data-act="tRepDay" data-id="${t.id}" data-d="${d}" aria-pressed="${String(t.repeatDays||'')[d]==='1'}">${w}</button>`).join('')}</div>`:''}
       <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
@@ -5095,23 +5101,16 @@ function lookApply(){
   const lt=vars(A[2],`color-mix(in srgb, ${A[2]} 13%, #fff)`), dk=vars(A[3],`color-mix(in srgb, ${A[3]} 20%, #1c1f24)`);
   el.textContent=`:root{${lt}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dk}}}:root[data-theme="dark"]{${dk}}`;
   const m=document.querySelector('meta[name="theme-color"]'); if(m&&A[0]!=='blue') m.setAttribute('content',A[2]);
+  if(typeof designMeta==='function') designMeta();
 }
-const DESIGN_KEY='moyplan.design.v1';
-const designOn=()=>{ const l=document.getElementById('designCss'); return !!l&&!l.disabled; };
-const tgOn=()=>{ const l=document.getElementById('tgCss'); return !!l&&!l.disabled; };
-const designCur=()=>tgOn()?'tg':designOn()?'new':'old';
-// цвет полосы телефона над приложением: в «Телеграме» — как шапка
+// цвет полосы телефона над приложением — как шапка
 function designMeta(){
-  const m=document.querySelector('meta[name="theme-color"]'); if(!m) return;
-  if(!m.dataset.base) m.dataset.base=m.getAttribute('content');
-  m.setAttribute('content',tgOn()?getComputedStyle(document.documentElement).getPropertyValue('--tg-head').trim()||'#517DA2':m.dataset.base);
+  const m=document.querySelector('meta[name="theme-color"]'), l=document.getElementById('designCss'); if(!m||!l||l.disabled) return;
+  m.setAttribute('content',getComputedStyle(document.documentElement).getPropertyValue('--hd-head').trim()||'#517DA2');
 }
-function designSet(v){ try{ localStorage.setItem(DESIGN_KEY,v); }catch(e){} const l=document.getElementById('designCss'), t=document.getElementById('tgCss');
-  if(l) l.disabled=v==='old'; if(t) t.disabled=v!=='tg'; designMeta(); openSettings(); }
 function lookBox(){
   const L=lookGet();
-  return `<div class="field"><label>Стиль</label><div class="seg">${[['new','Новый'],['tg','Телеграм'],['old','Прежний']].map(([v,l])=>`<button class="${designCur()===v?'on':''}" data-act="design" data-v="${v}">${l}</button>`).join('')}</div></div>
-    <div class="field"><label>Цвет оформления</label><div class="swatches">${ACCENTS.map(([id,n,c,d])=>`<button class="sw-c ${L.accent===id?'on':''}" style="--c:${c};--cd:${d}" data-act="lookAcc" data-v="${id}" aria-label="${n}" title="${n}" aria-pressed="${L.accent===id}"></button>`).join('')}</div></div>
+  return `<div class="field"><label>Цвет оформления</label><div class="swatches">${ACCENTS.map(([id,n,c,d])=>`<button class="sw-c ${L.accent===id?'on':''}" style="--c:${c};--cd:${d}" data-act="lookAcc" data-v="${id}" aria-label="${n}" title="${n}" aria-pressed="${L.accent===id}"></button>`).join('')}</div></div>
     <div class="field"><label>Цвета разделов</label><div class="seg"><button class="${L.mono?'':'on'}" data-act="lookSec" data-v="0">У каждого свой</button><button class="${L.mono?'on':''}" data-act="lookSec" data-v="1">Как оформление</button></div></div>`;
 }
 // какие разделы показывать в «Ещё» и на главной
@@ -5598,7 +5597,6 @@ document.addEventListener('click',e=>{
   else if(a==='edSave') saveEditor();
   else if(a==='edDelete') deleteEditor();
   else if(a==='sheetClose') closeSheet();
-  else if(a==='design') designSet(b.dataset.v);
   else if(a==='qh') toggleQh(b);
   else if(a==='syncInfo') toast(document.getElementById('sync').title||'Сохранено');
   else if(a==='secHelp') openHelp();
