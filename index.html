@@ -794,7 +794,10 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 </style>
 <!-- новое оформление — отдельным слоем; «Настройки → Оформление → Прежнее» выключает его (moyplan.design.v1 = old) -->
 <link rel="stylesheet" id="designCss" href="design.css">
-<script>try{if(localStorage.getItem('moyplan.design.v1')==='old')document.getElementById('designCss').disabled=true}catch(e){}</script>
+<!-- пробный стиль «Телеграм» — поверх design.css (moyplan.design.v1 = tg) -->
+<link rel="stylesheet" id="tgCss" href="tg.css">
+<script>(function(){var v='';try{v=localStorage.getItem('moyplan.design.v1')||''}catch(e){}
+document.getElementById('designCss').disabled=v==='old';document.getElementById('tgCss').disabled=v!=='tg';})()</script>
 </head>
 <body>
 <header class="top">
@@ -5095,10 +5098,19 @@ function lookApply(){
 }
 const DESIGN_KEY='moyplan.design.v1';
 const designOn=()=>{ const l=document.getElementById('designCss'); return !!l&&!l.disabled; };
-function designSet(v){ try{ localStorage.setItem(DESIGN_KEY,v); }catch(e){} const l=document.getElementById('designCss'); if(l) l.disabled=v==='old'; openSettings(); }
+const tgOn=()=>{ const l=document.getElementById('tgCss'); return !!l&&!l.disabled; };
+const designCur=()=>tgOn()?'tg':designOn()?'new':'old';
+// цвет полосы телефона над приложением: в «Телеграме» — как шапка
+function designMeta(){
+  const m=document.querySelector('meta[name="theme-color"]'); if(!m) return;
+  if(!m.dataset.base) m.dataset.base=m.getAttribute('content');
+  m.setAttribute('content',tgOn()?getComputedStyle(document.documentElement).getPropertyValue('--tg-head').trim()||'#517DA2':m.dataset.base);
+}
+function designSet(v){ try{ localStorage.setItem(DESIGN_KEY,v); }catch(e){} const l=document.getElementById('designCss'), t=document.getElementById('tgCss');
+  if(l) l.disabled=v==='old'; if(t) t.disabled=v!=='tg'; designMeta(); openSettings(); }
 function lookBox(){
   const L=lookGet();
-  return `<div class="field"><label>Стиль</label><div class="seg"><button class="${designOn()?'on':''}" data-act="design" data-v="new">Новый</button><button class="${designOn()?'':'on'}" data-act="design" data-v="old">Прежний</button></div></div>
+  return `<div class="field"><label>Стиль</label><div class="seg">${[['new','Новый'],['tg','Телеграм'],['old','Прежний']].map(([v,l])=>`<button class="${designCur()===v?'on':''}" data-act="design" data-v="${v}">${l}</button>`).join('')}</div></div>
     <div class="field"><label>Цвет оформления</label><div class="swatches">${ACCENTS.map(([id,n,c,d])=>`<button class="sw-c ${L.accent===id?'on':''}" style="--c:${c};--cd:${d}" data-act="lookAcc" data-v="${id}" aria-label="${n}" title="${n}" aria-pressed="${L.accent===id}"></button>`).join('')}</div></div>
     <div class="field"><label>Цвета разделов</label><div class="seg"><button class="${L.mono?'':'on'}" data-act="lookSec" data-v="0">У каждого свой</button><button class="${L.mono?'on':''}" data-act="lookSec" data-v="1">Как оформление</button></div></div>`;
 }
@@ -5864,9 +5876,10 @@ document.addEventListener('click',e=>{
   else if(a==='reset'){ if(!confirm('Вернуть финансы к данным из Excel? Всё, что вводили здесь, пропадёт. Привычки останутся.')) return;
     const keep={}; for(const k of ['habits','habitLog','tasks','goals','goalSteps','books','movies','noteFolders','recipes','pantry','notes','foodLog','waterLog','weightLog','exercises','routines','workouts','trainActive','projects','payments','payLog','trash']) keep[k]=S[k];
     S=Object.assign(normalize(DEFAULT_DATA)[0],keep); closeSheet(); persist(); render(); toast('Данные из Excel восстановлены'); }
-  else if(a==='theme'){ const v=b.dataset.v; if(v) document.documentElement.dataset.theme=v; else delete document.documentElement.dataset.theme; try{ localStorage.setItem('moyplan.theme',v); }catch(err){} openSettings(); }
+  else if(a==='theme'){ const v=b.dataset.v; if(v) document.documentElement.dataset.theme=v; else delete document.documentElement.dataset.theme; try{ localStorage.setItem('moyplan.theme',v); }catch(err){} designMeta(); openSettings(); }
 });
 try{ const t=localStorage.getItem('moyplan.theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+designMeta();
 lookApply();
 
 boot();

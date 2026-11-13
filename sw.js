@@ -1,7 +1,7 @@
 /* Работа без интернета: страница и значки берутся из памяти телефона и обновляются в фоне.
    Запросы к таблице и бирже (другие адреса) не трогаем — их ведёт сама страница. */
-const CACHE = 'moyplan-v2';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './design.css', './fonts/nunitosans-cyrillic.woff2', './fonts/nunitosans-latin.woff2'];
+const CACHE = 'moyplan-v3';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './design.css', './tg.css', './fonts/nunitosans-cyrillic.woff2', './fonts/nunitosans-latin.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -1,0 +1,127 @@
+/* ═══════════ Стиль «Телеграм» (пробный) ═══════════
+   Ложится поверх design.css и меняет только вид. Включается «Настройки → Оформление → Стиль: Телеграм»
+   (moyplan.design.v1 = tg, link#tgCss). Убрать совсем — удалить этот файл, <link id="tgCss"> и кнопку в lookBox.
+   Идея: синяя шапка с вкладками-подчёркиваниями, серый фон и белые плоские группы, строки с разделителями,
+   кнопки без рамок, поля с линией снизу, тёмное всплывающее уведомление. Цвет оформления, выбранный
+   пользователем (не синий), по-прежнему главнее: lookCss подключается позже и перекрывает --accent. */
+
+:root{
+  --ds-font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+  --ds-r-card:12px; --ds-r-ctl:10px;
+  --page:#F1F2F6; --surface:#FFFFFF; --solid:#FFFFFF; --surface-2:#F4F4F7; --line:#E6E7EB;
+  --text:#000000; --text-2:#4A4A4F; --muted:#707579;
+  --accent:#3390EC; --accent-soft:#E4F0FC; --s-home:#3390EC; --s-tasks:#3390EC; --s-week:#3390EC;
+  --tg-head:#517DA2; --tg-head-2:#5B8AB2; --tg-on-head:#FFFFFF;
+  --shadow:none; --ds-shadow-up:0 -.5px 0 var(--line);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#0E1621; --surface:#17212B; --solid:#17212B; --surface-2:#202B36; --line:#0F1923;
+    --text:#F5F5F5; --text-2:#C6CDD4; --muted:#7F91A4;
+    --accent:#5EA6EC; --accent-soft:#1E3247; --s-home:#5EA6EC; --s-tasks:#5EA6EC; --s-week:#5EA6EC;
+    --tg-head:#17212B; --tg-head-2:#17212B; --tg-on-head:#F5F5F5;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#0E1621; --surface:#17212B; --solid:#17212B; --surface-2:#202B36; --line:#0F1923;
+  --text:#F5F5F5; --text-2:#C6CDD4; --muted:#7F91A4;
+  --accent:#5EA6EC; --accent-soft:#1E3247; --s-home:#5EA6EC; --s-tasks:#5EA6EC; --s-week:#5EA6EC;
+  --tg-head:#17212B; --tg-head-2:#17212B; --tg-on-head:#F5F5F5;
+}
+
+body{letter-spacing:0;line-height:1.4}
+
+/* шапка: сплошная синяя (в тёмной — цвета панелей), белые значки */
+.top{background:var(--tg-head);color:var(--tg-on-head);-webkit-backdrop-filter:none;backdrop-filter:none}
+.top h1{font-weight:600;font-size:20px;color:var(--tg-on-head)}
+.top .icon-btn{color:var(--tg-on-head);border-radius:50%}
+.top .icon-btn:hover,.top .icon-btn:active{background:rgba(255,255,255,.14)}
+.top .sic{background:rgba(255,255,255,.18);color:var(--tg-on-head);border-radius:50%}
+.top .sync{color:rgba(255,255,255,.75)}
+.top .qh{border-color:rgba(255,255,255,.5);color:var(--tg-on-head)}
+.top .sync i{box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+
+/* подвкладки — продолжение шапки, выбранная подчёркнута, как папки чатов */
+.subnav{background:var(--tg-head-2);-webkit-backdrop-filter:none;backdrop-filter:none;padding:0 8px;gap:0;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.subnav .chip{background:transparent;border:0;border-radius:0;color:rgba(255,255,255,.72);font-weight:600;min-height:44px;padding:10px 14px;position:relative}
+.subnav .chip.on{color:#fff;background:transparent}
+.subnav .chip.on::after{content:'';position:absolute;left:10px;right:10px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:#fff}
+:root[data-theme="dark"] .subnav .chip.on{color:var(--accent)}
+:root[data-theme="dark"] .subnav .chip.on::after{background:var(--accent)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .subnav .chip.on{color:var(--accent)}
+  :root:not([data-theme="light"]) .subnav .chip.on::after{background:var(--accent)}
+}
+main{padding-top:10px}
+.subnav:not([hidden])+main{padding-top:0}
+
+/* карточки — плоские белые группы на сером фоне */
+.card{border:0;box-shadow:none;border-radius:var(--ds-r-card);padding:14px 16px}
+.card h3{font-weight:600;font-size:16px}
+.tile{border:0;box-shadow:none;border-radius:var(--ds-r-card)}
+.quick button{border:0;box-shadow:none;background:var(--surface);border-radius:var(--ds-r-card);font-weight:600}
+.hello b{font-weight:700}
+
+/* строки списков: разделитель отступает от левого края, как в списке чатов */
+.trow,.list-row,.hrow,.note-card,.note-row,.soonrow{border-top-color:color-mix(in srgb,var(--muted) 18%,transparent)}
+.tcheck{border-width:1.5px}
+.trow.done .tcheck{background:var(--accent);border-color:var(--accent)}
+
+/* кнопки: главное — синяя заливка, остальное — синий текст без рамки */
+.btn{border:0;background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent);font-weight:600;border-radius:var(--ds-r-ctl)}
+.btn:active{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.btn.primary{background:var(--accent);color:#fff;box-shadow:none}
+.btn.danger{background:color-mix(in srgb,var(--neg-text) 10%,transparent);color:var(--neg-text)}
+.nav-btn{border:0;background:var(--surface);border-radius:50%;color:var(--accent)}
+.back{color:var(--accent);font-weight:600}
+
+/* метки и переключатели */
+.chip{border:0;background:var(--surface);color:var(--text-2)}
+.chip.on{background:var(--accent);color:#fff;border:0}
+.card .chip:not(.on),.sheet .chip:not(.on),.sgroup .chip:not(.on){background:var(--surface-2)}
+.seg{background:var(--surface-2)}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+
+/* поля: без заливки, линия снизу, при вводе — синяя */
+.field label{color:var(--accent);font-weight:600;font-size:13px}
+.field input:not([type=checkbox]):not([type=radio]),.field select,.field textarea,.inline-in{
+  background:transparent;border:0;border-bottom:1.5px solid color-mix(in srgb,var(--muted) 35%,transparent);border-radius:0;padding:10px 2px}
+.field input:focus,.field select:focus,.field textarea:focus,.inline-in:focus{border-color:transparent;border-bottom-color:var(--accent)}
+.field textarea{border:1.5px solid color-mix(in srgb,var(--muted) 35%,transparent);border-radius:var(--ds-r-ctl);padding:10px 12px}
+.field textarea:focus{border-color:var(--accent)}
+
+/* нижнее меню: белая панель, выбранный — синий значок и подпись, без подложки */
+.bottom{background:var(--surface);box-shadow:var(--ds-shadow-up)}
+.bottom button{font-weight:500;color:var(--muted)}
+.bottom button svg{padding:2px 16px}
+.bottom button.on{color:var(--accent);font-weight:600}
+.bottom button.on svg,.bottom button:active svg{background:transparent}
+
+/* окна снизу: серый фон и белые группы, как экран настроек */
+.sheet{background:var(--page);border-radius:14px 14px 0 0}
+.sheet h2{font-weight:700;font-size:20px}
+.sheet .card,.sheet .tile{background:var(--surface)}
+.sheet-bg{background:rgba(0,0,0,.5)}
+.sheet .field input:not([type=checkbox]):not([type=radio]),.sheet .field select{background:transparent}
+.actions.stick{background:var(--page)!important;border-top:0!important}
+
+/* настройки: белые группы, заголовок группы синим, как в Телеграме */
+.sgroup{background:var(--surface);border-radius:var(--ds-r-card)}
+.sgroup h4{color:var(--accent);font-size:14.5px;font-weight:600}
+.sgroup .field input:not([type=checkbox]):not([type=radio]),.sgroup .field select,.sgroup .inline-in{background:transparent}
+.sgroup .field textarea{background:transparent}
+.sgroup .seg{background:var(--surface-2)}
+.sgroup .seg button.on{background:var(--surface)}
+.srow{background:var(--surface);border-radius:var(--ds-r-card)}
+.srow-ic{border-radius:50%;background:var(--accent);color:#fff}
+.shead .sx{background:transparent}
+
+/* уведомление внизу — тёмная плашка */
+.toast{background:rgba(32,32,36,.92);color:#fff;border:0;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.toast-act{color:#6AB3F3}
+
+/* заметки — «облачками», как сообщения */
+.note-card{background:var(--surface);border:0;border-radius:14px 14px 14px 4px;padding:10px 14px;margin:0 0 8px;box-shadow:0 1px 1px rgba(0,0,0,.06)}
+.note-row{border-top:0}
+.note-row .note-card{margin:0 0 8px}
+.card .note-card{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
