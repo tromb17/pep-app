@@ -447,7 +447,11 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .macro{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;font-size:13px;color:var(--text-2)}
 .macro small{font-size:12px;font-weight:500;color:var(--muted)}
 .mbar{display:block;height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden;margin-top:4px}.mbar i{display:block;height:100%;background:var(--sec,var(--accent));border-radius:2px}
-.body-l{display:block;text-align:left;padding:8px 0 0;font-size:13px}
+.body-card{border-color:color-mix(in srgb,var(--sec,var(--accent)) 35%,var(--line))}
+.body-card.open{background:color-mix(in srgb,var(--sec,var(--accent)) 6%,var(--card,var(--surface)))}
+.body-row{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;color:inherit;padding:0;text-align:left;cursor:pointer;font:inherit}
+.body-ic{font-size:22px;width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--sec,var(--accent)) 14%,transparent);flex:none}
+.body-t{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.body-ch{font-size:22px;color:var(--muted)}
 .norm-i{font-size:12px;width:20px;height:20px;color:var(--sec,var(--accent));border-color:currentColor}
 .norm-info p{margin:0 0 10px;line-height:1.5}
 .fd-sug{margin-top:6px}.fd-sug:empty{display:none}
@@ -4024,11 +4028,10 @@ function bodyNorm(){
   const fib=Math.max(25,Math.round(kcal/1000*14)), water=Math.round(kg*30/50)*50, bmi=kg/((h/100)**2);
   return {kg,h,age,sex:b.sex,act,goal:b.goal||'keep',bmr:Math.round(bmr),tdee:Math.round(tdee),gk,kcal,pk,p,f,c,fib,water,glasses:Math.max(1,Math.round(water/250)),bmi};
 }
-function openBody(){
+function bodyForm(){
   const b=S.settings.body||{}, kg=lastKg()||b.kg||'', age=b.year?new Date().getFullYear()-b.year:'';
   const chips=(name,list,cur)=>`<div class="qa-chips" role="group">${list.map(([v,l])=>`<button type="button" class="chip ${String(cur||'')===v?'on':''}" data-act="bodyPick" data-k="${name}" data-v="${v}">${l}</button>`).join('')}</div>`;
-  openSheet(`<h2>Мои данные</h2><p class="hint" style="margin:0 0 10px">Нужны, чтобы посчитать норму калорий, белков, жиров, углеводов, клетчатки и воды. Хранятся вместе с остальными данными плана.</p>
-    <form class="form" id="bodyForm" onsubmit="return false">
+  return `<form class="form" id="bodyForm" onsubmit="return false">
       <div class="field"><label>Пол</label>${chips('sex',[['f','Женский'],['m','Мужской']],b.sex)}<input type="hidden" name="sex" value="${esc(b.sex||'')}"></div>
       <div class="row2" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         <div class="field"><label>Возраст</label><input name="age" class="num" inputmode="numeric" value="${esc(age)}" placeholder="лет"></div>
@@ -4036,8 +4039,21 @@ function openBody(){
         <div class="field"><label>Вес, кг</label><input name="kg" class="num" inputmode="decimal" value="${esc(String(kg).replace('.',','))}" placeholder="70"></div></div>
       <div class="field"><label>Активность</label><select name="act">${ACTS.map(([v,l])=>`<option value="${v}" ${String(b.act||'1.2')===v?'selected':''}>${l}</option>`).join('')}</select></div>
       <div class="field"><label>Цель</label>${chips('goal',BGOALS,b.goal||'keep')}<input type="hidden" name="goal" value="${esc(b.goal||'keep')}"></div>
-    </form><p class="hint">Вес берётся из последней записи веса в «Дневнике»; новый вес отсюда запишется на сегодня.</p>
+    </form><p class="hint">Вес берётся из последней записи веса; новый вес отсюда запишется на сегодня.</p>`;
+}
+const BODY_WHY='Нужны, чтобы посчитать вашу норму калорий, белков, жиров, углеводов, клетчатки и воды.';
+function openBody(){
+  openSheet(`<h2>Мои данные</h2><p class="hint" style="margin:0 0 10px">${BODY_WHY}</p>${bodyForm()}
     <div class="actions"><span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="bodySave">Сохранить</button></div>`);
+}
+// карточка наверху «Питания»: не заполнено — форма открыта; заполнено — одна строка, раскрывается по нажатию
+function bodyCard(N){
+  const b=S.settings.body||{};
+  if(N&&!UI.bodyOpen) return `<section class="card body-card"><button class="body-row" data-act="bodyToggle" aria-expanded="false"><span class="body-ic" aria-hidden="true">👤</span>
+    <span class="body-t"><b>Мои данные</b><span class="fsub">${N.sex==='m'?'муж.':'жен.'}, ${N.age} ${plural(N.age,'год','года','лет')}, ${N.h} см, ${fmt1(N.kg)} кг · ${BGOALS.find(g=>g[0]===N.goal)[1].toLowerCase()}</span></span><span class="body-ch">›</span></button></section>`;
+  return `<section class="card body-card open"><div class="row-between"><h3>👤 Мои данные</h3>${N?'<button class="btn small" data-act="bodyToggle">Свернуть</button>':''}</div>
+    <p class="hint" style="margin:2px 0 10px">${BODY_WHY}${N?'':' Заполните один раз — потом карточка свернётся.'}</p>${bodyForm()}
+    <div class="actions" style="margin-top:4px"><span class="sp"></span><button class="btn primary" data-act="bodySave">${N?'Сохранить':'Посчитать норму'}</button></div></section>`;
 }
 function bodySave(){
   const F=document.getElementById('bodyForm'), v=n=>F.querySelector(`[name="${n}"]`).value.trim();
@@ -4048,7 +4064,7 @@ function bodySave(){
   S.settings.body={sex:v('sex'),year:age?new Date().getFullYear()-age:null,h:h||null,kg:kg||null,act:v('act'),goal:v('goal')||'keep'};
   const keys=['settings'];
   if(kg&&kg!==lastKg()){ const tk=todayK(), i=S.weightLog.findIndex(w=>w.date===tk); if(i>=0) S.weightLog[i].kg=kg; else S.weightLog.push({date:tk,kg}); keys.push('weightLog'); }
-  closeSheet(); persist(...keys); render(); toast(bodyNorm()?'Норма посчитана':'Сохранено — для расчёта нужны пол, возраст, рост и вес');
+  const ok=!!bodyNorm(); if(ok) UI.bodyOpen=false; closeSheet(); persist(...keys); render(); toast(ok?'Норма посчитана — данные можно открыть наверху «Питания»':'Сохранено — для расчёта нужны пол, возраст, рост и вес');
 }
 // окно «!» — как считается норма, с подставленными числами
 function openNormInfo(){
@@ -4143,14 +4159,14 @@ function viewFoodDiary(){
   if(weights.length>=2) CH.weight={vals:weights.map(w=>+w.kg),tips:weights.map(w=>dRu(w.date)),axis:weights.map((w,k)=>(weights.length-1-k)%Math.max(1,Math.ceil(weights.length/6))===0?dRu(w.date).slice(0,5):''),kind:'line',sparse:true,fit:true,
     fv:v=>String(Math.round(v*10)/10).replace('.',','),ftip:v=>String(v).replace('.',',')+' кг'};
   const recent=[]; S.foodLog.slice().reverse().forEach(f=>{ if(recent.length<10&&!recent.some(r=>r.name===f.name)) recent.push(f); });
-  return `<div class="row-between" style="margin-bottom:10px"><span class="badge" style="margin:0">Тестовая версия</span><span class="fsub">пробуем, что пригодится</span></div>
+  return `${bodyCard(N)}<div class="row-between" style="margin-bottom:10px"><span class="badge" style="margin:0">Тестовая версия</span><span class="fsub">пробуем, что пригодится</span></div>
   <div class="monthbar"><button class="nav-btn" data-act="foodDay" data-d="-1" aria-label="Предыдущий день">‹</button><div class="t"><b>${dayLabel(dk)}</b><span>${d.getDate()} ${MG[d.getMonth()]} ${d.getFullYear()}</span></div><button class="nav-btn" data-act="foodDay" data-d="1" ${dk>=todayK()?'disabled':''} aria-label="Следующий день">›</button></div>
   <section class="card"><div class="row-between"><h3>Калории<button class="qh norm-i" data-act="normInfo" aria-label="Как считается норма">!</button></h3><div class="finput"><span class="fsub">цель</span><input class="num" style="width:76px" data-path="settings.kcalGoal" data-type="n" data-full="1" inputmode="numeric" value="${esc(S.settings.kcalGoal??'')}" placeholder="${N?N.kcal:2000}" aria-label="Цель по калориям"></div></div>
     <div class="row-between" style="margin-top:6px"><b class="num" style="font-size:26px">${fmt(kc)} <small>ккал</small></b><span class="fsub num">${goal?(kc<=goal?'осталось '+fmt(goal-kc):'<span class="neg">сверх цели '+fmt(kc-goal)+'</span>'):''}</span></div>
     ${goal?`<div class="thermo"><i style="width:${Math.min(100,kc/goal*100).toFixed(1)}%;${kc>goal?'background:var(--neg-bar)':''}"></i></div>`:''}
     <div class="macro num">${[['p','Белки'],['f','Жиры'],['c','Углеводы'],['fib','Клетчатка']].map(([k,l])=>{ const v=sum(k), n=N?N[k]:0;
       return `<div>${l}<b>${fmt(v)}${n?`<small> / ${n}</small>`:''} г</b>${n?`<i class="mbar"><i style="width:${Math.min(100,v/n*100).toFixed(1)}%"></i></i>`:''}</div>`; }).join('')}</div>
-    <button class="more body-l" data-act="bodyOpen">${N?`Норма ${fmt(N.kcal)} ккал${S.settings.kcalGoal?' (цель — своя)':''} · Мои данные ›`:'Укажите пол, возраст, рост и вес — посчитаю норму калорий, БЖУ, клетчатки и воды ›'}</button></section>
+    ${N?`<p class="hint" style="margin:8px 0 0">Норма по вашим данным — ${fmt(N.kcal)} ккал${S.settings.kcalGoal?' (сейчас цель своя)':''}</p>`:''}</section>
   ${MEALS.map(m=>{ const es=day.filter(f=>f.meal===m);
     return `<section class="card"><div class="ghead">${m}<span class="sum num fsub">${es.length?fmt(es.reduce((s,f)=>s+numOr(f.kcal,0),0))+' ккал':''}</span></div>
       ${es.map(f=>`<div class="trow"><button class="tmain" data-act="editId" data-kind="food" data-id="${f.id}"><div class="fname">${esc(f.name)}${numOr(f.g,0)?` <span class="fsub">${fmt1(f.g)} г</span>`:''}</div><div class="fsub num">${fmt(numOr(f.kcal,0))} ккал${(f.p||f.f||f.c)?' · Б '+fmt1(numOr(f.p,0))+' Ж '+fmt1(numOr(f.f,0))+' У '+fmt1(numOr(f.c,0)):''}${numOr(f.fib,0)?' · клетчатка '+fmt1(f.fib)+' г':''}</div></button><button class="xbtn" data-act="foodDel" data-id="${f.id}" aria-label="Удалить">×</button></div>`).join('')}
@@ -5074,6 +5090,7 @@ function openSettings(){
     ${storageBox()}
     <div class="field"><label>Резервная копия (JSON)</label><textarea id="jsonBox" spellcheck="false" placeholder="Нажмите «Выгрузить» или вставьте сюда копию и нажмите «Загрузить»"></textarea></div>
     <div class="actions" style="margin-top:0"><button class="btn small" data-act="export">Выгрузить</button><button class="btn small" data-act="copy">Скопировать</button><button class="btn small" data-act="import">Загрузить</button></div>
+    <div class="field"><label>Мои данные</label><div class="hint" style="margin:0 0 6px">Пол, возраст, рост, вес, активность — для нормы питания и воды.</div><button class="btn small" data-act="bodyOpen">${bodyNorm()?'Изменить':'Заполнить'}</button></div>
     ${nativeBox()}
     <div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
     ${lookBox()}${secBox()}
@@ -5712,6 +5729,7 @@ document.addEventListener('click',e=>{
   else if(a==='foodPiece'){ const g=document.querySelector('#foodForm [name=g]'); if(g){ g.value=b.dataset.g; foodTot(); } }
   else if(a==='foodDelEd'){ const i=S.foodLog.findIndex(x=>foodEd&&x.id===foodEd.id); if(i>=0){ S.foodLog.splice(i,1); persist('foodLog'); } closeSheet(); render(); }
   else if(a==='bodyOpen') openBody();
+  else if(a==='bodyToggle'){ UI.bodyOpen=!UI.bodyOpen; render(); }
   else if(a==='bodySave') bodySave();
   else if(a==='bodyPick'){ b.parentNode.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b)); const h=document.querySelector(`#bodyForm [name="${b.dataset.k}"]`); if(h) h.value=b.dataset.v; }
   else if(a==='normInfo') openNormInfo();
