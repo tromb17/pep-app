@@ -338,6 +338,17 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 .welcome .btn{display:block;width:100%;margin-top:10px;padding:13px 14px;font-size:16px}
 .welcome .btn.link{border:0;background:none;color:var(--text-2);font-weight:500}
 .actions .sp{flex:1}
+.shead .sx{font-size:18px;color:var(--text-2);background:var(--surface-2)}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}.shead h2{margin:0}
+.sgroup{background:var(--surface-2);border-radius:16px;padding:14px;margin:0}
+.sgroup h4{margin:0 0 10px;font-size:15px}
+.sgroup>.field+.field{margin-top:12px}
+.sgroup .field input:not([type=checkbox]),.sgroup .field select,.sgroup .field textarea,.sgroup .seg button.on{background:var(--surface)}
+.sgroup .seg{background:color-mix(in srgb,var(--text) 7%,transparent)}
+.srow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--surface-2);border-radius:16px;padding:12px 14px;margin:0 0 10px;min-height:64px;color:var(--text)}
+.srow>span:nth-child(2){flex:1;min-width:0}.srow b{display:block;font-size:16px}.srow small{display:block;color:var(--muted);font-size:13px}
+.srow-ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:color-mix(in srgb,var(--accent) 14%,transparent);flex:none}.srow .chev{font-size:22px;color:var(--muted)}
+.actions.stick{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));background:var(--surface);margin:12px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:2}
 .sheet textarea{min-height:110px}
 #jsonBox{min-height:110px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
 [hidden]{display:none!important}
@@ -781,6 +792,9 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .bond-y{text-align:right;white-space:nowrap}
 .bond-y b{font-size:17px}
 </style>
+<!-- новое оформление — отдельным слоем; «Настройки → Оформление → Прежнее» выключает его (moyplan.design.v1 = old) -->
+<link rel="stylesheet" id="designCss" href="design.css">
+<script>try{if(localStorage.getItem('moyplan.design.v1')==='old')document.getElementById('designCss').disabled=true}catch(e){}</script>
 </head>
 <body>
 <header class="top">
@@ -1902,13 +1916,18 @@ function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=se
 function nativeBox(){
   if(!NATIVE) return ''; const c=notifCfg(), ck=(k,l)=>`<label class="chk"><input type="checkbox" data-ncfg="${k}" ${c[k]?'checked':''}><span>${l}</span></label>`;
   let lock=false, ver=''; try{ lock=!!NATIVE.lockOn(); ver=String(NATIVE.build()); }catch(e){}
-  return `<div class="field"><label>Уведомления</label>${ck('on','Присылать уведомления')}
+  return `<div class="field">${ck('on','Присылать уведомления')}
     <div style="padding-left:26px;display:grid;gap:2px">${ck('pay','Платежи — заранее (как указано в платеже) и в день оплаты')}${ck('bd','Дни рождения')}${ck('free','Погашение облигаций и вкладов — за неделю и в день')}${ck('task','Задачи, у которых указано время')}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('digest','Утром — задачи на день, в')}<input type="time" data-ncfg="digestAt" value="${esc(c.digestAt)}" style="width:auto"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('habit','Вечером — неотмеченные привычки, в')}<input type="time" data-ncfg="habitAt" value="${esc(c.habitAt)}" style="width:auto"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ck('week','В воскресенье — итоги недели, в')}<input type="time" data-ncfg="weekAt" value="${esc(c.weekAt)}" style="width:auto"></div></div></div>
-    <div class="field"><label>Защита</label><label class="chk"><input type="checkbox" id="lockOn" ${lock?'checked':''}><span>Вход по отпечатку пальца (или PIN телефона)</span></label></div>
-    <div class="field"><label>Приложение</label><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(ver)}</span><span class="sp"></span>${APK_NEW?`<button class="btn small primary" data-act="apkGet">Скачать 1.${APK_NEW.n}</button>`:'<button class="btn small" data-act="apkCheck">Проверить обновления</button>'}</div></div>`;
+`; }
+function nativeLock(){
+  if(!NATIVE) return ''; let lock=false; try{ lock=!!NATIVE.lockOn(); }catch(e){}
+  return `<div class="field"><label class="chk"><input type="checkbox" id="lockOn" ${lock?'checked':''}><span>Вход по отпечатку пальца (или PIN телефона)</span></label></div>`; }
+function nativeApp(){
+  if(!NATIVE) return ''; let ver=''; try{ ver=String(NATIVE.build()); }catch(e){}
+  return `<div class="field"><div class="actions" style="margin:0"><span class="hint" style="margin:0">Версия 1.${esc(ver)}</span><span class="sp"></span>${APK_NEW?`<button class="btn small primary" data-act="apkGet">Скачать 1.${APK_NEW.n}</button>`:'<button class="btn small" data-act="apkCheck">Проверить обновления</button>'}</div></div>`;
 }
 document.addEventListener('change',e=>{ const el=e.target; if(!NATIVE||!el.closest||!el.closest('#sheet')) return;
   if(el.dataset.ncfg){ const c=notifCfg(); c[el.dataset.ncfg]=el.type==='checkbox'?el.checked:el.value;
@@ -5074,27 +5093,36 @@ function lookApply(){
   el.textContent=`:root{${lt}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dk}}}:root[data-theme="dark"]{${dk}}`;
   const m=document.querySelector('meta[name="theme-color"]'); if(m&&A[0]!=='blue') m.setAttribute('content',A[2]);
 }
+const DESIGN_KEY='moyplan.design.v1';
+const designOn=()=>{ const l=document.getElementById('designCss'); return !!l&&!l.disabled; };
+function designSet(v){ try{ localStorage.setItem(DESIGN_KEY,v); }catch(e){} const l=document.getElementById('designCss'); if(l) l.disabled=v==='old'; openSettings(); }
 function lookBox(){
   const L=lookGet();
-  return `<div class="field"><label>Цвет оформления</label><div class="swatches">${ACCENTS.map(([id,n,c,d])=>`<button class="sw-c ${L.accent===id?'on':''}" style="--c:${c};--cd:${d}" data-act="lookAcc" data-v="${id}" aria-label="${n}" title="${n}" aria-pressed="${L.accent===id}"></button>`).join('')}</div></div>
+  return `<div class="field"><label>Стиль</label><div class="seg"><button class="${designOn()?'on':''}" data-act="design" data-v="new">Новый</button><button class="${designOn()?'':'on'}" data-act="design" data-v="old">Прежний</button></div></div>
+    <div class="field"><label>Цвет оформления</label><div class="swatches">${ACCENTS.map(([id,n,c,d])=>`<button class="sw-c ${L.accent===id?'on':''}" style="--c:${c};--cd:${d}" data-act="lookAcc" data-v="${id}" aria-label="${n}" title="${n}" aria-pressed="${L.accent===id}"></button>`).join('')}</div></div>
     <div class="field"><label>Цвета разделов</label><div class="seg"><button class="${L.mono?'':'on'}" data-act="lookSec" data-v="0">У каждого свой</button><button class="${L.mono?'on':''}" data-act="lookSec" data-v="1">Как оформление</button></div></div>`;
 }
 // какие разделы показывать в «Ещё» и на главной
 function secBox(){
   const h=new Set(S.settings.hidden||[]);
-  return `<div class="field"><label>Разделы</label><p class="hint" style="margin:0 0 6px">Ненужное можно убрать — данные останутся, раздел вернётся одним нажатием.</p><div class="secpick">${SECTIONS.filter(s=>!s.nav).map(s=>`<button class="${h.has(s.id)?'':'on'}" style="--sec:var(--s-${s.id})" data-act="secHide" data-id="${s.id}" aria-pressed="${!h.has(s.id)}"><span class="ic">${icon(s.id)}</span>${s.title}</button>`).join('')}</div></div>`;
+  return `<div class="field"><p class="hint" style="margin:0 0 8px">Ненужное можно убрать — данные останутся, раздел вернётся одним нажатием.</p><div class="secpick">${SECTIONS.filter(s=>!s.nav).map(s=>`<button class="${h.has(s.id)?'':'on'}" style="--sec:var(--s-${s.id})" data-act="secHide" data-id="${s.id}" aria-pressed="${!h.has(s.id)}"><span class="ic">${icon(s.id)}</span>${s.title}</button>`).join('')}</div></div>`;
 }
 const secOn=id=>!(S&&S.settings.hidden||[]).includes(id);
+// настройки группами: у каждой — заголовок со значком; содержимое и действия прежние
 function openSettings(){
-  openSheet(`<h2>Настройки</h2><div class="form">
-    ${storageBox()}
-    <div class="field"><label>Резервная копия (JSON)</label><textarea id="jsonBox" spellcheck="false" placeholder="Нажмите «Выгрузить» или вставьте сюда копию и нажмите «Загрузить»"></textarea></div>
-    <div class="actions" style="margin-top:0"><button class="btn small" data-act="export">Выгрузить</button><button class="btn small" data-act="copy">Скопировать</button><button class="btn small" data-act="import">Загрузить</button></div>
-    <div class="field"><label>Мои данные</label><div class="hint" style="margin:0 0 6px">Пол, возраст, рост, вес, активность — для нормы питания и воды.</div><button class="btn small" data-act="bodyOpen">${bodyNorm()?'Изменить':'Заполнить'}</button></div>
-    ${nativeBox()}
-    <div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
-    ${lookBox()}${secBox()}
-    </div><div class="actions"><span class="sp"></span><button class="btn primary" data-act="sheetClose">Готово</button></div>`);
+  const N=bodyNorm(), g=(t,h)=>h?`<section class="sgroup"><h4>${t}</h4>${h}</section>`:'';
+  openSheet(`<div class="shead"><h2>Настройки</h2><button class="icon-btn sx" data-act="sheetClose" aria-label="Закрыть">✕</button></div>
+    <button class="srow" data-act="bodyOpen"><span class="srow-ic" aria-hidden="true">👤</span><span><b>Мои данные</b><small>${N?`${N.sex==='m'?'муж.':'жен.'}, ${N.age} ${plural(N.age,'год','года','лет')}, ${N.h} см, ${fmt1(N.kg)} кг — норма питания и воды`:'Пол, возраст, рост, вес — для нормы питания и воды'}</small></span><span class="chev">›</span></button>
+    <div class="form">
+    ${g('☁️ Данные и вход',storageBox())}
+    ${g('🎨 Оформление',`<div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>${lookBox()}`)}
+    ${g('🧩 Разделы',secBox())}
+    ${g('🔔 Уведомления',nativeBox())}
+    ${g('🔒 Защита',nativeLock())}
+    ${g('💾 Резервная копия',`<div class="field"><textarea id="jsonBox" spellcheck="false" placeholder="Нажмите «Выгрузить» или вставьте сюда копию и нажмите «Загрузить»" aria-label="Резервная копия (JSON)"></textarea></div>
+    <div class="actions" style="margin-top:0"><button class="btn small" data-act="export">Выгрузить</button><button class="btn small" data-act="copy">Скопировать</button><button class="btn small" data-act="import">Загрузить</button></div>`)}
+    ${g('📱 Приложение',nativeApp())}
+    </div><div class="actions stick"><span class="sp"></span><button class="btn primary" data-act="sheetClose">Готово</button></div>`);
 }
 
 /* ---------- перетаскивание статей ---------- */
@@ -5558,6 +5586,7 @@ document.addEventListener('click',e=>{
   else if(a==='edSave') saveEditor();
   else if(a==='edDelete') deleteEditor();
   else if(a==='sheetClose') closeSheet();
+  else if(a==='design') designSet(b.dataset.v);
   else if(a==='qh') toggleQh(b);
   else if(a==='syncInfo') toast(document.getElementById('sync').title||'Сохранено');
   else if(a==='secHelp') openHelp();
