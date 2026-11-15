@@ -526,7 +526,15 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 @keyframes chB{0%{transform:scale(.3);opacity:0}35%{transform:scale(1.15);opacity:1}75%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}
 @keyframes chP{from{transform:rotate(var(--a)) translateY(-8px);opacity:1}to{transform:rotate(var(--a)) translateY(-54px) scale(.5);opacity:0}}
 .pulse{animation:pulse .35s ease-out}@keyframes pulse{50%{transform:scale(1.04)}}
-@media (prefers-reduced-motion: reduce){.cheer,.pulse{animation:none!important}.cheer{display:none}}
+/* привычка: клетка заполняется мягко, без рывка; снятие — тихо гаснет */
+.hc.pop,.hpill.pop i{animation:hcPop .42s cubic-bezier(.22,1,.36,1) both}
+.hc.unpop,.hpill.unpop i{animation:hcUnpop .3s cubic-bezier(.22,1,.36,1) both}
+@keyframes hcPop{0%{transform:scale(.9);filter:saturate(.4) brightness(1.15);opacity:.6}60%{transform:scale(1.02);opacity:1}100%{transform:none;filter:none;opacity:1}}
+@keyframes hcUnpop{0%{transform:scale(.96);opacity:.6}100%{transform:none;opacity:1}}
+.hpill.pop{animation:hpGlow .5s ease-out}@keyframes hpGlow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--sec) 35%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
+.cheer.soft i{border-width:1.5px;animation:chRs .6s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes chRs{from{transform:scale(.7);opacity:.55}to{transform:scale(1.45);opacity:0}}
+@media (prefers-reduced-motion: reduce){.cheer,.pulse,.hc.pop,.hc.unpop,.hpill.pop,.hpill.pop i,.hpill.unpop i{animation:none!important}.cheer{display:none}}
 .mcols{display:grid;gap:4px}@media (min-width:640px){.mcols{grid-template-columns:1fr 1fr;gap:14px;align-items:start}}
 .mk-film{--mc:var(--s-movies)}.mk-ser{--mc:var(--s-pay)}
 .mhead{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mc);margin:4px 2px 8px}.mhead .fsub{margin-left:auto}
@@ -641,6 +649,60 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .emo span.csw::after{content:'';width:22px;height:22px;border-radius:50%;background:var(--c)}
 .trow.ghost{opacity:.7} .trow.ghost .tcheck{border-style:dashed;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:13px}
 @media (min-width:700px){.tcal{gap:5px}.tday{min-height:100px;padding:5px 4px}.tci{font-size:11.5px;padding:2px 5px}.tday b{font-size:13px}.tmore{font-size:11px}}
+/* еда по фото */
+.fd-ai{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.fd-ai .fsub{min-width:0}.fd-ai .btn{flex:none;white-space:nowrap}
+.fd-aires{background:var(--surface-2);border-radius:10px;padding:8px 10px;margin:-2px 0 10px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;vertical-align:-1px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* из чего сложится сумма к погашению */
+.pj-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px;margin:10px 0 8px}
+.pj-bar i{background:var(--c);min-width:3px}
+.pj-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px}
+.pj-row i{width:10px;height:10px;border-radius:3px;background:var(--c);flex:none}
+.pj-row span{flex:1;min-width:0;color:var(--text-2)}
+/* календарь по часам (неделя, 3 дня, день) */
+.tcal-seg{margin-bottom:10px}
+.tcal-nav h3{margin:0;font-size:16px;text-align:center;flex:1;min-width:0}
+.tcal-nav .btns{display:flex;gap:6px}
+.tgrid{--gcal:#4f86e8;margin-top:8px;font-size:12px}
+.tg-head,.tg-free,.tg-body{display:grid;grid-template-columns:38px repeat(var(--cols),minmax(0,1fr))}
+.tg-dh{border:0;background:transparent;font:inherit;color:var(--text-2);display:flex;flex-direction:column;align-items:center;gap:1px;padding:2px 0 6px;cursor:pointer;min-width:0}
+.tg-dh i{font-style:normal;font-size:11px;color:var(--muted)}
+.tg-dh b{font-size:15px;font-weight:600;width:28px;height:28px;border-radius:50%;display:grid;place-items:center}
+.tg-dh.we b{color:var(--muted)}
+.tg-dh.today b{background:var(--accent);color:var(--on-accent,#fff)}
+.tg-free{border-top:1px solid var(--line);padding:4px 0;gap:0}
+.tg-fl{font-size:10px;line-height:1.15;color:var(--muted);padding:2px 4px 0 0;text-align:right}
+.tg-fc{display:flex;flex-direction:column;gap:2px;padding:0 1px;min-width:0}
+.tgrid .tci{font:inherit;font-size:10.5px;text-align:left;cursor:pointer;border-top:0;border-right:0;border-bottom:0;width:100%}
+.tgrid.one .tci{font-size:13.5px;padding:5px 8px;border-radius:6px;border-left-width:3px}
+.tgrid .tmore{border:0;background:transparent;text-align:left;cursor:pointer;font:inherit;font-size:10.5px}
+.tg-body{border-top:1px solid var(--line);position:relative}
+.tg-hrs span{display:block;font-size:10.5px;color:var(--muted);text-align:right;padding-right:5px;transform:translateY(-6px);font-variant-numeric:tabular-nums}
+.tg-hrs span:first-child{transform:none}
+.tgrid.wk .tg-ev{font-size:10px;line-height:1.2;padding:2px 2px 2px 3px;border-left-width:2px;overflow-wrap:anywhere;hyphens:auto}
+.tgrid.wk .tg-ev b{display:none}
+.tg-col{position:relative;border-left:1px solid var(--line);min-width:0}
+.tg-col.today{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.tg-slot{display:block;width:100%;border:0;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);background:transparent;padding:0;cursor:pointer}
+.tg-slot:first-child{border-top:0}
+.tg-slot:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.tg-ev{position:absolute;overflow:hidden;border:0;border-left:3px solid var(--c);border-radius:5px;background:var(--surface);background:color-mix(in srgb,var(--c) 22%,var(--surface));color:var(--text);font:inherit;font-size:11px;line-height:1.25;text-align:left;padding:2px 4px;cursor:pointer;z-index:1;box-shadow:0 0 0 1px var(--surface)}
+.tg-ev b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-2)}
+.tgrid.one .tg-ev{font-size:13.5px;padding:4px 8px}
+.tgrid:not(.one) .tg-ev b{display:block;font-size:10px}
+.tg-ev.done{opacity:.55;text-decoration:line-through}
+.tg-ev.ghost{background:var(--surface);border-left-style:dashed;color:var(--text-2)}
+.tg-ev.over b{color:var(--critical)}
+.tg-ev.gc,.tci.gc{--c:var(--gcal)}
+.tg-now{position:absolute;left:-1px;right:0;height:2px;background:var(--critical);z-index:2;pointer-events:none}
+.tg-now::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--critical)}
+.tcal,.tlegend{--gcal:#4f86e8}
+.gcdot{background:var(--gcal,#4f86e8)!important;border-color:var(--gcal,#4f86e8)!important}
+#tcalSelCard{--gcal:#4f86e8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tgrid,:root:not([data-theme="light"]) .tcal,:root:not([data-theme="light"]) .tlegend{--gcal:#7aa5f0}}
+:root[data-theme="dark"] .tgrid,:root[data-theme="dark"] .tcal,:root[data-theme="dark"] .tlegend{--gcal:#7aa5f0}
 /* барабан чисел */
 .numpick{width:100%;min-width:0;height:36px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--text);font-family:inherit;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
 .numpick.empty{color:var(--muted);font-weight:400}
@@ -896,6 +958,16 @@ function buildBal(months,rows,ins,gifts,pos,pick,al){
   return B;
 }
 
+// доходность в % годовых по денежным потокам [[дата, сумма]] (вложения — минус, доход и стоимость сейчас — плюс)
+function xirr(cf){
+  if(!cf.length||!cf.some(x=>x[1]<0)||!cf.some(x=>x[1]>0)) return null;
+  const t0=parseD(cf.reduce((a,x)=>x[0]<a?x[0]:a,cf[0][0])).getTime(), T=d=>(parseD(d).getTime()-t0)/(365*864e5);
+  const span=Math.max(...cf.map(x=>T(x[0]))); if(span<30/365) return null;
+  const npv=y=>cf.reduce((s,[d,x])=>s+x/Math.pow(1+y,T(d)),0);
+  let lo=-0.99, hi=10; if(npv(lo)*npv(hi)>0) return null;
+  for(let i=0;i<100;i++){ const mid=(lo+hi)/2; if(npv(mid)>0) lo=mid; else hi=mid; }
+  return (lo+hi)/2;
+}
 // доход бумаги с биржи: купоны облигации по графику биржи (ещё не объявленный — по текущему) или ожидаемый дивиденд
 function exIncome(p,q,qtyAt,qty,nowK){
   const out=[]; if(!q) return out;
@@ -991,44 +1063,59 @@ function compute(st,now){
     const cYear=y=>{ let s=0; for(let m=y*12;m<y*12+12;m++) s+=contribIn(m); return s; };
     const coFinY=y=>(ratio>0&&y0!=null&&y>=y0&&y<y0+10&&cYear(y)>=2000)?Math.min(36000,cYear(y)*ratio):0;
     const taxY=y=>p.taxBack?Math.round(Math.min(400000,cYear(y))*0.13):0;
+    // ПДС: доход остаётся на счёте и сам растёт (сложный процент) — как капитализация, даже без галочки
+    const reinv=!!p.reinvest||ratio>0, curY=Math.floor(curM/12);
+    // уже пришло: доплата — в январе следующего года, вычет — в мае следующего года
+    let stateGot=0, taxGot=0; if(y0!=null) for(let y=y0; y<curY; y++){ if((y+1)*12<=curM) stateGot+=coFinY(y); if((y+1)*12+4<=curM) taxGot+=taxY(y); }
     let acc=cl.filter(x=>x.m<months[0]).reduce((s,x)=>s+x.v,0);
     const plan=[],capital=[],flowIn=[],flowOut=[];
     months.forEach(m=>{ const add=contribIn(m); acc+=add; if(ratio>0&&m%12===0) acc+=coFinY(Math.floor(m/12)-1);
-      plan.push(ex?exInc.reduce((s,x)=>s+(x.m===m?x.v:0),0):(open(m)&&!p.reinvest)?acc*r/12:0);
+      plan.push(ex?exInc.reduce((s,x)=>s+(x.m===m?x.v:0),0):(open(m)&&!reinv)?acc*r/12:0);
       flowIn.push(p.flow?add:0);
       flowOut.push(((p.flow&&sF!=null&&m===sF)?acc:0)+((p.taxBack&&m%12===4)?taxY(Math.floor(m/12)-1):0));
       capital.push((sF!=null&&m>=sF)?0:acc); });
     const fact=keys.map(k=>k in fm?fm[k]:null);
     const used=plan.map((v,j)=>fact[j]!=null?fact[j]:v);
     const received=Object.values(fm).reduce((a,b)=>a+b,0);
+    // сколько дохода уже пришло: вписанное вами, а у бумаг с биржи за месяцы без записи — прошедшие купоны и дивиденды по графику
+    const earned=ex?received+exInc.reduce((s,x)=>s+(x.d<=nowK&&!(mKey(x.m) in fm)?x.v:0),0):received;
     const invested=cl.filter(x=>x.m<=curM).reduce((s,x)=>s+x.v,0);
     // оценка стоимости, если руками не вписана: при капитализации — наращиваем по ставке, иначе = внесено
     let est=invested;
-    if(p.reinvest&&cl.length){ let V=0; for(let m=cl[0].m; m<=curM; m++){ if(m>cl[0].m) V*=1+r/12; V+=manual(m); if(ratio>0&&m%12===0&&m>cl[0].m) V+=coFinY(Math.floor(m/12)-1); } est=V; }
+    if(reinv&&cl.length){ let V=0; for(let m=cl[0].m; m<=curM; m++){ if(m>cl[0].m) V*=1+r/12; V+=manual(m); if(ratio>0&&m%12===0&&m>cl[0].m) V+=coFinY(Math.floor(m/12)-1); } est=V; }
     const vMan=numOr(p.value,null), closed=sF!=null&&curM>sF;
     const exVal=(q&&q.price!=null)?qty*q.price:null;
     const valueNow=closed?0:exVal!=null?exVal:(vMan!=null?vMan:est);
     const yearK=dkey(new Date(now.getFullYear()+1,now.getMonth(),now.getDate()));
-    const monNow=ex?exInc.reduce((s,x)=>s+((x.d>nowK&&x.d<=yearK)?x.v:0),0)/12:(!p.reinvest&&open(curM))?invested*r/12:0;
+    const monNow=ex?exInc.reduce((s,x)=>s+((x.d>nowK&&x.d<=yearK)?x.v:0),0)/12:(!reinv&&open(curM))?invested*r/12:0;
     // расчёт к погашению: помесячно от сегодняшней стоимости, с плановыми пополнениями и доплатой государства
     let proj=null;
     if(sF!=null&&sF>curM){
       const cf=numOr(p.coFin,0); let V=valueNow+planned(curM), pay=0, fc=planned(curM), fs=0; const pm=[curM], pv=[V];
       for(let m=curM+1; m<=sF; m++){
-        if(p.reinvest) V*=1+r/12; else pay+=V*r/12;
+        if(reinv) V*=1+r/12; else pay+=V*r/12;
         const add=contribIn(m); V+=add; fc+=add;
         if(ratio>0){ if(m%12===0){ const g=coFinY(Math.floor(m/12)-1); V+=g; fs+=g; } }
         else if(cf&&sE!=null&&m%12===sE%12){ V+=cf; fs+=cf; }
         pm.push(m); pv.push(V);
       }
-      proj={months:pm,values:pv,vEnd:V,payouts:pay,futureContrib:fc,futureState:fs,total:V+pay,income:V+pay+received-invested-fc-fs};
+      // вычет за годы до погашения (последний — за год погашения, придёт после него)
+      let taxFut=0; if(p.taxBack&&y0!=null) for(let y=Math.max(y0,curY-1); y<=Math.floor(sF/12); y++) if((y+1)*12+4>curM) taxFut+=taxY(y);
+      const own=invested+fc, state=stateGot+fs, gain=V+pay+received-own-state;
+      proj={months:pm,values:pv,vEnd:V,payouts:pay,futureContrib:fc,futureState:fs,total:V+pay,income:gain,own,state,taxFut,taxGot,reinv};
     }
+    // денежные потоки для доходности: пополнения (минус), пришедший доход и стоимость сейчас (плюс)
+    const mEnd=k=>{ const [yy,mm]=String(k).split('-').map(Number); const d=dkey(new Date(yy,mm,0)); return d>nowK?nowK:d; };
+    const cf=closed?[]:cl.filter(x=>String(x.c.date)<=nowK).map(x=>[x.c.date,-x.v])
+      .concat(Object.entries(fm).filter(([k,v])=>v&&/^\d{4}-\d{2}$/.test(k)&&mEnd(k)<=nowK).map(([k,v])=>[mEnd(k),v]))
+      .concat(ex?exInc.filter(x=>x.d<=nowK&&!(mKey(x.m) in fm)).map(x=>[x.d,x.v]):[]);
+    if(cf.length&&!closed) cf.push([nowK,valueNow+((q&&q.nkd)?qty*q.nkd:0)]);
     const progress=(sE!=null&&sF!=null&&sF>sE)?Math.max(0,Math.min(1,(curM-sE)/(sF-sE))):null;
     return {p,plan,fact,used,flowIn,flowOut,capital,received,fm,invested,est,valueNow,valueManual:vMan!=null||exVal!=null,
       ex,qty,avg:(ex&&qty>0)?invested/qty:null,quote:q,exInc,nkd:(q&&q.nkd&&!closed)?qty*q.nkd:0,
       dayChg:(exVal!=null&&q.chg!=null&&!closed)?exVal-exVal/(1+q.chg/100):0,
       result:closed?0:valueNow-invested,resultPct:(!closed&&invested)?(valueNow-invested)/invested:null,monNow,proj,progress,
-      contribs:cl,monthsLeft:sF!=null?sF-curM:null,closed,
+      contribs:cl,monthsLeft:sF!=null?sF-curM:null,closed,reinv,stateGot,taxGot,earned,cf,irr:xirr(cf),
       pdsRows:(ratio>0||p.taxBack)&&y0!=null?Array.from({length:Math.max(0,Math.min(y0+9,Math.floor(curM/12)+1)-y0+1)},(_,i)=>({y:y0+i,c:cYear(y0+i),g:coFinY(y0+i),t:taxY(y0+i)})):[]};
   });
   const sumOpen=(ps,k)=>ps.reduce((s,r)=>s+(r.closed?0:r[k]),0);
@@ -1272,6 +1359,11 @@ const errText=e=>(e&&e.message)||String(e||'');
    (молча, если вход в Google жив); в Android — сам телефон (play-services). */
 const G_CLIENT='893196265831-ud5vg101ao5lti4ltktphrjf44l2maf9.apps.googleusercontent.com'; // идентификатор клиента «Веб-приложение» из Google Cloud (не секрет)
 const G_SCOPE='openid email https://www.googleapis.com/auth/drive.file';
+// Google Календарь (по желанию): своё разрешение в придачу ко входу — см. блок «Google Календарь»
+const GCAL_KEY='moyplan.gcal.v1', GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events', CAL_API='https://www.googleapis.com/calendar/v3/calendars/primary/events';
+let GCAL=null; try{ GCAL=JSON.parse(localStorage.getItem(GCAL_KEY)||'null'); }catch(e){}
+const gcalOn=()=>!!(GCAL&&GCAL.on)&&gOK();
+const gScope=()=>G_SCOPE+(GCAL&&GCAL.on?' '+GCAL_SCOPE:'');
 const GTOK_KEY='moyplan.gtok.v1', GAUTH_KEY='moyplan.gauth.v1', GAUTO_KEY='moyplan.gauto.v1', GBK_KEY='moyplan.gbackup.v1';
 const GS_TITLE='Мой план', GS_BK_FOLDER='Мой план — резервные копии';
 const SHEETS_API='https://sheets.googleapis.com/v4/spreadsheets', DRIVE_API='https://www.googleapis.com/drive/v3/files';
@@ -1287,17 +1379,17 @@ function gsDropTok(){ GTOK=null; try{ localStorage.removeItem(GTOK_KEY); }catch(
   try{ st=JSON.parse(localStorage.getItem(GAUTH_KEY)||'null'); localStorage.removeItem(GAUTH_KEY); }catch(e){}
   history.replaceState(null,'',location.pathname);
   if(!st||p.get('state')!==st.n) return;
-  if(p.get('access_token')){ gsSetTok(p.get('access_token'),+p.get('expires_in')||3600); GAUTH_RET={ok:true,first:st.first}; }
-  else GAUTH_RET={err:p.get('error')||'ошибка',first:st.first};
+  if(p.get('access_token')){ gsSetTok(p.get('access_token'),+p.get('expires_in')||3600); GAUTH_RET={ok:true,first:st.first,cal:st.cal}; }
+  else GAUTH_RET={err:p.get('error')||'ошибка',first:st.first,cal:st.cal};
   if(st.action&&!LAUNCH) LAUNCH=st.action;
 })();
 function gsNeed(msg){ const e=new Error(msg||'нужно снова войти в Google'); e.need=true; return e; }
 // переход на страницу входа Google (страница перезагрузится; неотправленное лежит на устройстве)
 function gsRedirect(o){
   const n=Math.random().toString(36).slice(2)+Date.now().toString(36);
-  try{ localStorage.setItem(GAUTH_KEY,JSON.stringify({n,first:!!o.first,action:LAUNCH||''})); if(!o.interactive) localStorage.setItem(GAUTO_KEY,String(Date.now())); }catch(e){}
+  try{ localStorage.setItem(GAUTH_KEY,JSON.stringify({n,first:!!o.first,cal:!!(GCAL&&GCAL.on),action:LAUNCH||''})); if(!o.interactive) localStorage.setItem(GAUTO_KEY,String(Date.now())); }catch(e){}
   if(REMOTE) keepLocal();
-  const q=new URLSearchParams({client_id:G_CLIENT,redirect_uri:gRedirectUri(),response_type:'token',scope:G_SCOPE,state:n,include_granted_scopes:'true'});
+  const q=new URLSearchParams({client_id:G_CLIENT,redirect_uri:gRedirectUri(),response_type:'token',scope:gScope(),state:n,include_granted_scopes:'true'});
   if(o.first) q.set('prompt','select_account'); else if(!o.interactive) q.set('prompt','none');
   if(!o.first&&REMOTE&&REMOTE.email) q.set('login_hint',REMOTE.email);
   location.assign('https://accounts.google.com/o/oauth2/v2/auth?'+q);
@@ -1316,7 +1408,7 @@ function gsAuth(interactive){
       window.__gauth=j=>{ const w=gsAuth.q; gsAuth.q=[]; let o={}; try{ o=JSON.parse(j); }catch(e){}
         if(o.token){ gsSetTok(o.token,3000); w.forEach(x=>x[0](o.token)); }
         else { const e=o.error==='need'?gsNeed():new Error(o.error||'вход не удался'); w.forEach(x=>x[1](e)); } };
-      try{ NATIVE.googleAuth(!!interactive,email); }catch(e){ window.__gauth(JSON.stringify({error:errText(e)})); } });
+      try{ if(typeof NATIVE.googleAuth2==='function') NATIVE.googleAuth2(!!interactive,email,GCAL&&GCAL.on?GCAL_SCOPE:''); else NATIVE.googleAuth(!!interactive,email); }catch(e){ window.__gauth(JSON.stringify({error:errText(e)})); } });
   }
   if(interactive||gsAutoOk()) return gsRedirect({interactive});
   return Promise.reject(gsNeed());
@@ -1399,7 +1491,8 @@ const GS_SCHEMA = [
     ['doneAt', 'Когда сделано', 'd'], ['note', 'Описание', 's'], ['created', 'Создана', 'd'],
     ['project', 'ID проекта', 's'], ['projectName', 'Проект', 's'], ['repeatDays', 'Дни повтора пн…вс', 's'], ['checklist', 'Чек-лист (служебное)', 'j'],
     ['times', 'Сколько раз', 'n'], ['timesDone', 'Сделано раз', 'n'],
-    ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's'], ['deadline', 'Крайний срок', 'd']] },
+    ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's'], ['deadline', 'Крайний срок', 'd'],
+    ['gcal', 'Событие Google Календаря (служебное)', 's']] },
   { key: 'projects', sheet: 'Проекты', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Проект', 's'], ['parent', 'ID родительского проекта', 's'], ['created', 'Создан', 'd'],
     ['color', 'Цвет (1–7, пусто — сам)', 's'], ['pin', 'Важный', 'b']] },
@@ -1726,7 +1819,7 @@ function normalize(d){
     const inc=o.items.filter(it=>it.type==='Доход'||it.type==='Разовый доход'), mine=inc.filter(it=>(it.owner||'me')==='me');
     f.src=(f.who==='all'||mine.length===inc.length)?[]:mine.map(it=>it.id); f.once=AL0.base==='all'; delete f.who; });
   o.facts.forEach(f=>{ if(f.tags==null) f.tags=''; });
-  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; if(t.deadline==null) t.deadline=''; t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
+  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; if(t.deadline==null) t.deadline=''; if(t.gcal==null) t.gcal=''; t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
   o.goals.forEach(g=>{ for(const k of ['specific','measure','achievable']) if(g[k]==null) g[k]=''; });
   o.habits.forEach(h=>{ if(!h.type) h.type='check'; });
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
@@ -1992,6 +2085,7 @@ function boot(){
       return; }
     setTimeout(()=>toast(GAUTH_RET.err==='access_denied'?'Вход через Google отменён':'Вход через Google не удался: '+GAUTH_RET.err),500);
   }
+  else if(GAUTH_RET&&GAUTH_RET.cal&&GAUTH_RET.err==='access_denied'){ gcalSet(false); setTimeout(()=>toast('Доступ к Google Календарю не разрешён'),500); }
   if(IS_GAS){
     setSync('pending','Загружаю из таблицы…');
     google.script.run
@@ -2804,7 +2898,7 @@ function viewSecPos(r){
   <div class="kpis">${kpi('Стоит сейчас',r.valueNow,hasP?fmtQ(r.qty)+' шт. × '+fmtP(q.price):'цена не загружена')}
     ${kpiT('Результат',`<span class="${rc}">${r.result>=0?'+':'−'}${fmt(Math.abs(r.result))} ₽</span>`,(r.invested?`<span class="${rc}">${r.result>=0?'+':'−'}${pctD(Math.abs(r.result)/r.invested)}</span> · `:'')+'внесено '+fmt(r.invested)+' ₽')}
     ${kpiT('Средняя цена',fmtP(r.avg),hasP?'сейчас '+fmtP(q.price)+' '+chgHtml(q.chg):'')}
-    ${kpi('Доход получен',r.received,lab.toLowerCase())}</div>`;
+    ${kpi('Доход получен',r.earned,lab.toLowerCase()+(r.earned>r.received+0.5?' · по графику биржи':''))}${yieldBox([r])}</div>`;
   if(bond&&q){ const fut=r.exInc.filter(x=>x.d>today).slice(0,6);
     html+=`<section class="card"><h3>Облигация</h3>
       ${ytmHtml(q)}
@@ -2894,11 +2988,13 @@ function freeHtml(){
 /* ---- Инвестиции ---- */
 const tot=(list,k)=>list.reduce((s,r)=>s+(r.closed&&(k==='invested'||k==='valueNow')?0:r[k]),0);
 function viewInvest(){
-  const open=C.pos.filter(r=>!r.closed), inv=tot(C.pos,'invested'), val=tot(C.pos,'valueNow'), rec=tot(C.pos,'received'), mon=tot(C.pos,'monNow');
+  const open=C.pos.filter(r=>!r.closed), inv=tot(C.pos,'invested'), val=tot(C.pos,'valueNow'), rec=tot(C.pos,'earned'), mon=tot(C.pos,'monNow');
   const gain=val-inv, day=open.reduce((s,r)=>s+r.dayChg,0), cls=gain>0.5?'pos':gain<-0.5?'neg':'';
   const growth=`<span class="${cls}">${inv?(gain>=0?'+':'−')+pctD(Math.abs(gain)/inv):'—'}</span>`;
   const gsub=`<span class="${cls}">${gain>=0?'+':'−'}${fmt(Math.abs(gain))} ₽</span>${Math.round(day)?` · за день <span class="${day>0?'pos':'neg'}">${day>0?'+':'−'}${fmt(Math.abs(day))} ₽</span>`:''}`;
-  return `${qBar()}<div class="kpis">${kpi('Стоит сейчас',val,'внесено '+fmt(inv)+' ₽')}${kpiT('Прирост портфеля',growth,gsub)}${kpi('Пришло дохода',rec,'купоны, проценты, дивиденды')}${kpi('Ожидаемый доход',mon,'в месяц: купоны, дивиденды, ставки')}</div>
+  const P=yieldBox(open);
+  return `${qBar()}<div class="kpis">${kpi('Стоит сейчас',val,'внесено '+fmt(inv)+' ₽')}${kpiT('Прирост портфеля',growth,gsub)}${kpi('Пришло дохода',rec,'купоны, проценты, дивиденды')}${P}${kpi('Ожидаемый доход',mon,'в месяц: купоны, дивиденды, ставки')}</div>
+  ${P?`<p class="hint" style="margin:-4px 0 12px">«Доходность» — всё вместе: рост стоимости, пришедшие купоны, проценты и дивиденды, с учётом того, когда вносили деньги. Купоны по графику биржи — до налога; если вписали фактический доход за месяц, берётся он.</p>`:''}
   <button class="list-row" data-act="bondsOpen" style="margin-bottom:12px"><div class="m"><div class="fname"><b>Подбор облигаций</b></div><div class="fsub">Все облигации Мосбиржи: доходность к погашению, купон, оферта, НКД — с фильтрами</div></div>${CHEV}</button>
   ${freeHtml()}
   ${divHtml(open.filter(r=>r.valueNow>0))}
@@ -2910,12 +3006,19 @@ function viewInvest(){
   ${wishHtml()}
   ${longCard()}`;
 }
+// доходность в % годовых — с купонами, процентами и дивидендами (по датам вложений)
+function yieldBox(list){
+  const cf=list.flatMap(r=>r.cf||[]), y=xirr(cf); if(y==null) return '';
+  const inv=list.reduce((s,r)=>s+r.invested,0), g=list.reduce((s,r)=>s+r.valueNow+r.nkd+r.earned-r.invested,0), cls=g>0.5?'pos':g<-0.5?'neg':'';
+  const st=list.some(r=>r.stateGot>0);
+  return kpiT('Доходность',`<span class="${y>0.0005?'pos':y<-0.0005?'neg':''}">${pctY(y)}</span> <span class="fsub">годовых</span>`,`<span class="${cls}">${g>=0?'+':'−'}${fmt(Math.abs(g))} ₽</span>${inv?` · ${g>=0?'+':'−'}${pctD(Math.abs(g)/inv)} за всё время`:''}${st?' · с доплатой государства':''}`);
+}
 function viewInvDetail(G){
   const g=G.g, gi=S.invGroups.indexOf(g), m=selMonth(), j=C.months.indexOf(m), lab=KIND_INCOME[g.kind]||'Доход';
   const monTot=G.pos.reduce((s,r)=>s+r.used[j],0);
   return `<button class="back" data-act="back">‹ Инвестиции</button>
   <div class="detail-title"><h2>${esc(g.name)} <span class="tag">${esc(g.kind)}</span></h2><button class="btn small" data-act="edit" data-kind="invGroup" data-i="${gi}">Изменить</button></div>
-  <div class="kpis" data-live="invk">${kpi('Внесено',G.invested)}${kpi('Стоит сейчас',G.value,resHtml(G.value-G.invested,G.invested))}${kpi('Пришло всего',G.received,lab.toLowerCase())}${kpi('Ожидается в месяц',G.mon,'по ставкам')}</div>
+  <div class="kpis" data-live="invk">${kpi('Внесено',G.invested)}${kpi('Стоит сейчас',G.value,resHtml(G.value-G.invested,G.invested))}${kpi('Пришло всего',G.pos.reduce((s,r)=>s+r.earned,0),lab.toLowerCase())}${yieldBox(G.pos.filter(r=>!r.closed))||kpi('Ожидается в месяц',G.mon,'по ставкам')}</div>
   <section class="card"><div class="row-between"><h3>Позиции${QH}</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invPos">+ Вручную</button></div></div>
     <p class="hint qtip" hidden>Нажмите на позицию: пополнения, стоимость сейчас, доход по месяцам.</p>
     ${G.pos.length?G.pos.map(r=>`<button class="list-row" data-act="posOpen" data-id="${r.p.id}"><div class="m"><div class="fname">${esc(r.p.name||'Без названия')}${r.p.long?' <span class="tag">долгоср.</span>':''}${r.closed?' <span class="tag">закрыта</span>':''}</div>
@@ -2932,26 +3035,32 @@ function viewPos(r){
   if(r.ex) return viewSecPos(r);
   const p=r.p, G=C.groups.find(g=>g.g.id===p.group), pi=S.invPositions.indexOf(p), lab=KIND_INCOME[G?G.g.kind:'']||'Доход', rate=numOr(p.rate,0);
   const backLbl=UI.detail.back==='long'?'Инвестиции':(G?G.g.name:'Инвестиции');
-  const valSub=r.closed?'позиция закрыта':r.valueManual?(p.valueDate?'на '+dRu(p.valueDate):'вписано вами'):(p.reinvest&&rate?'оценка по ставке':'оценка = внесено');
+  const valSub=r.closed?'позиция закрыта':r.valueManual?(p.valueDate?'на '+dRu(p.valueDate):'вписано вами'):(r.reinv&&rate?'оценка по ставке'+(r.stateGot?' + доплата':''):'оценка = внесено');
   let html=`<button class="back" data-act="back">‹ ${esc(backLbl)}</button>
   <div class="detail-title"><h2>${esc(p.name||'Без названия')}</h2><button class="btn small" data-act="edit" data-kind="invPos" data-i="${pi}">Изменить</button></div>
   <p class="hint" style="margin-top:-6px">${G?esc(G.g.name):''}${rate?' · '+String(p.rate).replace('.',',')+'% годовых':''}${p.start?' · с '+dRu(p.start):''}${p.end?' до '+dRu(p.end):''}
     ${p.long?' <span class="tag">долгосрочная</span>':''}${p.reinvest?' <span class="tag">капитализация</span>':''}${p.flow?' <span class="tag">из бюджета</span>':''}${r.closed?' <span class="tag">закрыта</span>':''}</p>
   <div class="kpis" data-live="posk">${kpi('Внесено',r.invested,r.contribs.filter(x=>x.m<=C.curM).length+' пополн.')}${kpi('Стоит сейчас',r.valueNow,valSub)}
-    ${kpiT('Результат',resHtml(r.result,r.invested),'стоимость − внесено')}${kpi('Доход получен',r.received,lab.toLowerCase())}</div>
-  <section class="card"><h3>Стоимость сейчас${QH}</h3><p class="hint qtip" hidden>Сколько позиция стоит сегодня — из приложения брокера или банка. Пусто — ${p.reinvest&&rate?'оценка по ставке':'считается равной внесённому'}.</p>
+    ${kpiT('Результат',resHtml(r.result,r.invested),'стоимость − внесено')}${kpi('Доход получен',r.received,lab.toLowerCase())}${yieldBox([r])}</div>
+  <section class="card"><h3>Стоимость сейчас${QH}</h3><p class="hint qtip" hidden>Сколько позиция стоит сегодня — из приложения брокера или банка. Пусто — ${r.reinv&&rate?'оценка по ставке':'считается равной внесённому'}.</p>
     <div class="row-between"><div class="finput"><input class="num" data-posval="${p.id}" value="${esc(p.value??'')}" placeholder="${fmt(r.est)}" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Стоимость сейчас" style="width:160px"></div>
     <span class="fsub" data-live="posvd">${r.valueManual&&p.valueDate?'обновлено '+dRu(p.valueDate):''}</span></div></section>`;
   if(p.long||p.end){
     if(r.proj){
       const pr=r.proj;
       CH.proj={vals:pr.values,tips:pr.months.map(monthTitle),axis:yearAxis(pr.months),kind:'line',sparse:true};
+      const pds=numOr(p.pdsRatio,0)>0, part=(l,v,c)=>v>0.5?`<div class="pj-row"><i style="--c:${c}"></i><span>${l}</span><b class="num">${rub(v)}</b></div>`:'';
+      const bar=[[pr.own,'var(--t1)'],[pr.state,'var(--t4)'],[Math.max(0,pr.income),'var(--good)']].filter(x=>x[0]>0.5), sum=bar.reduce((a,x)=>a+x[0],0)||1;
       html+=`<section class="card" data-live="posproj"><h3>К погашению</h3><p class="hint">${dRu(p.end)} · через ${durText(r.monthsLeft)} · пополнения: ${contribText(p)}</p>
         ${r.progress!=null?`<div class="thermo"><i style="width:${(r.progress*100).toFixed(1)}%"></i></div><p class="hint" style="margin-top:0">прошло ${pct(r.progress)} срока</p>`:''}
-        <div class="kpis" style="margin-bottom:6px">${kpi('Будет к погашению',pr.total,p.reinvest?'с капитализацией':'тело + выплаты дохода')}${kpi('Доход за весь срок',pr.income,'ожидаемый')}
-        ${kpi('Внесёте ещё',pr.futureContrib,'до погашения')}${pr.futureState?kpi('Доплата государства',pr.futureState,'до погашения'):''}</div>
+        <div class="kpis" style="margin-bottom:6px">${kpi('Будет на счёте',pr.total,pr.reinv?'доход остаётся и растёт (сложный процент)':'тело + выплаты дохода')}${kpi('Доход за весь срок',pr.income,rate?'по ставке '+String(p.rate).replace('.',',')+'%':'ставка не указана')}
+        ${p.taxBack?kpi('Вернётся вычетом',pr.taxFut,'ещё до погашения — на вашу карту'):kpi('Внесёте ещё',pr.futureContrib,'до погашения')}${pr.taxFut+pr.taxGot>0?kpi('Всего с вычетом',pr.total+pr.taxFut+r.taxGot,'счёт + весь вычет'):''}</div>
+        <div class="pj-bar" aria-hidden="true">${bar.map(x=>`<i style="flex:${x[0]/sum};--c:${x[1]}"></i>`).join('')}</div>
+        <div class="pj-list">${part('Ваши взносы (внесено '+fmt(r.invested)+' + ещё '+fmt(pr.futureContrib)+')',pr.own,'var(--t1)')}${part(pds?'Доплата государства (пришло '+fmt(r.stateGot)+' + ещё '+fmt(pr.futureState)+')':'Доплата государства',pr.state,'var(--t4)')}${part('Инвестиционный доход',pr.income,'var(--good)')}${p.taxBack?part('Налоговый вычет (вернулось '+fmt(r.taxGot)+' + ещё '+fmt(pr.taxFut)+') — не на счёт, а вам',pr.taxFut+r.taxGot,'var(--t7)'):''}</div>
+        <div class="field" style="margin:10px 0 4px"><label>Ожидаемая доходность, % годовых${QH}</label><p class="hint qtip" hidden>Средняя доходность за год — ваша оценка (у фондов ПДС обычно 8–12%). Доход каждый месяц прибавляется к счёту, и на него дальше тоже начисляется доход.</p>
+          <input class="num" data-posrate="${p.id}" value="${esc(p.rate??'')}" placeholder="например 10" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-label="Ожидаемая доходность, % годовых" style="width:120px"></div>
         <div class="chart" data-chart="proj"></div>
-        <p class="hint" style="margin:6px 0 0">Ожидаемая стоимость по месяцам. ${rate?'Ставка '+String(p.rate).replace('.',',')+'% — ваша оценка, не гарантия.':'Ставка не указана — показаны только пополнения.'}</p></section>`;
+        <p class="hint" style="margin:6px 0 0">Ожидаемая сумма на счёте по месяцам${pr.state>0?' — с доплатой государства':''}. ${rate?'Ставка — ваша оценка, не гарантия.':'Ставка не указана — показаны только взносы'+(pr.state>0?' и доплата':'')+'. Впишите доходность выше.'}</p></section>`;
     } else if(!r.closed) html+=`<section class="card"><h3>К погашению</h3><p class="hint">${p.end?'Срок погашения наступил.':'Укажите дату погашения в «Изменить» — появится расчёт ожидаемого дохода к погашению.'}</p></section>`;
   }
   if(r.pdsRows.length) html+=pdsHtml(r);
@@ -3455,31 +3564,104 @@ const TCAL_HIDE='moyplan.tcalhide.v1';
 function tcalHidden(){ try{ const v=JSON.parse(localStorage.getItem(TCAL_HIDE)||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
 const projRoot=id=>{ const p=projById(id); return p?(p.parent&&projById(p.parent)?p.parent:p.id):''; };
 const taskCol=t=>t.project&&projById(t.project)?'var('+projColor(t.project)+')':'var(--muted)';
+// вид календаря: месяц, неделя, 3 дня, день (запоминается на устройстве)
+const TCAL_V='moyplan.tcalv.v1', TCAL_VIEWS=[['month','Месяц'],['week','Неделя'],['3d','3 дня'],['day','День']];
+function tcalView(){ if(!UI.tcalV){ let v=''; try{ v=localStorage.getItem(TCAL_V)||''; }catch(e){} UI.tcalV=TCAL_VIEWS.some(x=>x[0]===v)?v:'month'; } return UI.tcalV; }
+const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const tMin=s=>{ const x=/^(\d{1,2}):(\d{2})/.exec(s||''); return x?Math.min(1439,(+x[1])*60+(+x[2])):null; };
+// время у записи календаря: у задачи — только в день выполнения (в день крайнего срока — без времени)
+const occMin=o=>o.gc?o.s:((o.ghost||o.k===o.t.due)?tMin(o.t.time):null);
+const PART_ORD={morning:1,during:2,day:3,evening:4};
+function tcalItems(fromK,toK){
+  const hid=new Set(tcalHidden()), all=taskOccs(fromK,toK);
+  const L=all.filter(o=>!hid.has(projRoot(o.t.project)));
+  const mine=new Set(S.tasks.map(t=>t.gcal).filter(Boolean));
+  if(!hid.has('gcal')) gcalEvents(fromK,toK).forEach(e=>{ if(!mine.has(e.id)) L.push(e); });
+  return {all,L,hid};
+}
+const occSort=(a,b)=>(a.done?1:0)-(b.done?1:0)||(a.ghost?1:0)-(b.ghost?1:0)||((occMin(a)??9999)-(occMin(b)??9999))||(a.gc||b.gc?0:(+b.t.priority||0)-(+a.t.priority||0));
+const occName=o=>esc(o.gc?o.name:(o.t.name||'Без названия'));
+const occCol=o=>o.gc?'var(--gcal)':taskCol(o.t);
+const occAct=o=>o.gc?`data-act="gcalOpen" data-u="${esc(o.url||'')}"`:`data-act="taskOpen" data-full="1" data-id="${o.t.id}"`;
+function tcalShift(n){
+  const v=tcalView(), t0=TODAY();
+  if(v==='month'){ UI.tcalM=(UI.tcalM!=null?UI.tcalM:t0.getFullYear()*12+t0.getMonth())+n; UI.tcalDay=null; return; }
+  const k=dkey(addDays(parseD(UI.tcalSel||todayK()),n*({week:7,'3d':3,day:1})[v])); UI.tcalDay=k; const d=parseD(k); UI.tcalM=d.getFullYear()*12+d.getMonth();
+}
+function tcalLegend(all,hid){
+  const roots=[...new Set(all.map(o=>projRoot(o.t.project)).concat([...hid].filter(id=>id===''||projById(id))))];
+  const gc=gcalOn()?`<button class="lg ${hid.has('gcal')?'off':''}" data-act="tcalHide" data-v="gcal" aria-pressed="${!hid.has('gcal')}"><span class="dot" style="--c:var(--gcal)"></span>Google Календарь</button>`:'';
+  return roots.map(id=>`<button class="lg ${hid.has(id)?'off':''}" data-act="tcalHide" data-v="${id}" aria-pressed="${!hid.has(id)}" title="${hid.has(id)?'Показать в календаре':'Скрыть в календаре'}"><span class="dot" style="--c:${id?'var('+projColor(id)+')':'var(--muted)'}"></span>${esc(id?projById(id).name:'Без проекта')}</button>`).join('')+gc;
+}
 function tasksCal(){
-  const t0=TODAY(), m=UI.tcalM!=null?UI.tcalM:t0.getFullYear()*12+t0.getMonth(), y=Math.floor(m/12), mo=m%12, tk=todayK();
-  const first=new Date(y,mo,1), last=new Date(y,mo+1,0), occAll=taskOccs(dkey(first),dkey(last)), by={};
-  const hid=new Set(tcalHidden()), occ=occAll.filter(o=>!hid.has(projRoot(o.t.project)));
-  occ.forEach(o=>(by[o.k]||(by[o.k]=[])).push(o));
-  Object.values(by).forEach(l=>l.sort((a,b)=>(a.done?1:0)-(b.done?1:0)||(a.ghost?1:0)-(b.ghost?1:0)||(+b.t.priority||0)-(+a.t.priority||0)||(a.t.time||'99:99').localeCompare(b.t.time||'99:99')));
-  const sel=UI.tcalDay&&UI.tcalDay.startsWith(mKey(m))?UI.tcalDay:(tk.startsWith(mKey(m))?tk:dkey(first)); UI.tcalSel=sel;
+  const v=tcalView(), t0=TODAY(), tk=todayK();
+  const m=UI.tcalM!=null?UI.tcalM:t0.getFullYear()*12+t0.getMonth();
+  const sel=UI.tcalDay&&(v!=='month'||UI.tcalDay.startsWith(mKey(m)))?UI.tcalDay:(v!=='month'||tk.startsWith(mKey(m))?tk:mKey(m)+'-01'); UI.tcalSel=sel;
+  const seg=`<div class="seg tcal-seg" aria-label="Период">${TCAL_VIEWS.map(([x,l])=>`<button class="${v===x?'on':''}" data-act="tcalV" data-v="${x}" aria-pressed="${v===x}">${l}</button>`).join('')}</div>`;
+  let days=null, title;
+  if(v==='month'){ title=MN[m%12]+' '+Math.floor(m/12); }
+  else { const a=parseD(sel), st=v==='week'?addDays(a,-wd(a)):a, n=({week:7,'3d':3,day:1})[v];
+    days=Array.from({length:n},(_,i)=>dkey(addDays(st,i)));
+    const f=parseD(days[0]), l=parseD(days[n-1]);
+    title=n===1?dayLabel(sel):(f.getMonth()===l.getMonth()?f.getDate()+'–'+l.getDate()+' '+MG[f.getMonth()]:f.getDate()+' '+MG[f.getMonth()].slice(0,3)+' – '+l.getDate()+' '+MG[l.getMonth()].slice(0,3)); }
+  const away=v==='month'?!tk.startsWith(mKey(m)):!days.includes(tk);
+  const nav=`<div class="row-between tcal-nav"><button class="btn small" data-act="tcalM" data-d="-1" aria-label="Назад">‹</button><h3>${title}</h3><span class="btns">${away?'<button class="btn small" data-act="tcalToday">Сегодня</button>':''}<button class="btn small" data-act="tcalM" data-d="1" aria-label="Вперёд">›</button></span></div>`;
+  const gnote=gcalNote();
+  if(v==='month') return seg+tcalMonth(m,sel,nav,gnote)+tcalDayCard(sel);
+  const {all,L,hid}=tcalItems(days[0],days[days.length-1]), legend=tcalLegend(all,hid);
+  return seg+`<section class="card">${nav}${tcalGrid(days,L,v)}
+    ${legend?`<div class="tlegend">${legend}</div>`:''}${gnote}
+    <p class="hint" style="margin:6px 0 0">${v==='day'?'Нажмите на свободный час, чтобы поставить задачу на это время.':'Нажмите на число — день откроется по часам.'} Пунктир — будущие повторы.</p></section>`+(v==='day'?tcalDayCard(sel,true):'');
+}
+function tcalMonth(m,sel,nav,gnote){
+  const y=Math.floor(m/12), mo=m%12, tk=todayK(), first=new Date(y,mo,1), last=new Date(y,mo+1,0);
+  const {all,L,hid}=tcalItems(dkey(first),dkey(last)), by={};
+  L.forEach(o=>(by[o.k]||(by[o.k]=[])).push(o)); Object.values(by).forEach(l=>l.sort(occSort));
   const cells=[];
   for(let k=0;k<wd(first);k++) cells.push('<span class="tday void"></span>');
   for(let d=1; d<=last.getDate(); d++){ const dt=new Date(y,mo,d), k=dkey(dt), l=by[k]||[], more=l.length-3;
-    cells.push(`<button class="tday ${k===tk?'today':''} ${k===sel?'sel':''} ${wd(dt)>4?'we':''}" data-act="tcalDay" data-d="${k}" aria-label="${d} ${MG[mo]}${l.length?', задач: '+l.length:''}"><b>${d}</b>${l.slice(0,3).map(o=>`<span class="tci ${o.done?'done':''} ${o.ghost?'ghost':''} ${o.over?'over':''}" style="--c:${taskCol(o.t)}">${esc(o.t.name||'Без названия')}</span>`).join('')}${more>0?`<span class="tmore">ещё ${more}</span>`:''}</button>`); }
-  // легенда — проекты этого месяца и скрытые; нажатие скрывает или возвращает проект в календаре
-  const roots=[...new Set(occAll.map(o=>projRoot(o.t.project)).concat([...hid].filter(id=>id===''||projById(id))))];
-  const legend=roots.map(id=>`<button class="lg ${hid.has(id)?'off':''}" data-act="tcalHide" data-v="${id}" aria-pressed="${!hid.has(id)}" title="${hid.has(id)?'Показать в календаре':'Скрыть в календаре'}"><span class="dot" style="--c:${id?'var('+projColor(id)+')':'var(--muted)'}"></span>${esc(id?projById(id).name:'Без проекта')}</button>`).join('');
-  const dl=by[sel]||[], real=dl.filter(o=>!o.ghost), ghosts=dl.filter(o=>o.ghost);
-  return `<section class="card"><div class="row-between"><button class="btn small" data-act="tcalM" data-d="-1" aria-label="Предыдущий месяц">‹</button><h3>${MN[mo]} ${y}</h3><button class="btn small" data-act="tcalM" data-d="1" aria-label="Следующий месяц">›</button></div>
+    cells.push(`<button class="tday ${k===tk?'today':''} ${k===sel?'sel':''} ${wd(dt)>4?'we':''}" data-act="tcalDay" data-d="${k}" aria-label="${d} ${MG[mo]}${l.length?', записей: '+l.length:''}"><b>${d}</b>${l.slice(0,3).map(o=>`<span class="tci ${o.done?'done':''} ${o.ghost?'ghost':''} ${o.over?'over':''} ${o.gc?'gc':''}" style="--c:${occCol(o)}">${occName(o)}</span>`).join('')}${more>0?`<span class="tmore">ещё ${more}</span>`:''}</button>`); }
+  const legend=tcalLegend(all,hid);
+  return `<section class="card">${nav}
     <div class="tcal" style="margin-top:8px">${WD.map(w=>`<i>${w}</i>`).join('')}${cells.join('')}</div>
-    ${legend?`<div class="tlegend">${legend}</div>`:''}
-    <p class="hint" style="margin:6px 0 0">Пунктир — будущие повторы. Нажмите на день, чтобы увидеть задачи и поставить новую на эту дату.${legend?' Нажмите на проект внизу, чтобы скрыть его здесь'+(hid.size?' (скрыто: '+hid.size+')':'')+'.':''}</p></section>
-  <section class="card" id="tcalSelCard"><div class="ghead">${dayLabel(sel)}<span class="sum fsub">${dl.length||''}</span></div>
-    ${real.map(o=>taskRow(o.t)).join('')}
-    ${ghosts.map(o=>`<div class="trow ghost"><span class="tcheck" aria-hidden="true">↻</span><button class="tmain" data-act="taskOpen" data-id="${o.t.id}"><div class="fname">${esc(o.t.name||'Без названия')}</div><div class="fsub">повтор · ${repeatText(o.t)}${o.t.project&&projById(o.t.project)?' · '+esc(projName(o.t.project)):''}</div></button></div>`).join('')}
-    ${dl.length?'':'<p class="hint" style="margin:0 0 4px">На этот день задач нет.</p>'}
-    <div class="qa-row" style="margin-top:8px"><input class="inline-in" id="tcalNew" placeholder="Новая задача на ${esc(dayLabel(sel).toLowerCase())}…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача на этот день"><button class="btn primary" data-act="tcalAdd">Добавить</button></div>
-    <div class="qa-chips"><button class="chip" data-act="tcalMore">Подробнее: проект, повтор…</button></div></section>`;
+    ${legend?`<div class="tlegend">${legend}</div>`:''}${gnote}
+    <p class="hint" style="margin:6px 0 0">Пунктир — будущие повторы. Нажмите на день, чтобы увидеть задачи и поставить новую на эту дату.${legend?' Нажмите на проект внизу, чтобы скрыть его здесь'+(hid.size?' (скрыто: '+hid.size+')':'')+'.':''}</p></section>`;
+}
+// по часам: сверху — «без времени», ниже шкала; пересекающиеся по времени стоят рядом
+function tcalGrid(days,L,v){
+  const tk=todayK(), by={}; days.forEach(k=>by[k]={timed:[],free:[]});
+  L.forEach(o=>{ const b=by[o.k]; if(!b) return; const s=occMin(o); if(s==null) b.free.push(o); else b.timed.push({o,s,e:o.gc?Math.max(o.e,s+15):Math.min(1440,s+60)}); });
+  let h0=8, h1=21; days.forEach(k=>by[k].timed.forEach(x=>{ h0=Math.min(h0,Math.floor(x.s/60)); h1=Math.max(h1,Math.ceil(x.e/60)); }));
+  const nowD=new Date(), nowM=nowD.getHours()*60+nowD.getMinutes(); if(days.includes(tk)){ h0=Math.min(h0,Math.floor(nowM/60)); h1=Math.max(h1,Math.floor(nowM/60)+1); }
+  h1=Math.min(24,h1); const H=v==='day'?52:v==='3d'?46:42, one=days.length===1;
+  const head=one?'':`<div class="tg-head"><span></span>${days.map(k=>{ const d=parseD(k); return `<button class="tg-dh ${k===tk?'today':''} ${wd(d)>4?'we':''}" data-act="tcalOpenDay" data-d="${k}" aria-label="${dayLabel(k)} — по часам"><i>${WD[wd(d)]}</i><b>${d.getDate()}</b></button>`; }).join('')}</div>`;
+  const chip=o=>`<button class="tci ${o.done?'done':''} ${o.ghost?'ghost':''} ${o.over?'over':''} ${o.gc?'gc':''}" style="--c:${occCol(o)}" ${occAct(o)}>${occName(o)}${one&&!o.gc&&o.t.part?` <span class="fsub">· ${PART_SHORT[o.t.part]||''}</span>`:''}</button>`;
+  const free=days.some(k=>by[k].free.length)?`<div class="tg-free"><span class="tg-fl">без времени</span>${days.map(k=>{ const n=one?99:3, l=by[k].free.sort((a,b)=>(PART_ORD[a.gc?'':a.t.part]||0)-(PART_ORD[b.gc?'':b.t.part]||0)||occSort(a,b));
+      return `<div class="tg-fc">${l.slice(0,n).map(chip).join('')}${l.length>n?`<button class="tmore" data-act="tcalOpenDay" data-d="${k}">ещё ${l.length-n}</button>`:''}</div>`; }).join('')}</div>`:'';
+  const hours=Array.from({length:h1-h0},(_,i)=>h0+i);
+  const cols=days.map(k=>{
+    const T=by[k].timed.sort((a,b)=>a.s-b.s||b.e-a.e), lanes=[];
+    // раскладка по дорожкам: группа пересекающихся делит ширину поровну
+    let grp=[], gEnd=-1; const flush=()=>{ const n=Math.max(...grp.map(x=>x.lane))+1; grp.forEach(x=>x.n=n); grp=[]; lanes.length=0; };
+    T.forEach(x=>{ if(grp.length&&x.s>=gEnd) flush(); let i=lanes.findIndex(e=>e<=x.s); if(i<0){ i=lanes.length; lanes.push(0); } lanes[i]=x.e; x.lane=i; grp.push(x); gEnd=Math.max(gEnd,x.e); });
+    if(grp.length) flush();
+    const blocks=T.map(x=>{ const top=(x.s-h0*60)/60*H, ht=Math.max(one?24:20,(x.e-x.s)/60*H-2), o=x.o;
+      return `<button class="tg-ev ${o.done?'done':''} ${o.ghost?'ghost':''} ${o.over?'over':''} ${o.gc?'gc':''}" style="--c:${occCol(o)};top:${top}px;height:${ht}px;left:calc(${x.lane} * 100% / ${x.n} + 1px);width:calc(100% / ${x.n} - 2px)" ${occAct(o)}><b>${hm(x.s)}</b> ${occName(o)}</button>`; }).join('');
+    const now=k===tk&&nowM>=h0*60&&nowM<h1*60?`<i class="tg-now" style="top:${(nowM-h0*60)/60*H}px" aria-hidden="true"></i>`:'';
+    return `<div class="tg-col ${k===tk?'today':''}">${hours.map(h=>`<button class="tg-slot" data-act="tcalSlot" data-d="${k}" data-h="${h}" style="height:${H}px" aria-label="${one?'':dayLabel(k)+', '}${h}:00 — новая задача"></button>`).join('')}${blocks}${now}</div>`; }).join('');
+  return `<div class="tgrid ${one?'one':''} ${days.length>4?'wk':''}" style="--cols:${days.length}">${head}${free}<div class="tg-body"><div class="tg-hrs">${hours.map(h=>`<span style="height:${H}px">${String(h).padStart(2,'0')}:00</span>`).join('')}</div>${cols}</div></div>`;
+}
+// карточка дня: задачи и быстрое добавление на эту дату (и время, если выбрано на шкале)
+function tcalDayCard(sel,compact){
+  const {L}=tcalItems(sel,sel), dl=L.filter(o=>o.k===sel).sort(occSort), real=dl.filter(o=>!o.ghost&&!o.gc), ghosts=dl.filter(o=>o.ghost), ev=dl.filter(o=>o.gc);
+  const tm=UI.tcalTime&&UI.tcalTimeDay===sel?UI.tcalTime:'';
+  return `<section class="card" id="tcalSelCard"><div class="ghead">${compact?'Новая задача':dayLabel(sel)}<span class="sum fsub">${compact?'':dl.length||''}</span></div>
+    ${compact?'':real.map(o=>taskRow(o.t)).join('')}
+    ${compact?'':ghosts.map(o=>`<div class="trow ghost"><span class="tcheck" aria-hidden="true">↻</span><button class="tmain" data-act="taskOpen" data-id="${o.t.id}"><div class="fname">${esc(o.t.name||'Без названия')}</div><div class="fsub">повтор · ${repeatText(o.t)}${o.t.project&&projById(o.t.project)?' · '+esc(projName(o.t.project)):''}</div></button></div>`).join('')}
+    ${compact?'':ev.map(o=>`<div class="trow"><span class="tcheck gcdot" aria-hidden="true"></span><button class="tmain" ${occAct(o)}><div class="fname">${occName(o)}</div><div class="fsub">Google Календарь · ${o.s!=null?hm(o.s)+'–'+hm(o.e):'весь день'}</div></button></div>`).join('')}
+    ${!compact&&!dl.length?'<p class="hint" style="margin:0 0 4px">На этот день задач нет.</p>':''}
+    <div class="qa-row" style="margin-top:8px"><input class="inline-in" id="tcalNew" placeholder="${compact?'На '+esc(dayLabel(sel).toLowerCase()):'Новая задача'}${tm?' в '+tm:''}…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача на этот день"><button class="btn primary" data-act="tcalAdd">Добавить</button></div>
+    <div class="qa-chips">${tm?`<button class="chip on" data-act="tcalTimeClr" aria-label="Убрать время">в ${tm} ×</button>`:''}<button class="chip" data-act="tcalMore">Подробнее: проект, повтор…</button></div></section>`;
 }
 function viewTaskPage(t){
   const cl=t.checklist||[], dn=cl.filter(c=>c.done).length, isNew=!!UI.page.isNew, n=t.times||1;
@@ -3509,7 +3691,7 @@ function viewTaskPage(t){
     ${cl.map((c,i)=>`<div class="cl-row ${c.done?'done':''}"><button class="tcheck sm" data-act="clToggle" data-i="${i}" aria-pressed="${!!c.done}" aria-label="Пункт ${i+1}">${c.done?'✓':''}</button><input class="cl-text" data-cl="${i}" value="${esc(c.text)}" aria-label="Пункт ${i+1}"><button class="xbtn" data-act="clDel" data-i="${i}" aria-label="Удалить пункт">×</button></div>`).join('')}
     <div class="qa-row" style="margin-top:8px"><input class="inline-in" id="clNew" placeholder="Новый пункт…" enterkeyhint="done" autocomplete="off" aria-label="Новый пункт"><button class="btn" data-act="clAdd">Добавить</button></div></section>
   ${isNew?`<div class="actions sticky-ok"><span class="sp"></span><button class="btn" data-act="taskCancel">Отмена</button><button class="btn primary" data-act="taskOk">ОК</button></div>`
-    :`<div class="actions"><span class="fsub">${t.created?'создана '+dRu(t.created):''}${t.done&&t.doneAt?' · выполнена '+dRu(t.doneAt):''}</span><span class="sp"></span>${t.due||t.deadline?`<button class="btn small" data-act="taskCal" data-id="${t.id}">В Google Календарь</button>`:''}<button class="btn small danger" data-act="taskDel" data-id="${t.id}">Удалить задачу</button></div>
+    :`<div class="actions"><span class="fsub">${t.created?'создана '+dRu(t.created):''}${t.done&&t.doneAt?' · выполнена '+dRu(t.doneAt):''}</span><span class="sp"></span>${t.due||t.deadline?`<button class="btn small" data-act="taskCal" data-id="${t.id}">${gcalOn()&&t.gcal?'Обновить в Google Календаре':'В Google Календарь'}</button>`:''}<button class="btn small danger" data-act="taskDel" data-id="${t.id}">Удалить задачу</button></div>
     <div class="actions sticky-ok"><span class="sp"></span><button class="btn primary" data-act="back">Готово</button></div>`}`;
 }
 // новая задача из «Подробнее…» живёт черновиком, пока не нажали «ОК»
@@ -4119,12 +4301,80 @@ function openNormInfo(){
 
 /* ---- запись еды: продукт из справочника или свой, граммы → расчёт; без граммов — числа «всего» ---- */
 let foodEd=null;
+/* ---------- еда по фото: Claude смотрит на фото, называет блюдо, оценивает вес и КБЖУ ----------
+   Ключ Anthropic — только на этом устройстве (AI_KEY), в таблицу и на сайт не попадает.
+   Адрес можно заменить на свой посредник (если api.anthropic.com недоступен напрямую). */
+const AI_KEY='moyplan.ai.v1', AI_MODEL='claude-opus-5-5', AI_API='https://api.anthropic.com';
+function aiCfg(){ try{ return JSON.parse(localStorage.getItem(AI_KEY)||'null')||{}; }catch(e){ return {}; } }
+function aiSave(c){ try{ if(c) localStorage.setItem(AI_KEY,JSON.stringify(c)); else localStorage.removeItem(AI_KEY); }catch(e){} }
+function aiBox(){
+  const c=aiCfg();
+  return `<p class="hint" style="margin:0 0 8px">В записи еды кнопка «📷 По фото»: нейросеть Claude узнаёт блюдо и оценивает вес, калории, белки, жиры, углеводы и клетчатку. Нужен свой ключ Anthropic (console.anthropic.com) — около 1–2 ₽ за фото. Ключ хранится только на этом устройстве, фото уходит в Anthropic.</p>
+    <div class="field"><label>Ключ Anthropic</label><input id="aiKey" type="password" autocomplete="off" spellcheck="false" placeholder="${c.key?'сохранён — впишите новый, чтобы заменить':'sk-ant-…'}" aria-label="Ключ Anthropic"></div>
+    <div class="field"><label>Адрес (необязательно)</label><input id="aiUrl" autocomplete="off" spellcheck="false" value="${esc(c.url||'')}" placeholder="${AI_API}" aria-label="Адрес сервиса"></div>
+    <div class="actions" style="margin-top:0"><button class="btn small primary" data-act="aiSave">Сохранить</button>${c.key?'<button class="btn small" data-act="aiDel">Удалить ключ</button>':''}<span class="fsub">${c.key?'ключ есть':'ключа нет'}</span></div>`;
+}
+// фото → JPEG не больше 1024 px по длинной стороне (меньше трафика и дешевле)
+async function photoB64(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('не удалось открыть фото')); i.src=url; });
+    const k=Math.min(1,1024/Math.max(img.naturalWidth||1,img.naturalHeight||1)), c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.naturalWidth*k)); c.height=Math.max(1,Math.round(img.naturalHeight*k));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c.toDataURL('image/jpeg',0.85).split(',')[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+const AI_FOOD_SCHEMA={type:'object',additionalProperties:false,required:['dish','items','note'],properties:{
+  dish:{type:'string'}, note:{type:'string'},
+  items:{type:'array',items:{type:'object',additionalProperties:false,required:['name','grams','kcal','protein','fat','carbs','fiber'],properties:{
+    name:{type:'string'},grams:{type:'number'},kcal:{type:'number'},protein:{type:'number'},fat:{type:'number'},carbs:{type:'number'},fiber:{type:'number'}}}}}};
+async function aiFood(b64,hint){
+  const c=aiCfg(); if(!c.key) throw new Error('нет ключа');
+  const prompt='На фото — еда. Определи, что это, и оцени порцию, которую видно на фото.\n'+
+    'Для каждого заметного компонента: название по-русски, вес в граммах и для ВСЕЙ этой части (не на 100 г): ккал, белки, жиры, углеводы, клетчатку в граммах.\n'+
+    'dish — короткое название всего блюда по-русски (например «Гречка с курицей»). note — одна короткая фраза: на что опиралась оценка веса или что стоит уточнить. Если на фото не еда — items пустой, в note — почему.'+
+    (hint?'\nУточнение от человека: '+hint:'');
+  const ctl=new AbortController(), tm=setTimeout(()=>ctl.abort(),90000);
+  let r;
+  try{ r=await fetch((c.url||AI_API).replace(/\/+$/,'')+'/v1/messages',{method:'POST',signal:ctl.signal,
+      headers:{'content-type':'application/json','x-api-key':c.key,'anthropic-version':'2026-10-21','anthropic-beta':'server-side-fallback-2026-07-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:AI_MODEL,max_tokens:4000,fallbacks:'default',output_config:{effort:'low',format:{type:'json_schema',schema:AI_FOOD_SCHEMA}},
+        messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:prompt}]}]})}); }
+  catch(e){ throw new Error(e&&e.name==='AbortError'?'сервис не ответил за 1,5 минуты':'нет связи с сервисом (в России Anthropic напрямую может не открываться — нужен VPN или свой адрес-посредник)'); }
+  finally{ clearTimeout(tm); }
+  let j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok){ const m=j&&j.error&&j.error.message||'';
+    if(r.status===401) throw new Error('ключ не подошёл');
+    if(r.status===403) throw new Error('доступ запрещён'+(m?': '+m:'')+' (из России может понадобиться VPN)');
+    if(r.status===429||r.status===529) throw new Error('сервис занят, попробуйте через минуту');
+    if(r.status===400&&/credit|balance/i.test(m)) throw new Error('на счёте Anthropic нет денег');
+    throw new Error(m||'ошибка '+r.status); }
+  if(j.stop_reason==='refusal') throw new Error('нейросеть не стала разбирать это фото');
+  const t=(j.content||[]).find(b=>b.type==='text'); if(!t) throw new Error('пустой ответ');
+  return JSON.parse(t.text);
+}
+async function foodPhoto(file){
+  const box=document.getElementById('fdAiRes'), F=document.getElementById('foodForm'); if(!box||!F) return;
+  box.hidden=false; box.innerHTML='<span class="spin" aria-hidden="true"></span> Смотрю на фото…';
+  try{
+    const hint=(F.querySelector('[name=name]').value||'').trim(), res=await aiFood(await photoB64(file),hint);
+    const it=(res.items||[]).filter(x=>x&&x.grams>=0); if(!it.length){ box.textContent='Не получилось: '+(res.note||'еда на фото не найдена'); return; }
+    const sum=k=>it.reduce((s,x)=>s+(+x[k]||0),0), g=Math.round(sum('grams')), T={kcal:sum('kcal'),p:sum('protein'),f:sum('fat'),c:sum('carbs'),fib:sum('fiber')};
+    F.querySelector('[name=name]').value=res.dish||it.map(x=>x.name).join(', ');
+    F.querySelector('[name=g]').value=g>0?g:'';
+    FOOD_K.forEach(k=>{ const v=g>0?T[k]*100/g:T[k]; F.querySelector(`[name=${k}]`).value=String(n1(v)).replace('.',','); });
+    foodEd.piece=0; foodSug(); foodTot();
+    box.innerHTML=`<b>Оценка по фото</b> — проверьте вес, он влияет на всё. ${esc(res.note||'')}${it.length>1?'<br>'+it.map(x=>`${esc(x.name)} — ${fmt(x.grams)} г, ${fmt(x.kcal)} ккал`).join('; '):''}`;
+  }catch(e){ box.innerHTML='Не получилось: '+esc(errText(e))+(aiCfg().key?'':' — впишите ключ в «Настройки → Еда по фото»'); }
+}
 function openFood(id,preset){
   const f=id?S.foodLog.find(x=>x.id===id):null; if(id&&!f) return;
   const r=f?Object.assign({},f):Object.assign({id:uid(),date:UI.foodDate||todayK(),meal:guessMeal(),name:'',kcal:null,p:null,f:null,c:null,g:null,fib:null},preset||{});
   const g=numOr(r.g,0), per=FOOD_K.map(k=>r[k]==null||r[k]===''?'':g>0?n1(numOr(r[k],0)*100/g):numOr(r[k],0));
   foodEd={id:f?f.id:null,rec:r};
   openSheet(`<h2>${f?'Еда':'Новая запись: еда'}</h2><form class="form" id="foodForm" onsubmit="return false">
+    <div class="fd-ai"><label class="btn small" for="fdPhoto">📷 По фото</label><input type="file" id="fdPhoto" accept="image/*" hidden><span class="fsub">${aiCfg().key?'нейросеть оценит блюдо, вес и КБЖУ':'нужен ключ — «Настройки → Еда по фото»'}</span></div>
+    <p class="hint fd-aires" id="fdAiRes" hidden></p>
     <div class="field"><label>Что съели</label><input name="name" value="${esc(r.name)}" autocomplete="off" placeholder="Начните писать: груша, гречка, творог…"><div class="qa-chips fd-sug" id="fdSug"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="field"><label>Приём пищи</label><select name="meal">${MEALS.map(m=>`<option ${m===r.meal?'selected':''}>${m}</option>`).join('')}</select></div>
@@ -4137,6 +4387,10 @@ function openFood(id,preset){
   const F=document.getElementById('foodForm'), nm=F.querySelector('[name=name]');
   nm.addEventListener('input',()=>{ foodSug(); const m=foodFind(nm.value); if(m&&FOOD_K.every(k=>!F.querySelector(`[name=${k}]`).value)) foodFill(m); });
   F.addEventListener('input',e=>{ if(e.target.name!=='name') foodTot(); });
+  const ph=document.getElementById('fdPhoto');
+  ph.addEventListener('change',()=>{ const file=ph.files&&ph.files[0]; ph.value=''; if(!file) return;
+    if(!aiCfg().key){ const b=document.getElementById('fdAiRes'); b.hidden=false; b.textContent='Сначала впишите ключ Anthropic: «Настройки → Еда по фото».'; return; }
+    foodPhoto(file); });
   foodSug(); foodTot(); if(!f) setTimeout(()=>nm.focus(),50);
 }
 function foodSug(){
@@ -5126,8 +5380,10 @@ function openSettings(){
     <button class="srow" data-act="bodyOpen"><span class="srow-ic" aria-hidden="true">👤</span><span><b>Мои данные</b><small>${N?`${N.sex==='m'?'муж.':'жен.'}, ${N.age} ${plural(N.age,'год','года','лет')}, ${N.h} см, ${fmt1(N.kg)} кг — норма питания и воды`:'Пол, возраст, рост, вес — для нормы питания и воды'}</small></span><span class="chev">›</span></button>
     <div class="form">
     ${g('☁️ Данные и вход',storageBox())}
+    ${g('📅 Google Календарь',gcalBox())}
     ${g('🎨 Оформление',`<div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>${lookBox()}`)}
     ${g('🧩 Разделы',secBox())}
+    ${g('📷 Еда по фото',aiBox())}
     ${g('🔔 Уведомления',nativeBox())}
     ${g('🔒 Защита',nativeLock())}
     ${g('💾 Резервная копия',`<div class="field"><textarea id="jsonBox" spellcheck="false" placeholder="Нажмите «Выгрузить» или вставьте сюда копию и нажмите «Загрузить»" aria-label="Резервная копия (JSON)"></textarea></div>
@@ -5210,12 +5466,15 @@ document.addEventListener('pointerup',tdragEnd); document.addEventListener('poin
 let tapAt=null;
 document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('[data-act]'); if(!b) return; const r=b.getBoundingClientRect(); tapAt={x:r.left+r.width/2,y:r.top+r.height/2,t:Date.now()}; },true);
 function buzz(big){ try{ if(NATIVE&&typeof NATIVE.haptic==='function'){ NATIVE.haptic(big?2:1); return; } }catch(e){} try{ navigator.vibrate&&navigator.vibrate(big?[14,60,22]:14); }catch(e){} }
-// big — всё на сегодня сделано: искры вокруг галочки
-function cheer(big){
+// отметка привычки: сама клетка мягко заполняется (после render — новая, поэтому класс ставим ей)
+function hPop(h,d,on){ document.querySelectorAll('[data-act="hToggle"][data-d="'+d+'"]').forEach(el=>{ if(el.dataset.h===h) el.classList.add(on?'pop':'unpop'); }); }
+// big — всё на сегодня сделано: искры вокруг галочки; soft — без летящей галочки, только тихое кольцо
+function cheer(big,soft){
   buzz(big);
   const p=tapAt&&Date.now()-tapAt.t<4000?tapAt:null; if(!p||matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const el=document.createElement('div'); el.className='cheer'; el.style.left=p.x+'px'; el.style.top=p.y+'px';
-  el.innerHTML='<i></i><b>✓</b>'+(big?Array.from({length:10},(_,k)=>`<s style="--a:${k*36}deg;--c:var(--t${k%7+1})"></s>`).join(''):'');
+  if(soft&&!big) el.classList.add('soft');
+  el.innerHTML='<i></i>'+(soft&&!big?'':'<b>✓</b>')+(big?Array.from({length:10},(_,k)=>`<s style="--a:${k*36}deg;--c:var(--t${k%7+1})"></s>`).join(''):'');
   document.body.appendChild(el); setTimeout(()=>el.remove(),800);
 }
 // всё ли на сегодня сделано — для «большого» отклика
@@ -5310,6 +5569,89 @@ function delRecord(sp){
 }
 // меню по правой кнопке
 // отложить: на день позже (просроченная или сегодняшняя — на завтра); крайний срок не раньше новой даты
+/* ---------- Google Календарь: события видны в календаре задач, задачу можно поставить событием ----------
+   Отдельное разрешение Google (calendar.events) — только после «Подключить», хранится на устройстве (GCAL_KEY).
+   Пропуск тот же, что у входа через Google (gsAuth), просто с этим разрешением в придачу (gScope). */
+function gcalSet(on){ GCAL={on:on?1:0}; try{ localStorage.setItem(GCAL_KEY,JSON.stringify(GCAL)); }catch(e){} for(const k in GC_CACHE) delete GC_CACHE[k]; gcalErr=''; }
+const GC_CACHE={}; let gcalErr='';
+async function gcalApi(url,o){
+  try{ return await gsApi(url,o||{}); }
+  catch(e){
+    if(e.need) throw e;
+    const m=errText(e);
+    if(e.status===403&&/has not been used|is disabled|accessNotConfigured/i.test(m)) throw new Error('в Google Cloud не включён Google Calendar API (см. инструкцию)');
+    if(e.status===403) { const x=new Error('нет разрешения на календарь'); x.need=true; throw x; }
+    if(e.status===404||e.status===410){ const x=new Error('событие не найдено'); x.gone=true; throw x; }
+    throw e;
+  }
+}
+// события за период — из памяти; старше 5 минут — подгружаются заново, потом календарь перерисуется
+function gcalEvents(fromK,toK){
+  if(!gcalOn()) return [];
+  const key=fromK+'|'+toK, c=GC_CACHE[key];
+  if(!c||(!c.busy&&Date.now()-c.t>3e5)) gcalLoad(fromK,toK,key);
+  return c?c.items:[];
+}
+async function gcalLoad(fromK,toK,key){
+  const c=GC_CACHE[key]||(GC_CACHE[key]={items:[],t:0}); c.busy=true; c.t=Date.now();
+  try{
+    const q=new URLSearchParams({timeMin:parseD(fromK).toISOString(),timeMax:addDays(parseD(toK),1).toISOString(),singleEvents:'true',orderBy:'startTime',maxResults:'250'});
+    const j=await gcalApi(CAL_API+'?'+q); c.items=gcalParse(j.items||[],fromK,toK); gcalErr='';
+  }catch(e){ gcalErr=e.need?'need':errText(e); }
+  c.busy=false; c.t=Date.now();
+  const ae=document.activeElement;
+  if(UI.section==='tasks'&&UI.sub.tasks==='cal'&&!UI.page&&document.getElementById('sheet').hidden&&!(ae&&/INPUT|TEXTAREA/.test(ae.tagName))) render();
+}
+// событие → записи по дням: {gc, id, name, k, s, e (минуты от полуночи; s=null — весь день), url}
+function gcalParse(items,fromK,toK){
+  const out=[], mins=d=>d.getHours()*60+d.getMinutes();
+  items.forEach(ev=>{ if(!ev||ev.status==='cancelled'||!ev.start) return;
+    const base={gc:true,id:ev.id,name:ev.summary||'(без названия)',url:ev.htmlLink||''};
+    if(ev.start.date){ let d=parseD(ev.start.date); const end=ev.end&&ev.end.date?ev.end.date:dkey(addDays(d,1));
+      for(let n=0; dkey(d)<end&&n<62; n++, d=addDays(d,1)){ const k=dkey(d); if(k>=fromK&&k<=toK) out.push(Object.assign({k,s:null,e:null},base)); } return; }
+    const a=new Date(ev.start.dateTime), b=new Date(ev.end&&ev.end.dateTime||a.getTime()+36e5); if(isNaN(a)) return;
+    let d=new Date(a.getFullYear(),a.getMonth(),a.getDate());
+    for(let n=0; d<b&&n<62; n++, d=addDays(d,1)){ const k=dkey(d); if(k<fromK||k>toK) continue;
+      const s=k===dkey(a)?mins(a):0, e=k===dkey(b)?mins(b):1440; if(e<=s&&k!==dkey(a)) continue;
+      out.push(Object.assign({k},base,s===0&&e===1440?{s:null,e:null}:{s,e:Math.max(e,s+15)})); }
+  });
+  return out;
+}
+function gcalNote(){
+  if(!gOK()) return '';
+  if(!gcalOn()) return `<p class="hint" style="margin:8px 0 0"><button class="more" data-act="gcalConnect">📅 Показать здесь события Google Календаря</button></p>`;
+  if(gcalErr==='need') return `<p class="hint" style="margin:8px 0 0">Google Календарь: нужно снова разрешить доступ. <button class="more" data-act="gcalConnect">Разрешить</button></p>`;
+  if(gcalErr) return `<p class="hint" style="margin:8px 0 0">Google Календарь: ${esc(gcalErr)}. <button class="more" data-act="gcalRetry">Повторить</button></p>`;
+  return '';
+}
+function gcalBox(){
+  if(!gOK()) return '';
+  return `<p class="hint" style="margin:0 0 8px">${gcalOn()?'Подключён. События вашего календаря видны в «Задачи → Календарь», задачу можно поставить в календарь кнопкой на её странице.':'События вашего основного календаря появятся в «Задачи → Календарь», а задачу можно будет поставить в календарь событием. Google спросит разрешение на календарь.'}</p>
+    <div class="actions" style="margin-top:0">${gcalOn()?'<button class="btn small" data-act="gcalOff">Отключить</button>':'<button class="btn small primary" data-act="gcalConnect">Подключить Google Календарь</button>'}</div>`;
+}
+async function gcalConnect(){
+  gcalSet(true); gsDropTok();
+  try{ await gsAuth(true); toast('Google Календарь подключён'); }
+  catch(e){ toast('Google Календарь: '+(e.need?'доступ не разрешён':errText(e))); if(e.need) gcalSet(false); }
+  render();
+}
+// задача → событие (весь день или на час со временем); повторно — обновить то же событие
+async function gcalPush(t){
+  const k=t.due||t.deadline; if(!k) return toast('Сначала поставьте дату');
+  const body={summary:t.name||'Задача',description:[t.note||'',t.deadline&&t.deadline!==k?'Крайний срок: '+dRu(t.deadline):'','Из приложения «Мой план»'].filter(Boolean).join('\n')};
+  if(t.time&&t.due){ const [h,m]=t.time.split(':').map(Number), d=parseD(t.due), a=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h||0,m||0), tz=(()=>{ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone; }catch(e){ return undefined; } })();
+    body.start={dateTime:a.toISOString(),timeZone:tz}; body.end={dateTime:new Date(a.getTime()+36e5).toISOString(),timeZone:tz}; }
+  else { body.start={date:k}; body.end={date:dkey(addDays(parseD(k),1))}; }
+  toast('Ставлю в Google Календарь…');
+  try{
+    let ev;
+    if(t.gcal){ try{ ev=await gcalApi(CAL_API+'/'+encodeURIComponent(t.gcal),{method:'PATCH',body}); }catch(e){ if(!e.gone) throw e; } }
+    if(!ev) ev=await gcalApi(CAL_API,{method:'POST',body});
+    const was=t.gcal; t.gcal=ev.id||''; if(t.gcal!==was) persist('tasks');
+    for(const x in GC_CACHE) delete GC_CACHE[x];
+    render(); toast(was?'Событие обновлено':'Добавлено в Google Календарь',ev.htmlLink?{label:'Открыть',fn:()=>{ if(NATIVE) NATIVE.openUrl(ev.htmlLink); else window.open(ev.htmlLink,'_blank','noopener'); }}:null);
+  }catch(e){ if(e.need){ gcalErr='need'; toast('Google Календарь: нужно снова разрешить доступ',{label:'Разрешить',fn:gcalConnect}); } else toast('Google Календарь: '+errText(e)); }
+}
 // событие в Google Календаре (откроется готовая форма): весь день — по дате, со временем — на час
 function calUrl(t){
   const k=t.due||t.deadline, ymd=x=>x.replace(/-/g,''), p=new URLSearchParams({action:'TEMPLATE',text:t.name||'Задача'});
@@ -5347,7 +5689,7 @@ function swClose(){ const o=swOpen; swOpen=null; if(!o) return; o.row.style.tran
 document.addEventListener('pointerdown',e=>{
   if(!S||e.pointerType==='mouse'||!e.target.closest) return;
   if(swOpen&&!swOpen.wrap.contains(e.target)) swClose();
-  if(e.target.closest('input,textarea,select,[contenteditable="true"],[data-drag],[data-tdrag],.sw-bin,.hgrid,.tcal,.pcal,.cal,.sheet')) return;
+  if(e.target.closest('input,textarea,select,[contenteditable="true"],[data-drag],[data-tdrag],.sw-bin,.hgrid,.tcal,.tgrid,.tcal-seg,.pcal,.cal,.sheet')) return;
   const d=delTarget(e.target); if(!d) return;
   const W=openTask(d.sp)?152:76;
   sw={x:e.clientX,y:e.clientY,id:e.pointerId,row:d.row,sp:d.sp,on:false,dx:0,W,base:swOpen&&swOpen.row===d.row?-W:0};
@@ -5444,6 +5786,9 @@ document.addEventListener('change',e=>{
   for(const a in LIST_FACTS) if(el.dataset[a]){ const [list,idk]=LIST_FACTS[a], [id,month]=el.dataset[a].split('|');
     setListFact(S[list],idk,id,month,el.value); if(el.value.trim().startsWith('=')) el.value=el.value.trim().slice(1); persist(list); softRender(); return; }
   if(el.dataset.gfact){ setListFact(S.goalFacts,null,null,el.dataset.gfact,el.value); persist('goalFacts'); softRender(); return; }
+  if(el.dataset.posrate){ const p=S.invPositions.find(x=>x.id===el.dataset.posrate); if(!p) return;
+    const v=el.value.trim()===''?null:evalExpr(el.value.replace(',','.')); if(v!=null&&(isNaN(v)||v<-50||v>100)){ toast('Нужно число — проценты годовых'); return; }
+    p.rate=v; persist('invPositions'); render(); return; }
   if(el.dataset.posval){ const p=S.invPositions.find(x=>x.id===el.dataset.posval); if(!p) return;
     const v=el.value.trim()===''?null:evalExpr(el.value); if(v!=null&&isNaN(v)){ toast('Нужно число'); return; }
     p.value=v; p.valueDate=v==null?'':dkey(TODAY()); persist('invPositions'); softRender(); return; }
@@ -5536,7 +5881,7 @@ document.addEventListener('keydown',e=>{
     const map={ideaNew:'ideaAdd',recUrl:'recipeFetch',secQ:'',saPrice:'secSave',saLots:'secSave',bPrice:'buyAdd',qaTitle:'taskQuick',homeTask:'homeTask',qxAmt:'qxSave',stepTitle:'stepAdd',gtTitle:'goalTaskAdd',factNew:'factAdd',clNew:'clAdd',tclNew:'tclAdd',hcVal:'hcSave',tcalNew:'tcalAdd',fsubNew:'fsubAdd'}; const act=map[e.target.id];
     if(act){ e.preventDefault(); const btn=document.querySelector(`[data-act="${act}"]`); if(btn) btn.click(); return; }
     if(e.target.dataset&&e.target.dataset.tf==='name'&&UI.page&&UI.page.isNew){ e.preventDefault(); const btn=document.querySelector('[data-act="taskOk"]'); if(btn) btn.click(); return; } }
-  if(e.key==='Enter'&&e.target.matches('input[data-fact],input[data-ifact],input[data-insf],input[data-gfact],input[data-path],input[data-posval],input[data-ws],input[data-weight]')) e.target.blur();
+  if(e.key==='Enter'&&e.target.matches('input[data-fact],input[data-ifact],input[data-insf],input[data-gfact],input[data-path],input[data-posval],input[data-posrate],input[data-ws],input[data-weight]')) e.target.blur();
   if(e.key==='Escape'&&!document.getElementById('sheet').hidden) closeSheet();
 });
 document.addEventListener('click',e=>{
@@ -5612,7 +5957,7 @@ document.addEventListener('click',e=>{
   else if(a==='hToggle'){ const h=b.dataset.h, d=b.dataset.d, hb=S.habits.find(x=>x.id===h);
     if(hb&&hb.type==='count'){ openHabitCount(hb,d); return; }
     const i=S.habitLog.findIndex(l=>l.habit===h&&l.date===d);
-    if(i>=0) S.habitLog.splice(i,1); else S.habitLog.push({habit:h,date:d}); persist('habitLog'); render(); if(i<0) cheer(d===todayK()&&allHabitsDone()); }
+    if(i>=0) S.habitLog.splice(i,1); else S.habitLog.push({habit:h,date:d}); persist('habitLog'); render(); hPop(h,d,i<0); if(i<0) cheer(d===todayK()&&allHabitsDone(),true); }
   else if(a==='hcAdd'){ const inp=document.getElementById('hcVal'), v=b.dataset.v; inp.value=v[0]==='='?fmtN(+v.slice(1)):fmtN((evalExpr(inp.value)||0)+(+v)); inp.focus(); }
   else if(a==='hcSave'){ const h=b.dataset.h, d=b.dataset.d, i=S.habitLog.findIndex(l=>l.habit===h&&l.date===d), inp=document.getElementById('hcVal');
     const v=b.dataset.clear?null:(inp.value.trim()===''?null:evalExpr(inp.value)); if(v!=null&&(isNaN(v)||v<0)){ toast('Нужно число'); return; }
@@ -5699,11 +6044,15 @@ document.addEventListener('click',e=>{
   else if(a==='tcalHide'){ const h=new Set(tcalHidden()), v=b.dataset.v; if(h.has(v)) h.delete(v); else h.add(v); try{ localStorage.setItem(TCAL_HIDE,JSON.stringify([...h])); }catch(e){} render(); }
   else if(a==='taskOpen'&&!b.dataset.full&&UI.section==='tasks'&&!UI.page&&UI.tExp!==b.dataset.id&&((S.tasks.find(x=>x.id===b.dataset.id)||{}).checklist||[]).length&&!(S.tasks.find(x=>x.id===b.dataset.id)||{}).done){ UI.tExp=b.dataset.id; render(); }
   else if(a==='taskOpen'&&UI.section==='home'){ UI.tExp=null; UI.page={kind:'task',id:b.dataset.id,back:'Главная',from:'home'}; UI.section='tasks'; go(); }
-  else if(a==='taskOpen'){ UI.tExp=null; const back=UI.section==='goals'?'Цель':(({today:'Сегодня',upcoming:'Предстоящие',all:'Все задачи',done:'Готово',inbox:'Без проекта'})[UI.sub.tasks]||projName(String(UI.sub.tasks).slice(2))||'Задачи');
+  else if(a==='taskOpen'){ UI.tExp=null; const back=UI.section==='goals'?'Цель':(({today:'Сегодня',upcoming:'Предстоящие',all:'Все задачи',done:'Готово',inbox:'Без проекта',cal:'Календарь'})[UI.sub.tasks]||projName(String(UI.sub.tasks).slice(2))||'Задачи');
     UI.page={kind:'task',id:b.dataset.id,back,from:UI.section==='goals'&&UI.page?UI.page:null}; if(UI.section!=='tasks'){ UI.section='tasks'; } go(); }
   else if(a==='taskNew'){ const inp=document.getElementById('qaTitle'), v=UI.sub.tasks||''; const t=newTask(inp?inp.value.trim():'','',v.startsWith('p:')?v.slice(2):UI.qaProj&&projById(UI.qaProj)?UI.qaProj:'');
     UI.draft=t; UI.page={kind:'task',id:t.id,isNew:true,back:'Задачи'}; go(); const n=$view.querySelector('[data-tf="name"]'); if(n&&!t.name) n.focus(); }
   else if(a==='trashBack') trashRestore(b.dataset.id);
+  else if(a==='gcalConnect') gcalConnect();
+  else if(a==='gcalOff'){ gcalSet(false); toast('Google Календарь отключён'); openSettings(); }
+  else if(a==='gcalRetry'){ for(const x in GC_CACHE) delete GC_CACHE[x]; gcalErr=''; render(); }
+  else if(a==='taskCal'&&gcalOn()){ const t=S.tasks.find(x=>x.id===b.dataset.id)||(UI.draft&&UI.draft.id===b.dataset.id?UI.draft:null); if(t) gcalPush(t); }
   else if(a==='taskCal'){ const t=S.tasks.find(x=>x.id===b.dataset.id); if(!t) return; const u=calUrl(t); if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }
   else if(a==='lookAcc'){ const L=lookGet(); L.accent=b.dataset.v; lookSet(L); openSettings(); }
   else if(a==='lookSec'){ const L=lookGet(); L.mono=b.dataset.v==='1'; lookSet(L); openSettings(); }
@@ -5718,12 +6067,19 @@ document.addEventListener('click',e=>{
   else if(a==='tView'){ UI.sub.tasks=b.dataset.v; UI.projOpen=false; UI.page=null; saveUI(); go(); }
   else if(a==='numPick') openNumPick(b.dataset.k,b.dataset.ph);
   else if(a==='numPickOk') numPickOk();
-  else if(a==='tcalM'){ const t0=TODAY(); UI.tcalM=(UI.tcalM!=null?UI.tcalM:t0.getFullYear()*12+t0.getMonth())+(+b.dataset.d); UI.tcalDay=null; render(); }
+  else if(a==='tcalM'){ tcalShift(+b.dataset.d); render(); }
+  else if(a==='tcalV'){ UI.tcalV=b.dataset.v; try{ localStorage.setItem(TCAL_V,UI.tcalV); }catch(e){} if(UI.tcalV==='month'&&UI.tcalSel){ const d=parseD(UI.tcalSel); UI.tcalM=d.getFullYear()*12+d.getMonth(); UI.tcalDay=UI.tcalSel; } render(); }
+  else if(a==='tcalToday'){ const t0=TODAY(); UI.tcalM=t0.getFullYear()*12+t0.getMonth(); UI.tcalDay=todayK(); render(); }
+  else if(a==='tcalOpenDay'){ UI.tcalDay=b.dataset.d; UI.tcalV='day'; render(); window.scrollTo({top:0}); }
+  else if(a==='tcalSlot'){ UI.tcalDay=b.dataset.d; UI.tcalTime=String(b.dataset.h).padStart(2,'0')+':00'; UI.tcalTimeDay=b.dataset.d; if(tcalView()!=='day') UI.tcalV='day'; render();
+    const n=document.getElementById('tcalNew'); if(n){ n.focus(); n.scrollIntoView({block:'center',behavior:'smooth'}); } }
+  else if(a==='tcalTimeClr'){ UI.tcalTime=''; render(); }
+  else if(a==='gcalOpen'){ const u=b.dataset.u; if(!/^https:\/\/(www\.)?google\.com\/calendar\//.test(u)&&!/^https:\/\/calendar\.google\.com\//.test(u)) return; if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }
   else if(a==='tcalDay'){ UI.tcalDay=b.dataset.d; render(); const c=document.getElementById('tcalSelCard'); if(c&&c.getBoundingClientRect().top>innerHeight-160) c.scrollIntoView({block:'start',behavior:'smooth'}); }
   else if(a==='tcalAdd'){ const inp=document.getElementById('tcalNew'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
-    const t=newTask(name,'',''); inp.value=''; t.due=UI.tcalSel||todayK(); S.tasks.push(t); persist('tasks'); toast('Задача на '+dayLabel(t.due).toLowerCase()); render();
+    const t=newTask(name,'',''); inp.value=''; t.due=UI.tcalSel||todayK(); if(UI.tcalTime&&UI.tcalTimeDay===t.due){ t.time=UI.tcalTime; UI.tcalTime=''; } S.tasks.push(t); persist('tasks'); toast('Задача на '+dayLabel(t.due).toLowerCase()); render();
     const n=document.getElementById('tcalNew'); if(n) n.focus(); }
-  else if(a==='tcalMore'){ const inp=document.getElementById('tcalNew'); const t=newTask(inp?inp.value.trim():'','',''); t.due=UI.tcalSel||todayK();
+  else if(a==='tcalMore'){ const inp=document.getElementById('tcalNew'); const t=newTask(inp?inp.value.trim():'','',''); t.due=UI.tcalSel||todayK(); if(UI.tcalTime&&UI.tcalTimeDay===t.due){ t.time=UI.tcalTime; UI.tcalTime=''; }
     UI.draft=t; UI.page={kind:'task',id:t.id,isNew:true,back:'Календарь'}; go(); const n=$view.querySelector('[data-tf="name"]'); if(n&&!t.name) n.focus(); }
   else if(a==='projToggle'){ UI.projOpen=!UI.projOpen; render(); }
   else if(a==='projNew'){ UI.projParent=''; openEditor('project',null); }
@@ -5764,6 +6120,10 @@ document.addEventListener('click',e=>{
   else if(a==='foodDay'){ const d=addDays(parseD(UI.foodDate||todayK()),+b.dataset.d); if(dkey(d)>todayK()) return; UI.foodDate=dkey(d); render(); }
   else if(a==='foodAdd') openFood(null,{meal:b.dataset.meal});
   else if(a==='foodSave') foodSave();
+  else if(a==='aiSave'){ const k=(document.getElementById('aiKey').value||'').trim(), u=(document.getElementById('aiUrl').value||'').trim(), c=aiCfg();
+    if(u&&!/^https:\/\/[^\s]+$/.test(u)){ toast('Адрес должен начинаться с https://'); return; }
+    if(!k&&!c.key){ toast('Впишите ключ'); return; } aiSave({key:k||c.key,url:u}); toast('Сохранено на этом устройстве'); openSettings(); }
+  else if(a==='aiDel'){ aiSave(null); toast('Ключ удалён'); openSettings(); }
   else if(a==='foodPick'){ const m=foodEd&&foodEd.sug&&foodEd.sug[+b.dataset.i]; if(m) foodFill(m); }
   else if(a==='foodPiece'){ const g=document.querySelector('#foodForm [name=g]'); if(g){ g.value=b.dataset.g; foodTot(); } }
   else if(a==='foodDelEd'){ const i=S.foodLog.findIndex(x=>foodEd&&x.id===foodEd.id); if(i>=0){ S.foodLog.splice(i,1); persist('foodLog'); } closeSheet(); render(); }
