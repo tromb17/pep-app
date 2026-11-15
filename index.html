@@ -649,12 +649,6 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .emo span.csw::after{content:'';width:22px;height:22px;border-radius:50%;background:var(--c)}
 .trow.ghost{opacity:.7} .trow.ghost .tcheck{border-style:dashed;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:13px}
 @media (min-width:700px){.tcal{gap:5px}.tday{min-height:100px;padding:5px 4px}.tci{font-size:11.5px;padding:2px 5px}.tday b{font-size:13px}.tmore{font-size:11px}}
-/* еда по фото */
-.fd-ai{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.fd-ai .fsub{min-width:0}.fd-ai .btn{flex:none;white-space:nowrap}
-.fd-aires{background:var(--surface-2);border-radius:10px;padding:8px 10px;margin:-2px 0 10px}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;vertical-align:-1px;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 /* из чего сложится сумма к погашению */
 .pj-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px;margin:10px 0 8px}
 .pj-bar i{background:var(--c);min-width:3px}
@@ -733,7 +727,7 @@ body.has-timer{padding-bottom:calc(200px + env(safe-area-inset-bottom))}
 .sw-row{position:relative;z-index:1;background:var(--surface);transition:transform .2s ease}
 .sw-bin{position:absolute;right:0;top:0;bottom:0;width:76px;border:0;background:var(--critical);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:18px}
 .sw-bin small{font-size:11px}
-.sw-later{right:76px;background:var(--accent)}
+.sw-later{right:76px;background:var(--accent)}.sw-later small{line-height:1.15;text-align:center;padding:0 4px}
 .toast.has-act{display:flex;align-items:center;gap:14px}
 .toast.has-act.on{pointer-events:auto}
 .toast-act{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-decoration:underline;padding:2px 0}
@@ -4301,80 +4295,12 @@ function openNormInfo(){
 
 /* ---- запись еды: продукт из справочника или свой, граммы → расчёт; без граммов — числа «всего» ---- */
 let foodEd=null;
-/* ---------- еда по фото: Claude смотрит на фото, называет блюдо, оценивает вес и КБЖУ ----------
-   Ключ Anthropic — только на этом устройстве (AI_KEY), в таблицу и на сайт не попадает.
-   Адрес можно заменить на свой посредник (если api.anthropic.com недоступен напрямую). */
-const AI_KEY='moyplan.ai.v1', AI_MODEL='claude-opus-5-5', AI_API='https://api.anthropic.com';
-function aiCfg(){ try{ return JSON.parse(localStorage.getItem(AI_KEY)||'null')||{}; }catch(e){ return {}; } }
-function aiSave(c){ try{ if(c) localStorage.setItem(AI_KEY,JSON.stringify(c)); else localStorage.removeItem(AI_KEY); }catch(e){} }
-function aiBox(){
-  const c=aiCfg();
-  return `<p class="hint" style="margin:0 0 8px">В записи еды кнопка «📷 По фото»: нейросеть Claude узнаёт блюдо и оценивает вес, калории, белки, жиры, углеводы и клетчатку. Нужен свой ключ Anthropic (console.anthropic.com) — около 1–2 ₽ за фото. Ключ хранится только на этом устройстве, фото уходит в Anthropic.</p>
-    <div class="field"><label>Ключ Anthropic</label><input id="aiKey" type="password" autocomplete="off" spellcheck="false" placeholder="${c.key?'сохранён — впишите новый, чтобы заменить':'sk-ant-…'}" aria-label="Ключ Anthropic"></div>
-    <div class="field"><label>Адрес (необязательно)</label><input id="aiUrl" autocomplete="off" spellcheck="false" value="${esc(c.url||'')}" placeholder="${AI_API}" aria-label="Адрес сервиса"></div>
-    <div class="actions" style="margin-top:0"><button class="btn small primary" data-act="aiSave">Сохранить</button>${c.key?'<button class="btn small" data-act="aiDel">Удалить ключ</button>':''}<span class="fsub">${c.key?'ключ есть':'ключа нет'}</span></div>`;
-}
-// фото → JPEG не больше 1024 px по длинной стороне (меньше трафика и дешевле)
-async function photoB64(file){
-  const url=URL.createObjectURL(file);
-  try{
-    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('не удалось открыть фото')); i.src=url; });
-    const k=Math.min(1,1024/Math.max(img.naturalWidth||1,img.naturalHeight||1)), c=document.createElement('canvas');
-    c.width=Math.max(1,Math.round(img.naturalWidth*k)); c.height=Math.max(1,Math.round(img.naturalHeight*k));
-    c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c.toDataURL('image/jpeg',0.85).split(',')[1];
-  } finally { URL.revokeObjectURL(url); }
-}
-const AI_FOOD_SCHEMA={type:'object',additionalProperties:false,required:['dish','items','note'],properties:{
-  dish:{type:'string'}, note:{type:'string'},
-  items:{type:'array',items:{type:'object',additionalProperties:false,required:['name','grams','kcal','protein','fat','carbs','fiber'],properties:{
-    name:{type:'string'},grams:{type:'number'},kcal:{type:'number'},protein:{type:'number'},fat:{type:'number'},carbs:{type:'number'},fiber:{type:'number'}}}}}};
-async function aiFood(b64,hint){
-  const c=aiCfg(); if(!c.key) throw new Error('нет ключа');
-  const prompt='На фото — еда. Определи, что это, и оцени порцию, которую видно на фото.\n'+
-    'Для каждого заметного компонента: название по-русски, вес в граммах и для ВСЕЙ этой части (не на 100 г): ккал, белки, жиры, углеводы, клетчатку в граммах.\n'+
-    'dish — короткое название всего блюда по-русски (например «Гречка с курицей»). note — одна короткая фраза: на что опиралась оценка веса или что стоит уточнить. Если на фото не еда — items пустой, в note — почему.'+
-    (hint?'\nУточнение от человека: '+hint:'');
-  const ctl=new AbortController(), tm=setTimeout(()=>ctl.abort(),90000);
-  let r;
-  try{ r=await fetch((c.url||AI_API).replace(/\/+$/,'')+'/v1/messages',{method:'POST',signal:ctl.signal,
-      headers:{'content-type':'application/json','x-api-key':c.key,'anthropic-version':'2026-10-21','anthropic-beta':'server-side-fallback-2026-07-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:AI_MODEL,max_tokens:4000,fallbacks:'default',output_config:{effort:'low',format:{type:'json_schema',schema:AI_FOOD_SCHEMA}},
-        messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:prompt}]}]})}); }
-  catch(e){ throw new Error(e&&e.name==='AbortError'?'сервис не ответил за 1,5 минуты':'нет связи с сервисом (в России Anthropic напрямую может не открываться — нужен VPN или свой адрес-посредник)'); }
-  finally{ clearTimeout(tm); }
-  let j=null; try{ j=await r.json(); }catch(e){}
-  if(!r.ok){ const m=j&&j.error&&j.error.message||'';
-    if(r.status===401) throw new Error('ключ не подошёл');
-    if(r.status===403) throw new Error('доступ запрещён'+(m?': '+m:'')+' (из России может понадобиться VPN)');
-    if(r.status===429||r.status===529) throw new Error('сервис занят, попробуйте через минуту');
-    if(r.status===400&&/credit|balance/i.test(m)) throw new Error('на счёте Anthropic нет денег');
-    throw new Error(m||'ошибка '+r.status); }
-  if(j.stop_reason==='refusal') throw new Error('нейросеть не стала разбирать это фото');
-  const t=(j.content||[]).find(b=>b.type==='text'); if(!t) throw new Error('пустой ответ');
-  return JSON.parse(t.text);
-}
-async function foodPhoto(file){
-  const box=document.getElementById('fdAiRes'), F=document.getElementById('foodForm'); if(!box||!F) return;
-  box.hidden=false; box.innerHTML='<span class="spin" aria-hidden="true"></span> Смотрю на фото…';
-  try{
-    const hint=(F.querySelector('[name=name]').value||'').trim(), res=await aiFood(await photoB64(file),hint);
-    const it=(res.items||[]).filter(x=>x&&x.grams>=0); if(!it.length){ box.textContent='Не получилось: '+(res.note||'еда на фото не найдена'); return; }
-    const sum=k=>it.reduce((s,x)=>s+(+x[k]||0),0), g=Math.round(sum('grams')), T={kcal:sum('kcal'),p:sum('protein'),f:sum('fat'),c:sum('carbs'),fib:sum('fiber')};
-    F.querySelector('[name=name]').value=res.dish||it.map(x=>x.name).join(', ');
-    F.querySelector('[name=g]').value=g>0?g:'';
-    FOOD_K.forEach(k=>{ const v=g>0?T[k]*100/g:T[k]; F.querySelector(`[name=${k}]`).value=String(n1(v)).replace('.',','); });
-    foodEd.piece=0; foodSug(); foodTot();
-    box.innerHTML=`<b>Оценка по фото</b> — проверьте вес, он влияет на всё. ${esc(res.note||'')}${it.length>1?'<br>'+it.map(x=>`${esc(x.name)} — ${fmt(x.grams)} г, ${fmt(x.kcal)} ккал`).join('; '):''}`;
-  }catch(e){ box.innerHTML='Не получилось: '+esc(errText(e))+(aiCfg().key?'':' — впишите ключ в «Настройки → Еда по фото»'); }
-}
 function openFood(id,preset){
   const f=id?S.foodLog.find(x=>x.id===id):null; if(id&&!f) return;
   const r=f?Object.assign({},f):Object.assign({id:uid(),date:UI.foodDate||todayK(),meal:guessMeal(),name:'',kcal:null,p:null,f:null,c:null,g:null,fib:null},preset||{});
   const g=numOr(r.g,0), per=FOOD_K.map(k=>r[k]==null||r[k]===''?'':g>0?n1(numOr(r[k],0)*100/g):numOr(r[k],0));
   foodEd={id:f?f.id:null,rec:r};
   openSheet(`<h2>${f?'Еда':'Новая запись: еда'}</h2><form class="form" id="foodForm" onsubmit="return false">
-    <div class="fd-ai"><label class="btn small" for="fdPhoto">📷 По фото</label><input type="file" id="fdPhoto" accept="image/*" hidden><span class="fsub">${aiCfg().key?'нейросеть оценит блюдо, вес и КБЖУ':'нужен ключ — «Настройки → Еда по фото»'}</span></div>
-    <p class="hint fd-aires" id="fdAiRes" hidden></p>
     <div class="field"><label>Что съели</label><input name="name" value="${esc(r.name)}" autocomplete="off" placeholder="Начните писать: груша, гречка, творог…"><div class="qa-chips fd-sug" id="fdSug"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="field"><label>Приём пищи</label><select name="meal">${MEALS.map(m=>`<option ${m===r.meal?'selected':''}>${m}</option>`).join('')}</select></div>
@@ -4387,10 +4313,6 @@ function openFood(id,preset){
   const F=document.getElementById('foodForm'), nm=F.querySelector('[name=name]');
   nm.addEventListener('input',()=>{ foodSug(); const m=foodFind(nm.value); if(m&&FOOD_K.every(k=>!F.querySelector(`[name=${k}]`).value)) foodFill(m); });
   F.addEventListener('input',e=>{ if(e.target.name!=='name') foodTot(); });
-  const ph=document.getElementById('fdPhoto');
-  ph.addEventListener('change',()=>{ const file=ph.files&&ph.files[0]; ph.value=''; if(!file) return;
-    if(!aiCfg().key){ const b=document.getElementById('fdAiRes'); b.hidden=false; b.textContent='Сначала впишите ключ Anthropic: «Настройки → Еда по фото».'; return; }
-    foodPhoto(file); });
   foodSug(); foodTot(); if(!f) setTimeout(()=>nm.focus(),50);
 }
 function foodSug(){
@@ -5383,7 +5305,6 @@ function openSettings(){
     ${g('📅 Google Календарь',gcalBox())}
     ${g('🎨 Оформление',`<div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>${lookBox()}`)}
     ${g('🧩 Разделы',secBox())}
-    ${g('📷 Еда по фото',aiBox())}
     ${g('🔔 Уведомления',nativeBox())}
     ${g('🔒 Защита',nativeLock())}
     ${g('💾 Резервная копия',`<div class="field"><textarea id="jsonBox" spellcheck="false" placeholder="Нажмите «Выгрузить» или вставьте сюда копию и нажмите «Загрузить»" aria-label="Резервная копия (JSON)"></textarea></div>
@@ -5674,7 +5595,7 @@ document.addEventListener('contextmenu',e=>{
   const d=delTarget(e.target); if(!d) return;
   e.preventDefault(); hideCtx();
   const m=document.createElement('div'); m.className='ctx'; m.id='ctx'; m.setAttribute('role','menu');
-  m.innerHTML=`<div class="ctx-h">${esc(d.sp.name)}</div><button type="button" role="menuitem" data-cx="open">Открыть</button>${openTask(d.sp)?'<button type="button" role="menuitem" data-cx="later">Перенести на завтра</button>':''}<button type="button" role="menuitem" class="danger" data-cx="del">Удалить</button>`;
+  m.innerHTML=`<div class="ctx-h">${esc(d.sp.name)}</div><button type="button" role="menuitem" data-cx="open">Открыть</button>${openTask(d.sp)?'<button type="button" role="menuitem" data-cx="later">На следующий день</button>':''}<button type="button" role="menuitem" class="danger" data-cx="del">Удалить</button>`;
   document.body.appendChild(m); const r=m.getBoundingClientRect();
   m.style.left=Math.max(8,Math.min(e.clientX,innerWidth-r.width-8))+'px'; m.style.top=Math.max(8,Math.min(e.clientY,innerHeight-r.height-8))+'px';
   m.addEventListener('click',ev=>{ const c=ev.target.closest('[data-cx]'); if(!c) return; ev.stopPropagation(); hideCtx(); if(c.dataset.cx==='open') d.btn.click(); else if(c.dataset.cx==='later') postponeTask(d.sp.rec); else delRecord(d.sp); });
@@ -5706,7 +5627,7 @@ function swStart(){
   if(!wrap.classList.contains('sw-wrap')){ wrap=document.createElement('div'); wrap.className='sw-wrap'; sw.row.before(wrap);
     const bin=document.createElement('button'); bin.type='button'; bin.className='sw-bin'; bin.setAttribute('aria-label','Удалить: '+sw.sp.name); bin.innerHTML='<span aria-hidden="true">🗑</span><small>Удалить</small>';
     wrap.append(bin);
-    if(sw.W>76){ const mv=document.createElement('button'); mv.type='button'; mv.className='sw-bin sw-later'; mv.setAttribute('aria-label','Перенести на завтра: '+sw.sp.name); mv.innerHTML='<span aria-hidden="true">→</span><small>Завтра</small>'; wrap.append(mv); }
+    if(sw.W>76){ const mv=document.createElement('button'); mv.type='button'; mv.className='sw-bin sw-later'; mv.setAttribute('aria-label','На следующий день: '+sw.sp.name); mv.innerHTML='<span aria-hidden="true">→</span><small>На следующий день</small>'; wrap.append(mv); }
     wrap.append(sw.row); }
   sw.wrap=wrap; sw.row.classList.add('sw-row'); sw.row.style.transition='none';
 }
@@ -6120,10 +6041,6 @@ document.addEventListener('click',e=>{
   else if(a==='foodDay'){ const d=addDays(parseD(UI.foodDate||todayK()),+b.dataset.d); if(dkey(d)>todayK()) return; UI.foodDate=dkey(d); render(); }
   else if(a==='foodAdd') openFood(null,{meal:b.dataset.meal});
   else if(a==='foodSave') foodSave();
-  else if(a==='aiSave'){ const k=(document.getElementById('aiKey').value||'').trim(), u=(document.getElementById('aiUrl').value||'').trim(), c=aiCfg();
-    if(u&&!/^https:\/\/[^\s]+$/.test(u)){ toast('Адрес должен начинаться с https://'); return; }
-    if(!k&&!c.key){ toast('Впишите ключ'); return; } aiSave({key:k||c.key,url:u}); toast('Сохранено на этом устройстве'); openSettings(); }
-  else if(a==='aiDel'){ aiSave(null); toast('Ключ удалён'); openSettings(); }
   else if(a==='foodPick'){ const m=foodEd&&foodEd.sug&&foodEd.sug[+b.dataset.i]; if(m) foodFill(m); }
   else if(a==='foodPiece'){ const g=document.querySelector('#foodForm [name=g]'); if(g){ g.value=b.dataset.g; foodTot(); } }
   else if(a==='foodDelEd'){ const i=S.foodLog.findIndex(x=>foodEd&&x.id===foodEd.id); if(i>=0){ S.foodLog.splice(i,1); persist('foodLog'); } closeSheet(); render(); }
