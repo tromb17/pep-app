@@ -347,6 +347,17 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 .sgroup .seg{background:color-mix(in srgb,var(--text) 7%,transparent)}
 .srow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--surface-2);border-radius:16px;padding:12px 14px;margin:0 0 10px;min-height:64px;color:var(--text)}
 .srow>span:nth-child(2){flex:1;min-width:0}.srow b{display:block;font-size:16px}.srow small{display:block;color:var(--muted);font-size:13px}
+/* сводка: сворачиваемые карточки */
+.fold-h{display:flex;align-items:center;gap:6px}.fold-btn{margin-left:auto;border:0;background:none;color:var(--muted);font-size:15px;line-height:1;padding:6px 8px;border-radius:8px;cursor:pointer;flex:none}
+.card.folded>:not(.fold-h){display:none}.card.folded>.fold-h{margin-bottom:0}
+/* главная: ближайший платёж, настройка блоков */
+.npay{display:flex;align-items:center;gap:10px}.npay .tmain{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;border:0;background:none;padding:4px 0;text-align:left;color:inherit;font:inherit;cursor:pointer}.npay>b{flex:none}
+.hbrow{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}.hbrow .sp{flex:1}.hbrow .chk{display:flex;align-items:center;gap:8px}
+/* статистика за месяц: сетка дней */
+.mgrid{display:grid;grid-template-columns:minmax(84px,30%) 1fr auto;gap:4px 8px;align-items:center}.mgrid .mn{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mdays{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:2px}.mdays i{display:block;aspect-ratio:1/1.6;border-radius:3px;background:var(--surface-2)}
+.mdays i.on{background:var(--good)}.mdays i.part{background:color-mix(in srgb,var(--good) 40%,transparent)}.mdays i.off{background:transparent;outline:1px dashed var(--line);outline-offset:-1px}.mdays i.fut{opacity:.35}
+.mdays.head i{background:none;aspect-ratio:auto;font-style:normal;font-size:9px;color:var(--muted);text-align:center}.mgrid .mp{font-size:13px;min-width:38px;text-align:right}
 .srow-ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:color-mix(in srgb,var(--accent) 14%,transparent);flex:none}.srow .chev{font-size:22px;color:var(--muted)}
 .actions.stick{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));background:var(--surface);margin:12px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:2}
 .sheet textarea{min-height:110px}
@@ -1298,10 +1309,11 @@ function openHelp(){ const sec=SECTIONS.find(s=>s.id===UI.section)||SECTIONS[0];
 function toggleQh(b){ const box=b.closest('section,.card,.sheet')||$view; const tip=[...box.querySelectorAll('.qtip')].find(t=>b.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING);
   if(!tip) return; tip.hidden=!tip.hidden; b.classList.toggle('on',!tip.hidden); b.setAttribute('aria-expanded',String(!tip.hidden)); }
 const FIN_TABS=[['summary','Сводка'],['month','Месяц'],['items','Статьи'],['balance','Баланс'],['funds','Фонды'],['invest','Инвестиции'],['goal','Цель']];
+const FIN_MORE=['items','goal']; // нужны реже — в меню «⋯»
 // nav — в нижнем меню; остальные открываются из «Ещё»
 const SECTIONS=[
   {id:'home',title:'Главная',nav:1},
-  {id:'tasks',title:'Задачи',nav:1,tabs:[['today','Сегодня'],['upcoming','Предстоящие'],['cal','Календарь'],['all','Все'],['done','Готово']]},
+  {id:'tasks',title:'Задачи',nav:1,tabs:[['today','Сегодня'],['cal','Календарь'],['all','Все'],['done','Готово']]},
   {id:'notes',title:'Заметки',nav:1},
   {id:'more',title:'Ещё',nav:1},
   {id:'fin',title:'Финансы',tabs:FIN_TABS},
@@ -1439,14 +1451,14 @@ const GS_SCHEMA = [
     ['period', 'Периодичность, мес. (0 — разово)', 'n'], ['start', 'Дата старта', 'd'], ['end', 'Дата окончания', 'd'],
     ['comment', 'Комментарий', 's'], ['owner', 'Чей доход (me/spouse)', 's'], ['fund', 'Из фонда (ID)', 's'],
     ['subs', 'Подкатегории факта', 's'], ['limit', 'Лимит в месяц', 'n']] },
-  { key: 'facts', sheet: 'Факт', cols: [
+  { key: 'facts', pk: ['item', 'month'], sheet: 'Факт', cols: [
     ['item', 'ID статьи', 's'], ['itemName', 'Статья', 's'], ['month', 'Месяц', 'm'],
     ['value', 'Факт (можно 715+600)', 's'], ['sum', 'Сумма', 'n'],
     ['tags', 'Подкатегории записей (по порядку, через |)', 's']] },
   { key: 'insurance', sheet: 'Страхование', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Статья', 's'], ['amount', 'Сумма платежа', 'n'],
     ['start', 'Начало накопления', 'd'], ['pay', 'Дата платежа', 'd'], ['repeat', 'Повтор, мес. (0 — разово)', 'n'], ['paid', 'Последний платёж', 'd']] },
-  { key: 'insFacts', sheet: 'Страхование — взносы', cols: [
+  { key: 'insFacts', pk: ['ins', 'month'], sheet: 'Страхование — взносы', cols: [
     ['ins', 'ID страховки', 's'], ['insName', 'Статья', 's'], ['month', 'Месяц', 'm'],
     ['value', 'Перевёл на счёт', 's'], ['sum', 'Сумма', 'n']] },
   { key: 'gifts', sheet: 'Подарки', cols: [
@@ -1470,21 +1482,21 @@ const GS_SCHEMA = [
     ['id', 'ID (не менять)', 's'], ['pos', 'ID позиции', 's'], ['posName', 'Позиция', 's'],
     ['date', 'Дата', 'd'], ['amount', 'Сумма', 'n'], ['note', 'Комментарий', 's'],
     ['qty', 'Количество, шт.', 'n'], ['price', 'Цена за шт.', 'n']] },
-  { key: 'invFacts', sheet: 'Инв. доход', cols: [
+  { key: 'invFacts', pk: ['pos', 'month'], sheet: 'Инв. доход', cols: [
     ['pos', 'ID позиции', 's'], ['posName', 'Позиция', 's'], ['month', 'Месяц', 'm'],
     ['value', 'Пришло (купоны, %, дивиденды)', 's'], ['sum', 'Сумма', 'n']] },
   { key: 'invWish', sheet: 'Инв. хочу купить', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Бумага', 's'], ['secid', 'Тикер', 's'], ['kind', 'Вид', 's'], ['lots', 'Лотов', 'n'],
     ['note', 'Заметка', 's'], ['board', 'Режим торгов', 's'], ['market', 'Рынок', 's'], ['q', 'Котировка биржи (служебное)', 'j']] },
-  { key: 'scenarios', sheet: 'Сценарии', cols: [
+  { key: 'scenarios', pk: ['name'], sheet: 'Сценарии', cols: [
     ['name', 'Сценарий', 's'], ['inc', 'Коэфф. доходы', 'n'], ['exp', 'Коэфф. расходы', 'n'], ['sav', 'Коэфф. накопления', 'n']] },
-  { key: 'goalFacts', sheet: 'Цель — факт', cols: [
+  { key: 'goalFacts', pk: ['month'], sheet: 'Цель — факт', cols: [
     ['month', 'Месяц', 'm'], ['value', 'Отложено', 's'], ['sum', 'Сумма', 'n']] },
   { key: 'habits', sheet: 'Привычки', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Привычка', 's'], ['days', 'Дни пн…вс (1 — да)', 's'], ['created', 'Создана', 'd'],
     ['type', 'Тип (check/count)', 's'], ['target', 'Цель в день', 'n'], ['unit', 'Единица', 's'],
     ['link', 'Отмечать само (train/books)', 's'], ['icon', 'Значок', 's']] },
-  { key: 'habitLog', sheet: 'Привычки — отметки', cols: [
+  { key: 'habitLog', pk: ['habit', 'date'], sheet: 'Привычки — отметки', cols: [
     ['habit', 'ID привычки', 's'], ['habitName', 'Привычка', 's'], ['date', 'Дата', 'd'], ['value', 'Сколько сделано', 'n']] },
   { key: 'tasks', sheet: 'Задачи', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Задача', 's'], ['due', 'Срок', 'd'], ['priority', 'Приоритет 0–3', 'n'],
@@ -1493,7 +1505,7 @@ const GS_SCHEMA = [
     ['project', 'ID проекта', 's'], ['projectName', 'Проект', 's'], ['repeatDays', 'Дни повтора пн…вс', 's'], ['checklist', 'Чек-лист (служебное)', 'j'],
     ['times', 'Сколько раз', 'n'], ['timesDone', 'Сделано раз', 'n'],
     ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's'], ['deadline', 'Крайний срок', 'd'],
-    ['gcal', 'Событие Google Календаря (служебное)', 's'], ['remind', 'Напомнить за, мин (пусто — нет)', 's']] },
+    ['gcal', 'Событие Google Календаря (служебное)', 's'], ['remind', 'Напомнить за, мин (пусто — нет)', 's'], ['dtime', 'Крайний срок — время (чч:мм)', 's']] },
   { key: 'projects', sheet: 'Проекты', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Проект', 's'], ['parent', 'ID родительского проекта', 's'], ['created', 'Создан', 'd'],
     ['color', 'Цвет (1–7, пусто — сам)', 's'], ['pin', 'Важный', 'b']] },
@@ -1524,8 +1536,8 @@ const GS_SCHEMA = [
   { key: 'foodLog', sheet: 'Питание', cols: [
     ['id', 'ID (не менять)', 's'], ['date', 'Дата', 'd'], ['meal', 'Приём пищи', 's'], ['name', 'Что', 's'],
     ['kcal', 'Ккал', 'n'], ['p', 'Белки, г', 'n'], ['f', 'Жиры, г', 'n'], ['c', 'Углеводы, г', 'n'], ['g', 'Граммы', 'n'], ['fib', 'Клетчатка, г', 'n']] },
-  { key: 'waterLog', sheet: 'Вода', cols: [['date', 'Дата', 'd'], ['glasses', 'Стаканов', 'n']] },
-  { key: 'weightLog', sheet: 'Вес', cols: [['date', 'Дата', 'd'], ['kg', 'Вес, кг', 'n']] },
+  { key: 'waterLog', pk: ['date'], sheet: 'Вода', cols: [['date', 'Дата', 'd'], ['glasses', 'Стаканов', 'n']] },
+  { key: 'weightLog', pk: ['date'], sheet: 'Вес', cols: [['date', 'Дата', 'd'], ['kg', 'Вес, кг', 'n']] },
   { key: 'exercises', sheet: 'Упражнения', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Упражнение', 's'], ['kind', 'Тип (reps/weight/time)', 's'], ['muscle', 'Группа мышц', 's'], ['note', 'Заметка', 's']] },
   // подходы хранятся одной ячейкой (JSON) — так программа и тренировка остаются одной строкой
@@ -1567,7 +1579,9 @@ const GS_SETTINGS = [
   ['settings.alloc', 'Фонды: проценты и правила (служебное)', 'j'],
   ['settings.people', 'Чей доход: другие люди (служебное)', 'j'],
   ['settings.hidden', 'Скрытые разделы (служебное)', 'j'],
-  ['settings.body', 'Питание — мои данные: пол, год рождения, рост, вес, активность, цель (служебное)', 'j']
+  ['settings.body', 'Питание — мои данные: пол, год рождения, рост, вес, активность, цель (служебное)', 'j'],
+  ['settings.home', 'Главная: порядок и скрытые блоки (служебное)', 'j'],
+  ['settings.sumFold', 'Финансы, сводка: свёрнутые карточки (служебное)', 'j']
 ];
 /*schema@@*/
 const GS_FMT={n:{type:'NUMBER',pattern:'#,##0.##'},d:{type:'DATE',pattern:'dd.mm.yyyy'},s:{type:'TEXT',pattern:'@'}};
@@ -1616,15 +1630,22 @@ async function gsLoad(){
   const m=await gsMeta(true);
   if(!m[GS_SCHEMA[0].sheet]) return '';
   const tabs=GS_SCHEMA.filter(t=>m[t.sheet]), set=!!m[GS_SETTINGS_SHEET];
-  const ranges=tabs.map(t=>gsQ(t.sheet)+'!A2:'+gsCol(t.cols.length)); if(set) ranges.push(gsQ(GS_SETTINGS_SHEET)+'!A2:C');
-  const r=await gsApi('/values:batchGet?'+ranges.map(x=>'ranges='+encodeURIComponent(x)).join('&')+'&valueRenderOption=FORMULA&dateTimeRenderOption=SERIAL_NUMBER');
-  const vr=r.valueRanges||[], data={version:1,settings:{},goal:{}};
-  GS_SCHEMA.forEach(t=>{ data[t.key]=[]; });
-  tabs.forEach((t,i)=>((vr[i]||{}).values||[]).forEach(row=>{ if(!row.some(v=>v!==''&&v!=null)) return;
-    const rec={}; t.cols.forEach((c,j)=>{ rec[c[0]]=gsCell(row[j],c[2]); }); data[t.key].push(rec); }));
+  const {data,vr}=await gsRead(tabs,set?[gsQ(GS_SETTINGS_SHEET)+'!A2:C']:[]);
+  Object.assign(data,{version:1,settings:{},goal:{},srv:2});
+  GS_SCHEMA.forEach(t=>{ if(!data[t.key]) data[t.key]=[]; });
   if(set) ((vr[tabs.length]||{}).values||[]).forEach(row=>{ const def=GS_SETTINGS.find(s=>s[0]===row[0]); if(!def) return;
     const p=def[0].split('.'), v=gsCell(row[2],def[2]); if(p.length===1) data[p[0]]=v; else data[p[0]][p[1]]=v; });
   return JSON.stringify(data);
+}
+// листы → записи (как readTable_ в Code.gs); extra — ещё диапазоны, их ответ в vr после листов
+async function gsRead(tabs,extra){
+  const ranges=tabs.map(t=>gsQ(t.sheet)+'!A2:'+gsCol(t.cols.length)).concat(extra||[]), data={};
+  if(!ranges.length) return {data,vr:[]};
+  const r=await gsApi('/values:batchGet?'+ranges.map(x=>'ranges='+encodeURIComponent(x)).join('&')+'&valueRenderOption=FORMULA&dateTimeRenderOption=SERIAL_NUMBER');
+  const vr=r.valueRanges||[];
+  tabs.forEach((t,i)=>{ data[t.key]=[]; ((vr[i]||{}).values||[]).forEach(row=>{ if(!row.some(v=>v!==''&&v!=null)) return;
+    const rec={}; t.cols.forEach((c,j)=>{ rec[c[0]]=gsCell(row[j],c[2]); }); data[t.key].push(rec); }); });
+  return {data,vr};
 }
 // запись листов одним пакетом (всё или ничего): размер листа, очистка значений, шапка, строки
 function gsSheetReqs(m,name,header,rows,reqs){
@@ -1641,9 +1662,19 @@ function gsSheetReqs(m,name,header,rows,reqs){
 }
 async function gsSave(json,again){
   const msg=JSON.parse(json), data=msg.data||msg, keys=msg.keys||null, want=k=>!keys||keys.includes(k);
-  const m=await gsMeta(again), reqs=[];
-  GS_SCHEMA.forEach(t=>{ if(!want(t.key)) return;
-    gsSheetReqs(m,t.sheet,t.cols.map(c=>c[1]),(data[t.key]||[]).map(rec=>({values:t.cols.map(c=>gsCD(gsOut(rec[c[0]],c[2]),c[2]))})),reqs); });
+  const m=await gsMeta(again), reqs=[], patch=msg.patch||null;
+  // лист удалили руками — записываем его заново целиком из данных на устройстве
+  if(patch&&!msg.archive){ const miss=GS_SCHEMA.filter(t=>!m[t.sheet]&&!patch[t.key]&&want(t.key)); if(miss.length){ const p=payload('obj'); miss.forEach(t=>{ patch[t.key]={all:p[t.key]||[]}; }); } }
+  // по записям: сначала читаем, что сейчас на листах (могли поменять с другого устройства), и вносим только своё
+  const cur=patch?(await gsRead(GS_SCHEMA.filter(t=>patch[t.key]&&!patch[t.key].all&&m[t.sheet]))).data:null;
+  GS_SCHEMA.forEach(t=>{ let recs;
+    if(patch){ if(!patch[t.key]) return; recs=mergeRecs(t,patch[t.key],()=>cur[t.key]||[]); }
+    else { if(!want(t.key)) return; recs=data[t.key]||[]; }
+    gsSheetReqs(m,t.sheet,t.cols.map(c=>c[1]),recs.map(rec=>({values:t.cols.map(c=>gsCD(gsOut(rec[c[0]],c[2]),c[2]))})),reqs); });
+  if(msg.archive&&msg.archive.length){ let a=m[GS_ARCHIVE];
+    if(!a){ gsSheetReqs(m,GS_ARCHIVE,['Раздел','Дата','Запись (служебное)'],[],reqs); a=m[GS_ARCHIVE]; }
+    reqs.push({appendCells:{sheetId:a.id,fields:'userEnteredValue,userEnteredFormat.numberFormat',
+      rows:msg.archive.map(x=>({values:[gsCD(String(x.s||''),'s'),gsCD(gsOut(x.d,'d'),'d'),gsCD(JSON.stringify(x.r||{}),'s')]}))}}); }
   if(['version','settings','goal','trainActive'].some(want))
     gsSheetReqs(m,GS_SETTINGS_SHEET,['Ключ (не менять)','Что это','Значение'],GS_SETTINGS.map(s=>{ const p=s[0].split('.'), v=p.length===1?data[p[0]]:(data[p[0]]||{})[p[1]];
       return {values:[gsCD(s[0],'s'),gsCD(s[1],'s'),gsCD(gsOut(v,s[2]),s[2])]}; }),reqs);
@@ -1820,7 +1851,7 @@ function normalize(d){
     const inc=o.items.filter(it=>it.type==='Доход'||it.type==='Разовый доход'), mine=inc.filter(it=>(it.owner||'me')==='me');
     f.src=(f.who==='all'||mine.length===inc.length)?[]:mine.map(it=>it.id); f.once=AL0.base==='all'; delete f.who; });
   o.facts.forEach(f=>{ if(f.tags==null) f.tags=''; });
-  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; if(t.deadline==null) t.deadline=''; if(t.gcal==null) t.gcal=''; if(t.remind==null) t.remind=''; t.remind=String(t.remind); t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
+  o.tasks.forEach(t=>{ if(t.project==null) t.project=''; if(t.time==null) t.time=''; if(!Array.isArray(t.checklist)) t.checklist=[]; if(t.repeatDays==null) t.repeatDays=''; if(t.deadline==null) t.deadline=''; if(t.dtime==null) t.dtime=''; if(t.gcal==null) t.gcal=''; if(t.remind==null) t.remind=''; t.remind=String(t.remind); t.times=Math.max(1,Math.min(12,Math.round(numOr(t.times,1)))); t.timesDone=Math.max(0,Math.min(t.times,Math.round(numOr(t.timesDone,0)))); });
   o.goals.forEach(g=>{ for(const k of ['specific','measure','achievable']) if(g[k]==null) g[k]=''; });
   o.habits.forEach(h=>{ if(!h.type) h.type='check'; });
   for(const list of [o.projects,o.fundSpend]) list.forEach(x=>{ if(!x.id) x.id=uid(); });
@@ -1871,6 +1902,7 @@ let saveTimer=null, saving=false, dirtyAll=false;
 const dirtyKeys=new Set();
 const isDirty=()=>dirtyAll||dirtyKeys.size>0;
 function persist(...keys){
+  DATA_VER++;
   if(!canSave){ setSync('err','Не сохранено: нет связи с таблицей'); return; }
   if(keys.includes('facts')&&!keys.includes('expLog')) keys.push('expLog');
   if(!keys.length) dirtyAll=true; else keys.forEach(k=>dirtyKeys.add(k));
@@ -1901,7 +1933,44 @@ function payload(keys){
   const pays=names(S.payments); p.payLog.forEach(l=>{ l.payName=pays[l.pay]||''; });
   const exn=names(S.exercises);
   p.workouts.forEach(w=>{ w.summary=(w.items||[]).map(it=>(exn[it.ex]||it.exName||'')+' '+it.sets.length+'×').join('; '); });
-  return JSON.stringify({keys,data:p});
+  return keys==='obj'?p:JSON.stringify({keys,data:p});
+}
+/* Сохранение по записям. BASE — что лежит в таблице, по нашим сведениям (ключ записи → отпечаток), с последней
+   загрузки или сохранения. В таблицу уходят только изменённые, новые и удалённые записи — правки с другого
+   устройства в других записях не затираются. Нужен свежий скрипт (srv:2 в ответе loadState) или вход через Google. */
+const BASE_KEY='moyplan.base.v1', GS_ARCHIVE='Архив';
+let BASE=null;
+const remoteId=()=>IS_GAS?'gas':REMOTE?(REMOTE.g?'g:'+REMOTE.sheet:'u:'+REMOTE.url):'';
+function baseGet(){
+  const id=remoteId(); if(BASE&&BASE.id===id) return BASE;
+  try{ const b=JSON.parse(localStorage.getItem(BASE_KEY)||'null'); BASE=b&&b.id===id&&b.t?b:null; }catch(e){ BASE=null; }
+  return BASE||(BASE={id,srv:0,t:{}});
+}
+function baseKeep(){ try{ localStorage.setItem(BASE_KEY,JSON.stringify(BASE)); }catch(e){} }
+// ключ записи и слияние — как recKey_/mergeRecs_ в Code.gs
+const recKey=(t,r)=>t.pk?t.pk.map(k=>String(r[k]==null?'':r[k])).join('|'):String(r.id==null?'':r.id);
+function mergeRecs(t,p,read){
+  if(p.all) return p.all;
+  const del=new Set(p.del||[]), out=read().filter(r=>!del.has(recKey(t,r))), at=new Map();
+  out.forEach((r,i)=>at.set(recKey(t,r),i));
+  (p.put||[]).forEach(r=>{ const k=recKey(t,r); if(at.has(k)) out[at.get(k)]=r; else { at.set(k,out.length); out.push(r); } });
+  if(!p.order) return out;
+  const pos=new Map(p.order.map((k,i)=>[k,i])), first=out.filter(r=>pos.has(recKey(t,r))).sort((a,b)=>pos.get(recKey(t,a))-pos.get(recKey(t,b)));
+  return first.concat(out.filter(r=>!pos.has(recKey(t,r))));
+}
+function recHash(t,r){ const s=JSON.stringify(t.cols.map(c=>r[c[0]]==null?null:r[c[0]])); let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0).toString(36); }
+const baseOf=(t,recs)=>(recs||[]).map(r=>[recKey(t,r),recHash(t,r)]);
+// что поменялось в разделах keys (null — во всех) против BASE: {раздел: {put, del, order?} или {all}}
+function diffPatch(p,keys){
+  const B=baseGet(), patch={};
+  GS_SCHEMA.forEach(t=>{ if(keys&&!keys.includes(t.key)) return;
+    const recs=p[t.key]||[], b=B.t[t.key], ks=recs.map(r=>recKey(t,r)), kset=new Set(ks);
+    if(!b||ks.some(k=>!k)||kset.size!==ks.length){ patch[t.key]={all:recs}; return; }
+    const bm=new Map(b), put=recs.filter((r,i)=>bm.get(ks[i])!==recHash(t,r)), del=b.map(x=>x[0]).filter(k=>!kset.has(k));
+    const was=b.map(x=>x[0]).filter(k=>kset.has(k)), now=ks.filter(k=>bm.has(k)), moved=was.some((k,i)=>k!==now[i]);
+    if(put.length||del.length||moved) patch[t.key]=Object.assign({put,del},moved?{order:ks}:{}); });
+  return patch;
 }
 function flush(){
   if(!IS_GAS&&!REMOTE){ try{ localStorage.setItem(LS_KEY,JSON.stringify(S)); dirtyAll=false; dirtyKeys.clear(); setSync('ok','Сохранено в этом браузере'); }catch(e){ setSync('err','Браузер не дал сохранить'); } return; }
@@ -1911,8 +1980,12 @@ function flush(){
   if(REMOTE&&navigator.onLine===false){ setSync('pending','Нет интернета — сохранено в телефоне'); return; }
   const keys=dirtyAll?null:[...dirtyKeys];
   dirtyAll=false; dirtyKeys.clear(); saving=true;
-  const body=payload(keys);
-  server('saveState',body).then(()=>{ saving=false; if(REMOTE) keepLocal(); if(!isDirty()) setSync('ok','Сохранено в Google Таблице'); },
+  const p=payload('obj'), B=baseGet(), patch=B.srv>=2?diffPatch(p,keys):null;
+  // старый скрипт не умеет по записям — шлём разделы целиком, как раньше
+  const body=JSON.stringify(patch?{keys,patch,data:{version:p.version,settings:p.settings,goal:p.goal,trainActive:p.trainActive}}:{keys,data:p});
+  server('saveState',body).then(()=>{ saving=false; if(REMOTE) keepLocal();
+    GS_SCHEMA.forEach(t=>{ if(!keys||keys.includes(t.key)) B.t[t.key]=baseOf(t,p[t.key]); }); baseKeep();
+    if(!isDirty()) setSync('ok','Сохранено в Google Таблице'); },
     err=>{ saving=false; if(keys) keys.forEach(k=>dirtyKeys.add(k)); else dirtyAll=true;
       if(REMOTE){ keepLocal(); if(!gsNeedNotice(err)) setSync('pending','Нет связи с таблицей — сохранено в телефоне, отправлю позже');
         clearTimeout(retryT); retryT=setTimeout(()=>{ if(isDirty()) flush(); },30000); }
@@ -1997,8 +2070,10 @@ function notifPlan(){
     push('free|'+x.p.id+'|'+k+'|w',at(dkey(addDays(parseD(k),-7)),'10:00'),'Через неделю освободится '+rub(x.amt),nm+': '+what+' '+dRu(k).slice(0,5)+'. Подумайте, куда реинвестировать','invest');
     push('free|'+x.p.id+'|'+k,at(k,'10:00'),'Сегодня '+what+': '+nm,'Вернётся около '+rub(x.amt)+' — можно реинвестировать','invest'); });
   if(c.task) S.tasks.forEach(x=>{ if(!x.done&&x.due&&x.time&&x.remind!=='0') push('task|'+x.id+'|'+x.due+'|'+x.time,at(x.due,x.time),x.name,'Задача на '+x.time,'task'); });
-  S.tasks.forEach(x=>{ if(x.done||!x.due||x.remind==null||x.remind==='') return; const m=+x.remind; if(!(m>=0)) return;
-    push('trem|'+x.id+'|'+x.due+'|'+(x.time||'')+'|'+m,at(x.due,x.time||'09:00')-m*6e4,'⏰ '+(x.name||'Задача'),(x.time?'Задача на '+x.time+(m?' — '+remindTxt(m):''):'Задача на '+dayLabel(x.due).toLowerCase()),'task'); });
+  // напоминание — от даты и времени выполнения; без даты выполнения — от крайнего срока и его времени
+  S.tasks.forEach(x=>{ if(x.done||!(x.due||x.deadline)||x.remind==null||x.remind==='') return; const m=+x.remind; if(!(m>=0)) return;
+    const dl=!x.due, k=dl?x.deadline:x.due, tm=dl?x.dtime:x.time;
+    push('trem|'+x.id+'|'+k+'|'+(tm||'')+'|'+m,at(k,tm||'09:00')-m*6e4,'⏰ '+(x.name||'Задача'),(dl?'Крайний срок '+(tm?'в '+tm:dayLabel(k).toLowerCase()):tm?'Задача на '+tm:'Задача на '+dayLabel(k).toLowerCase())+(tm&&m?' — '+remindTxt(m):''),'task'); });
   if(c.digest) for(let i=0;i<=H;i++){ const k=dkey(addDays(t,i)), l=S.tasks.filter(x=>!x.done&&x.due&&(i===0?x.due<=k:x.due===k));
     if(l.length) push('digest|'+k,at(k,c.digestAt),'На сегодня '+l.length+' '+plural(l.length,'задача','задачи','задач'),l.slice(0,4).map(x=>x.name).join(', ')+(l.length>4?'…':''),'task'); }
   if(c.habit) for(let i=0;i<=H;i++){ const d=addDays(t,i), k=dkey(d), l=S.habits.filter(h=>h.days[wd(d)]==='1'&&(h.created||'')<=k&&!(HL[h.id]&&HL[h.id].has(k)));
@@ -2009,7 +2084,9 @@ function notifPlan(){
 }
 // после каждой отрисовки (с задержкой): уведомления, задачи для виджета, ссылка на таблицу для виджета
 let nativeT=null;
-function nativeSync(){ if(!NATIVE||!S) return; clearTimeout(nativeT); nativeT=setTimeout(()=>{ try{
+// виджеты и уведомления; из render — только если данные или день поменялись (soft)
+let NSYNC='', NS_S=null;
+function nativeSync(soft){ if(!NATIVE||!S) return; const k=DATA_VER+'|'+todayK(); if(soft===true&&NS_S===S&&NSYNC===k) return; NSYNC=k; NS_S=S; clearTimeout(nativeT); nativeT=setTimeout(()=>{ try{
   NATIVE.schedule(JSON.stringify(notifPlan()));
   const wk=dkey(addDays(TODAY(),7));
   NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&(x.deadline||x.due&&x.due<=wk)).map(x=>({id:x.id,name:x.name,due:x.due,deadline:x.deadline||'',time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
@@ -2070,14 +2147,52 @@ function pullRemote(){
     if(S&&!document.getElementById('sheet').hidden){ setTimeout(pullRemote,5000); return; }
     let d=null; try{ d=json?JSON.parse(json):null; }catch(e){}
     canSave=true;
-    if(d){ const [o,mig]=normalize(d), same=S&&JSON.stringify(o)===JSON.stringify(S); S=o; keepLocal();
-      setSync('ok','Загружено из Google Таблицы'); if(!same) render(); if(mig) persist(); applyInbox(); }
+    if(d){ const srv=+d.srv||0; delete d.srv;
+      const raw={}; GS_SCHEMA.forEach(t=>{ raw[t.key]=(Array.isArray(d[t.key])?d[t.key]:[]).map(r=>recKey(t,r||{})).filter(Boolean); });
+      const [o,mig]=normalize(d), same=S&&JSON.stringify(o)===JSON.stringify(S); S=o; keepLocal();
+      // загруженное = то, что в таблице: от этого и считаются следующие правки
+      const B=baseGet(), p=payload('obj'); B.srv=srv;
+      // что normalize убрал (старая корзина и т.п.) — в таблице ещё есть: при следующем сохранении удалится
+      GS_SCHEMA.forEach(t=>{ const b=baseOf(t,p[t.key]), have=new Set(b.map(x=>x[0])); raw[t.key].forEach(k=>{ if(!have.has(k)){ have.add(k); b.push([k,'']); } }); B.t[t.key]=b; }); baseKeep();
+      setSync('ok','Загружено из Google Таблицы'); if(!same) render(); if(mig) persist(); applyInbox(); setTimeout(archiveOld,3000); }
     else { if(!S) S=normalize(DEFAULT_DATA)[0]; render(); persist(); toast('Таблица была пустой — отправил в неё данные с этого устройства'); }
   }, err=>{
     if(!S){ canSave=false; S=normalize(DEFAULT_DATA)[0]; render();
       setSync('err','Нет связи с таблицей — правки не сохранятся'); toast('Не удалось загрузить: '+errText(err)); }
     else { if(!gsNeedNotice(err)) setSync('pending','Нет связи с таблицей — работаю с копией в телефоне'); applyInbox(); }
   });
+}
+
+/* Архив: раз в неделю записи старше года (питание, вода, выполненные задачи без цели) уходят на лист «Архив»
+   и убираются из приложения. Одним запросом: удалить из разделов + дописать в архив — ничего не теряется. */
+const ARCH_KEY='moyplan.archive.v1', ARCH_DAYS=365;
+function archivePick(cut){
+  const pick={};
+  const add=(key,f)=>{ const l=S[key].filter(f); if(l.length) pick[key]=l; };
+  // питание: свой продукт берётся из прошлых записей — последняя запись каждого названия остаётся
+  const lastFood=new Map(); S.foodLog.forEach(x=>{ const n=String(x.name||'').toLowerCase(), o=lastFood.get(n); if(!o||String(x.date||'')>String(o.date||'')) lastFood.set(n,x); });
+  add('foodLog',x=>x.date&&x.date<cut&&lastFood.get(String(x.name||'').toLowerCase())!==x);
+  add('waterLog',x=>x.date&&x.date<cut);
+  add('tasks',x=>x.done&&!x.goal&&x.doneAt&&x.doneAt<cut&&(!x.repeat||x.repeat==='none'));
+  return pick;
+}
+async function archiveOld(){
+  if(!S||!REMOTE&&!IS_GAS||isDirty()||saving||baseGet().srv<2) return;
+  let last=0; try{ last=+localStorage.getItem(ARCH_KEY)||0; }catch(e){}
+  if(Date.now()-last<7*864e5) return;
+  const pick=archivePick(dkey(addDays(TODAY(),-ARCH_DAYS))), keys=Object.keys(pick);
+  const done=()=>{ try{ localStorage.setItem(ARCH_KEY,String(Date.now())); }catch(e){} };
+  if(!keys.length) return done();
+  const p=payload('obj'), B=baseGet(), patch={}, archive=[];
+  keys.forEach(k=>{ const t=GS_SCHEMA.find(x=>x.key===k), ids=new Set(pick[k].map(r=>recKey(t,r)));
+    patch[k]={put:[],del:[...ids]};
+    p[k].filter(r=>ids.has(recKey(t,r))).forEach(r=>archive.push({s:t.sheet,d:r.date||r.doneAt||'',r})); });
+  saving=true;
+  try{ await server('saveState',JSON.stringify({keys,patch,archive,data:{}}));
+    keys.forEach(k=>{ const t=GS_SCHEMA.find(x=>x.key===k), ids=new Set(patch[k].del), gone=new Set(pick[k]);
+      S[k]=S[k].filter(r=>!gone.has(r)); if(B.t[k]) B.t[k]=B.t[k].filter(x=>!ids.has(x[0])); });
+    baseKeep(); done(); keepLocal(); render();
+  }catch(e){} finally{ saving=false; }
 }
 
 function boot(){
@@ -2162,7 +2277,14 @@ function launch(a){
 /* ---------- отрисовка ---------- */
 const $view=document.getElementById('view');
 function selMonth(){ const ms=C.months; let m=UI.month??C.curM; if(m<ms[0]||m>ms[ms.length-1]) m=Math.max(ms[0],Math.min(ms[ms.length-1],C.curM)); UI.month=m; return m; }
+// расчёты (план, привычки): при простом переходе по разделам и вкладкам (NAV_ACTS) не пересчитываются,
+// если с прошлого раза не было persist, не сменился день и сам план; при любом другом действии — всегда
+let DATA_VER=0, NAV=false; const PREP={};
+const NAV_ACTS=new Set(['section','tab','tabGo','tView','back','listAll','mgM','hcal','hview','tMore','homeSetup','projToggle','moreOpen','goto','habit','goalOpen','taskOpen','noteOpen','nfOpen','nfBack','tcalV','tcalNav']);
 function prepare(){
+  for(const k in CH) delete CH[k];
+  const day=todayK(), nav=NAV; NAV=false; if(nav&&PREP.s===S&&PREP.v===DATA_VER&&PREP.d===day&&C) return;
+  PREP.s=S; PREP.v=DATA_VER; PREP.d=day;
   C=compute(S);
   // HL — дни, когда привычка выполнена; HV — введённые количества (для привычек «сколько сделал»)
   HL={}; HV={}; const hb={}; S.habits.forEach(h=>{ HL[h.id]=new Set(); HV[h.id]=new Map(); hb[h.id]=h; });
@@ -2170,20 +2292,22 @@ function prepare(){
     if(h.type==='count'){ const v=numOr(l.value,0); HV[h.id].set(l.date,v); if(v>=habitTarget(h)) HL[h.id].add(l.date); }
     else HL[h.id].add(l.date); });
   const today=TODAY(); HS={}; S.habits.forEach(h=>HS[h.id]=habitStats(h,HL[h.id],today));
-  for(const k in CH) delete CH[k];
 }
 // поля быстрого ввода: набранный текст переживает перерисовку; после «Добавить» поле очищает обработчик
 const KEEP_IN=['qaTitle','homeTask','tcalNew'];
 function render(){
   if(LAUNCH){ const a=LAUNCH; LAUNCH=null; setTimeout(()=>launch(a),0); }
-  prepare(); nativeSync();
+  const nav=NAV; prepare(); nativeSync(nav);
+  const vk=UI.section+'|'+UI.tab+'|'+UI.sub[UI.section]+'|'+UI.noteFolder; if(vk!==render.vk){ render.vk=vk; UI.listAll=false; }
   const sec=SECTIONS.find(s=>s.id===UI.section)||SECTIONS[0];
   document.getElementById('title').textContent=sec.title;
   document.documentElement.style.setProperty('--sec','var(--s-'+sec.id+')');
   document.getElementById('secIc').innerHTML=icon(sec.id);
   document.getElementById('bottom').innerHTML=SECTIONS.filter(s=>s.nav).map(s=>`<button class="${s.id===UI.section||(s.id==='more'&&!sec.nav)?'on':''}" data-act="section" data-id="${s.id}">${icon(s.id)}<span>${s.title}</span></button>`).join('');
   const sub=document.getElementById('subnav');
-  if(sec.tabs){ const cur=sec.id==='fin'?UI.tab:UI.sub[sec.id]; sub.hidden=false; sub.innerHTML=sec.tabs.map(([id,t])=>`<button class="chip ${id===cur?'on':''}" data-act="tab" data-id="${id}">${t}</button>`).join(''); }
+  if(sec.tabs){ const cur=sec.id==='fin'?UI.tab:UI.sub[sec.id]; sub.hidden=false; const more=sec.id==='fin'?FIN_MORE:[], mc=more.includes(cur)&&sec.tabs.find(x=>x[0]===cur);
+    sub.innerHTML=sec.tabs.filter(([id])=>!more.includes(id)).map(([id,t])=>`<button class="chip ${id===cur?'on':''}" data-act="tab" data-id="${id}">${t}</button>`).join('')
+      +(more.length?`<button class="chip ${mc?'on':''}" data-act="tabMore" aria-label="Ещё вкладки">${mc?mc[1]+' ':''}⋯</button>`:''); }
   else sub.hidden=true;
   $view.classList.toggle('wide',UI.section==='tasks');
   const keep={}; for(const id of KEEP_IN){ const e=document.getElementById(id); if(e&&e.value) keep[id]=e.value; }
@@ -2214,6 +2338,9 @@ function afterRender(){
   if(S.trainActive&&!WL) keepAwake(true);
   document.querySelectorAll('[data-chart]').forEach(drawChart);
   drawTimer();
+  $view.querySelectorAll('.card[data-fold]').forEach(c=>{ const h=c.firstElementChild; if(!h) return; h.classList.add('fold-h');
+    const on=c.classList.contains('folded'), b=document.createElement('button'); b.type='button'; b.className='fold-btn'; b.dataset.act='sumFold'; b.dataset.id=c.dataset.fold;
+    b.setAttribute('aria-expanded',String(!on)); b.setAttribute('aria-label',on?'Развернуть':'Свернуть'); b.textContent=on?'▾':'▴'; h.appendChild(b); });
   $view.querySelectorAll('input[data-fact],input[data-ifact],input[data-insf],input[data-gfact],input[data-posval]').forEach(inp=>inp.classList.toggle('bad',isNaN(evalExpr(inp.value))));
   if(UI.section==='fin') setTimeout(()=>refreshQuotes(false),0);
   document.querySelectorAll('#subnav .chip.on,.qa-line .chip.on').forEach(c=>{ const p=c.parentElement, l=c.offsetLeft-p.offsetLeft;
@@ -2240,12 +2367,12 @@ function viewSummary(){
   const jj=ms.indexOf(C.curM);
   return `${S.items.length?'':firstStep('fin','Начните с плана','Добавьте в «Статьи» доходы и обычные расходы — приложение посчитает, сколько остаётся каждый месяц.',`<button class="btn small" data-act="tab" data-id="items">Открыть «Статьи»</button>`)}
   <section class="card">${jj>=0?moneyHero(jj):''}${capAt()}</section>
-  ${nowNextCard()}
-  ${incYear()}
-  <section class="card"><h3>Прибыль по месяцам${QH}</h3><p class="hint qtip" hidden>Доходы − расходы − накопления. Там, где введён факт, — по факту.</p><div class="chart" data-chart="free"></div></section>
-  ${avgCard()}
-  <section class="card"><h3>Накопленный капитал${QH}</h3><p class="hint qtip" hidden>Свободные деньги — прибыль нарастающим итогом с начала плана. Накопления — отложенное (статьи «Накопление») плюс вклады и инвестиции по текущей стоимости.</p>
-    <div class="legend"><span><i style="--c:var(--series)"></i>свободные</span><span><i style="--c:var(--t3)"></i>накопления</span></div><div class="chart" data-chart="cum"></div></section>
+  ${fold('now',nowNextCard())}
+  ${fold('inc',incYear())}
+  ${fold('free',`<section class="card"><h3>Прибыль по месяцам${QH}</h3><p class="hint qtip" hidden>Доходы − расходы − накопления. Там, где введён факт, — по факту.</p><div class="chart" data-chart="free"></div></section>`)}
+  ${fold('avg',avgCard())}
+  ${fold('cum',`<section class="card"><h3>Накопленный капитал${QH}</h3><p class="hint qtip" hidden>Свободные деньги — прибыль нарастающим итогом с начала плана. Накопления — отложенное (статьи «Накопление») плюс вклады и инвестиции по текущей стоимости.</p>
+    <div class="legend"><span><i style="--c:var(--series)"></i>свободные</span><span><i style="--c:var(--t3)"></i>накопления</span></div><div class="chart" data-chart="cum"></div></section>`)}
   <div class="kpis">
     ${kpi('Минимальный месячный остаток',B.free[mi],monthTitle(ms[mi]))}
     ${kpi('Сбережения сейчас',B.savings[cj],'отложено + вклады и инвестиции')}
@@ -2256,6 +2383,9 @@ function viewSummary(){
     <div class="thermo"><i style="width:${(g.pct*100).toFixed(1)}%"></i></div>
     <div class="hint" style="margin:0">накоплено ${rub(g.saved)} из ${rub(g.target)} · осталось ${rub(g.left)}</div></section>`:''}`;
 }
+// карточки сводки сворачиваются (settings.sumFold — список свёрнутых); заголовок — первый элемент карточки
+function fold(id,html){ if(!html) return ''; const on=(Array.isArray(S.settings.sumFold)?S.settings.sumFold:[]).includes(id);
+  return html.replace('<section class="card"',`<section class="card fold ${on?'folded':''}" data-fold="${id}"`); }
 // капитал на выбранный месяц: свободные деньги нарастающим итогом + накопления
 function capAt(){ const ms=C.months, B=C.B; const dec=Math.floor(C.curM/12)*12+11; let m=UI.capM; if(m==null||!ms.includes(m)) m=ms.includes(dec)?dec:ms[ms.length-1];
   const j=ms.indexOf(m), tot=B.cum[j]+B.savings[j];
@@ -3186,10 +3316,41 @@ function habitsStats(){
   return `<div class="kpis">${kpiT('Сегодня',doneN+' из '+due.length)}${kpiT('За 7 дней',pct(agg('d7')))}${kpiT('За 30 дней',pct(agg('d30')))}${kpiT('Лучшая серия сейчас',bestNow?serTxt(HS[bestNow.id],HS[bestNow.id].cur):'—',bestNow?esc(bestNow.name):'')}</div>
   <section class="card"><h3>Выполнение по дням${QH}</h3><p class="hint qtip" hidden>Доля сделанных из запланированных на день, последние 30 дней.</p><div class="chart" data-chart="hday"></div>
     <div class="legend" style="margin-top:8px"><span><i style="--c:var(--good)"></i>всё выполнено</span><span><i style="--c:var(--serious)"></i>не всё</span></div></section>
+  ${habitMonthCard()}
   <section class="card"><h3>По привычкам${QH}</h3><p class="hint qtip" hidden>За 30 дней. Нажмите, чтобы открыть статистику привычки.</p>
     ${ranked.map(h=>{ const st=HS[h.id]; return `<button class="pbar" data-act="habit" data-id="${h.id}"><div class="m"><div class="row-between"><span class="fname">${ico(h)}${esc(h.name)}</span><b class="num">${pct(st.d30.pct)}</b></div>
       <div class="thermo"><i style="width:${((st.d30.pct||0)*100).toFixed(1)}%"></i></div><div class="fsub">${st.d30.c} из ${st.d30.s} · серия ${serTxt(st,st.cur)}, лучшая ${serTxt(st,st.best)}</div></div>${CHEV}</button>`; }).join('')}
   </section>`;
+}
+/* Статистика за месяц сеткой: строка — привычка (или цель), клетка — день месяца. UI.mgM — выбранный месяц (номер года*12+месяц). */
+function mgMonth(){ const t=TODAY(), now=t.getFullYear()*12+t.getMonth(); if(UI.mgM==null||UI.mgM>now) UI.mgM=now; return UI.mgM; }
+function mgShell(title,hint,cm,rows){
+  const now=TODAY().getFullYear()*12+TODAY().getMonth(), dim=new Date(Math.floor(cm/12),cm%12+1,0).getDate();
+  return `<section class="card"><h3>${title}${QH}</h3><p class="hint qtip" hidden>${hint}</p>
+    <div class="monthbar" style="margin:4px 0 8px"><button class="nav-btn" data-act="mgM" data-d="-1" aria-label="Предыдущий месяц">‹</button><div class="t"><b>${monthTitle(cm)}</b></div><button class="nav-btn" data-act="mgM" data-d="1" ${cm>=now?'disabled':''} aria-label="Следующий месяц">›</button></div>
+    <div class="mgrid" style="--n:${dim}"><span></span><div class="mdays head">${[...Array(dim)].map((_,k)=>`<i>${(k+1)%5===0||k===0?k+1:''}</i>`).join('')}</div><span></span>${rows}</div></section>`;
+}
+function habitMonthCard(){
+  const cm=mgMonth(), y=Math.floor(cm/12), m=cm%12, dim=new Date(y,m+1,0).getDate(), today=TODAY();
+  const rows=S.habits.map(h=>{ const st=HS[h.id]; let p=0,c=0;
+    const cells=[...Array(dim)].map((_,k)=>{ const d=new Date(y,m,k+1), dk=dkey(d), cls=hState(h,dk), sc=d>=st.created&&st.sched(d), fut=d>today;
+      if(!fut&&d>=st.created){ if(sc) p++; if(cls==='on'||cls==='over') c++; }
+      return `<i class="${cls==='on'||cls==='over'?'on':cls==='part'?'part':sc?'':'off'} ${fut?'fut':''}" title="${k+1} ${MG[m]}"></i>`; }).join('');
+    return `<button class="mn namebtn" data-act="habit" data-id="${h.id}">${ico(h)}${esc(h.name)}</button><div class="mdays">${cells}</div><b class="mp num">${p?Math.round(Math.min(c,p)/p*100)+'%':'—'}</b>`; }).join('');
+  return mgShell('За месяц','Зелёная клетка — сделано, бледная — сделано меньше цели, пунктир — день не по плану. Справа — выполнено из запланированного за месяц.',cm,rows);
+}
+// цели: в какие дни было движение — выполнен шаг или задача цели
+function goalMonthCard(list){
+  if(!list.length) return '';
+  const cm=mgMonth(), y=Math.floor(cm/12), m=cm%12, dim=new Date(y,m+1,0).getDate(), today=TODAY(), pre=y+'-'+String(m+1).padStart(2,'0')+'-';
+  const rows=list.map(g=>{ const days=new Map();
+    S.goalSteps.forEach(x=>{ if(x.goal===g.id&&x.done&&String(x.doneAt||'').startsWith(pre)) days.set(x.doneAt,(days.get(x.doneAt)||0)+1); });
+    S.tasks.forEach(x=>{ if(x.goal===g.id&&x.done&&String(x.doneAt||'').startsWith(pre)) days.set(x.doneAt,(days.get(x.doneAt)||0)+1); });
+    const n=[...days.values()].reduce((a,b)=>a+b,0);
+    const cells=[...Array(dim)].map((_,k)=>{ const dk=pre+String(k+1).padStart(2,'0'), v=days.get(dk)||0;
+      return `<i class="${v?'on':''} ${new Date(y,m,k+1)>today?'fut':''}" title="${k+1} ${MG[m]}${v?': сделано '+v:''}"></i>`; }).join('');
+    return `<button class="mn namebtn" data-act="goalOpen" data-id="${g.id}">${ico(g)}${esc(g.name)}</button><div class="mdays">${cells}</div><b class="mp num">${n||'—'}</b>`; }).join('');
+  return mgShell('Движение за месяц','Зелёная клетка — в этот день выполнен шаг или задача цели. Справа — сколько всего за месяц.',cm,rows);
 }
 function viewHabit(h){
   const st=HS[h.id], today=TODAY(), i=S.habits.indexOf(h);
@@ -3261,30 +3422,52 @@ function viewHome(){
   const sh=open.slice(0,LIM), nOver=sh.filter(t=>tOver(t,tk)).length;
   const tl=open.length?`<div class="hlist">${nOver?'<div class="hsub neg">Просрочено</div>':''}${sh.map((t,i)=>(nOver&&i===nOver?'<div class="hsub">Сегодня</div>':'')+taskRow(t)).join('')}</div>${open.length>LIM?`<button class="more" data-act="section" data-id="tasks">Ещё ${open.length-LIM} ›</button>`:''}`
     :`<p class="hint" style="margin:6px 0 0">${doneN?'На сегодня всё сделано.':S.tasks.length?'На сегодня задач нет.':'Здесь будут задачи на сегодня. Срок можно писать словами: «завтра в 10», «в пятницу».'}</p>`;
-  html+=homeCard('tasks','Задачи на сегодня'+(open.length?` <span class="fsub num">${open.length}</span>`:''),add+tl,'Все');
+  const B={}; // блоки главной: порядок и видимость — settings.home (HOME_BLOCKS)
+  B.tasks=homeCard('tasks','Задачи на сегодня'+(open.length?` <span class="fsub num">${open.length}</span>`:''),add+tl,'Все');
   // привычки на сегодня — отметка одним касанием
   const due=secOn('habits')?S.habits.filter(x=>HS[x.id].sched(today)||HL[x.id].has(tk)):[];
   if(due.length){ const dn=due.filter(x=>HL[x.id].has(tk)).length;
-    html+=homeCard('habits',`Привычки <span class="fsub num">${dn} из ${due.length}</span>`,`<div class="hpills">${due.map(x=>{ const on=HL[x.id].has(tk), v=x.type==='count'?HV[x.id].get(tk):null;
+    B.habits=homeCard('habits',`Привычки <span class="fsub num">${dn} из ${due.length}</span>`,`<div class="hpills">${due.map(x=>{ const on=HL[x.id].has(tk), v=x.type==='count'?HV[x.id].get(tk):null;
       return `<button class="hpill ${on?'on':''}" data-act="hToggle" data-h="${x.id}" data-d="${tk}" aria-pressed="${on}"><i>${on?'✓':v!=null?fmtN(v):''}</i><span>${ico(x)}${esc(x.name)}</span></button>`; }).join('')}</div>`,'Все'); }
   // деньги в этом месяце
   const j=C.months.indexOf(C.curM);
-  if(secOn('fin')) html+=homeCard('fin','Деньги',!S.items.length
+  if(secOn('fin')) B.money=homeCard('fin','Деньги',!S.items.length
     ?firstStep('fin','Начните с плана','Добавьте доходы и обычные расходы — здесь появится, сколько остаётся каждый месяц.',`<button class="btn small" data-act="goto" data-sec="fin" data-tab="items">Открыть «Статьи»</button>`)
     :j<0?`<p class="hint" style="margin:0">Сегодняшний месяц вне периода плана — продлите план в настройках.</p>`:moneyHero(j),'Финансы');
   // лимиты по статьям в этом месяце
   const lims=S.items.map(it=>({it,L:limitOf(it,tk.slice(0,7))})).filter(x=>x.L).sort((a,b)=>b.L.pct-a.L.pct);
-  if(lims.length&&secOn('fin')) html+=homeCard('fin','Лимиты',lims.map(({it,L})=>`<div class="limrow"><div class="row-between"><span class="fname">${esc(it.name)}</span><span class="num fsub">${fmt(L.spent)} из ${fmt(L.lim)}</span></div>${limitBar(L)}<div class="fsub">${L.left>=0?'осталось '+rub(L.left):'<span class="neg">превышен на '+rub(-L.left)+'</span>'}</div></div>`).join(''));
+  if(lims.length&&secOn('fin')) B.limits=homeCard('fin','Лимиты',lims.map(({it,L})=>`<div class="limrow"><div class="row-between"><span class="fname">${esc(it.name)}</span><span class="num fsub">${fmt(L.spent)} из ${fmt(L.lim)}</span></div>${limitBar(L)}<div class="fsub">${L.left>=0?'осталось '+rub(L.left):'<span class="neg">превышен на '+rub(-L.left)+'</span>'}</div></div>`).join(''));
   // скоро: платежи, дни рождения, резервы, погашения — на неделю вперёд
   const wk=dkey(addDays(today,7)), rows=[];
-  const pays=secOn('pay')?payOcc(dkey(addDays(today,-31)),wk).filter(o=>!o.paid&&(o.due>=tk||o.due>=(o.p.created||''))):[];
+  // ближайший платёж — отдельным блоком с кнопкой «Оплачено» (в «Скоро» его уже нет)
+  const np=secOn('pay')&&homeOn('pay')?payOcc(dkey(addDays(today,-31)),dkey(addDays(today,62))).find(o=>!o.paid&&(o.due>=tk||o.due>=(o.p.created||''))):null;
+  if(np){ const it=np.p.item&&S.items.find(x=>x.id===np.p.item), over=np.due<tk, n=daysTo(np.due);
+    B.pay=homeCard('pay','Ближайший платёж',`<div class="npay"><button class="tmain" data-act="payOpen" data-id="${np.p.id}"><span class="fname">${esc(np.p.name)}</span>
+      <span class="fsub">${over?`<span class="neg">просрочен · ${dayLabel(np.due)}</span>`:dayLabel(np.due)+(n>1?' · через '+n+' '+plural(n,'день','дня','дней'):'')}${it?' · '+esc(it.name):''}</span></button>
+      <b class="num">${rub(payAmt(np))}</b><button class="btn small primary" data-act="payMark" data-id="${np.p.id}" data-due="${np.due}">Оплачено</button></div>`,'Все'); }
+  const pays=secOn('pay')?payOcc(dkey(addDays(today,-31)),wk).filter(o=>!o.paid&&(o.due>=tk||o.due>=(o.p.created||''))&&!(np&&o.p===np.p&&o.due===np.due)):[];
   if(secOn('bdays')) S.gifts.forEach(g=>{ const n=bdNext(g); if(n&&bdDays(n)<=7) rows.push({k:dkey(n),html:`<button class="soonrow" style="--sec:var(--s-bdays)" data-act="section" data-id="bdays"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">День рождения: ${esc(g.name)}</span><span class="w">${bdWhen(n)}</span></button>`}); });
   if(secOn('fin')) C.ins.filter(r=>insDue(r)&&daysTo(r.x.pay)<=14).forEach(r=>rows.push({k:r.x.pay,html:`<button class="soonrow" style="--sec:var(--s-fin)" data-act="goto" data-sec="fin" data-tab="funds"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">Платёж из резерва: ${esc(r.x.name)}</span><span class="w">${daysTo(r.x.pay)<0?'<span class="neg">просрочен</span>':dayLabel(r.x.pay)}</span></button>`}));
   if(secOn('fin')) freeList().filter(f=>f.d<=wk).forEach(f=>rows.push({k:f.d,html:`<button class="soonrow" style="--sec:var(--s-fin)" data-act="homeGo" data-v="invest"><span class="dot" style="--c:var(--sec)"></span><span class="m fname">${({mat:'Погашение',am:'Частичное погашение',offer:'Оферта',end:'Закрытие'})[f.kind]||'Возврат'}: ${esc(f.p.name)}</span><span class="w">${dayLabel(f.d)} · ${rub(f.amt)}</span></button>`}));
   rows.sort((a,b)=>a.k.localeCompare(b.k));
-  if(pays.length||rows.length) html+=homeCard('pay','Скоро',`${pays.map(payRow).join('')}${rows.map(r=>r.html).join('')}`);
-  return html;
+  if(pays.length||rows.length) B.soon=homeCard('pay','Скоро',`${pays.map(payRow).join('')}${rows.map(r=>r.html).join('')}`);
+  html+=homeOrder().filter(id=>homeOn(id)&&B[id]).map(id=>B[id]).join('');
+  return html+`<div class="actions" style="justify-content:center;margin-top:0"><button class="more" data-act="homeSetup">Настроить главную</button></div>`;
 }
+// блоки главной: [id, название]; порядок и скрытые — в settings.home {order:[…], hidden:[…]}
+const HOME_BLOCKS=[['tasks','Задачи на сегодня'],['habits','Привычки'],['money','Деньги'],['limits','Лимиты'],['pay','Ближайший платёж'],['soon','Скоро']];
+function homeCfg(){ const h=S.settings.home; return h&&typeof h==='object'?h:{}; }
+function homeOrder(){ const o=(homeCfg().order||[]).filter(id=>HOME_BLOCKS.some(b=>b[0]===id));
+  return o.concat(HOME_BLOCKS.map(b=>b[0]).filter(id=>!o.includes(id))); }
+const homeOn=id=>!(homeCfg().hidden||[]).includes(id);
+function openHomeSetup(){
+  const ord=homeOrder(), name=id=>HOME_BLOCKS.find(b=>b[0]===id)[1];
+  openSheet(`<h2>Главная</h2><p class="hint" style="margin-top:-8px">Какие блоки показывать и в каком порядке.</p>
+    <div class="hblist">${ord.map((id,i)=>`<div class="hbrow"><label class="chk"><input type="checkbox" data-act="homeBlk" data-id="${id}" ${homeOn(id)?'checked':''}><span>${name(id)}</span></label><span class="sp"></span>
+      <button class="btn small" data-act="homeMove" data-id="${id}" data-d="-1" ${i?'':'disabled'} aria-label="Выше: ${name(id)}">↑</button><button class="btn small" data-act="homeMove" data-id="${id}" data-d="1" ${i<ord.length-1?'':'disabled'} aria-label="Ниже: ${name(id)}">↓</button></div>`).join('')}</div>
+    <div class="actions"><button class="btn" data-act="homeReset">Как было</button><span class="sp"></span><button class="btn primary" data-act="sheetClose">Готово</button></div>`);
+}
+function homeSet(fn){ const h=Object.assign({order:homeOrder(),hidden:[]},homeCfg()); h.order=homeOrder(); h.hidden=(h.hidden||[]).slice(); fn(h); S.settings.home=h; persist('settings'); render(); openHomeSetup(); }
 const MORE_GROUPS=[['Деньги',['fin','pay']],['Цели и привычки',['habits','goals']],['Здоровье',['train','food']],['Досуг',['books','movies']],['Люди',['bdays']]];
 function viewMore(){
   if(UI.page&&UI.page.kind==='trash') return viewTrash();
@@ -3455,7 +3638,8 @@ const tToday=(t,tk)=>!t.done&&(t.deadline?t.deadline>=tk&&(!t.due||t.due<=tk):t.
 const tNow=(t,tk)=>(tOver(t,tk)||tToday(t,tk))&&repOk(TODAY(),t.repeat,t.repeatDays);
 const dDay=k=>{ const d=parseD(k); return d.getDate()+' '+MG[d.getMonth()]+(d.getFullYear()!==TODAY().getFullYear()?' '+d.getFullYear():''); };
 function deadlineTxt(t,tk){ const n=daysTo(t.deadline);
-  return n<0?'срок был '+dDay(t.deadline):n===0?'крайний срок сегодня':'до '+dDay(t.deadline)+' · осталось '+n+' '+plural(n,'день','дня','дней'); }
+  const tm=t.dtime?' '+esc(t.dtime):'';
+  return n<0?'срок был '+dDay(t.deadline)+tm:n===0?'крайний срок сегодня'+(t.dtime?' до '+esc(t.dtime):''):'до '+dDay(t.deadline)+tm+' · осталось '+n+' '+plural(n,'день','дня','дней'); }
 function taskRow(t,hideProj){
   const tk=todayK(), over=tOver(t,tk), g=t.goal&&S.goals.find(x=>x.id===t.goal), pr=+t.priority||0, cl=t.checklist||[];
   const parts=[];
@@ -3483,11 +3667,11 @@ function taskRow(t,hideProj){
 // по дате, в один день — по времени (без времени — после), потом без проекта выше, потом приоритет
 // сначала приоритет (высокий сверху, без приоритета — после всех приоритетных), потом дата, время (без времени — после), «без проекта»
 const sortT=(a,b)=>(+b.priority||0)-(+a.priority||0)||(a.due||a.deadline||'9999').localeCompare(b.due||b.deadline||'9999')||(a.time||'99:99').localeCompare(b.time||'99:99')||(inInbox(a)?0:1)-(inInbox(b)?0:1);
-function tBlock(title,list,hideProj,extra,drop){ return list.length||extra?`<section class="card"${drop!=null?` data-tdrop="${esc(drop)}"`:''}><div class="ghead">${title}<span class="sum fsub">${list.length||''}</span></div>${list.map(t=>taskRow(t,hideProj)).join('')}${extra||''}</section>`:''; }
+function tBlock(title,list,hideProj,extra,drop){ return list.length||extra?`<section class="card"${drop!=null?` data-tdrop="${esc(drop)}"`:''}><div class="ghead">${title}<span class="sum fsub">${list.length||''}</span></div>${capList(list).map(t=>taskRow(t,hideProj)).join('')}${capMore(list)}${extra||''}</section>`:''; }
 function projSide(v){
   const tk=todayK(), cnt=f=>S.tasks.filter(t=>!t.done&&f(t)).length;
   const item=(val,label,count,cls,dot)=>`<button class="side-item ${cls||''} ${v===val?'on':''}" data-act="tView" data-v="${val}"${val==='inbox'?' data-tdrop=""':val.startsWith('p:')?` data-tdrop="${val.slice(2)}"`:''}>${dot?`<span class="dot" style="--c:var(${dot})"></span>`:''}<span class="fname">${esc(label)}</span>${count?`<span class="cnt">${count}</span>`:''}</button>`;
-  return `<div class="side-h">Списки</div>${item('today','Сегодня',cnt(t=>tNow(t,tk)))}${item('cal','Календарь',0)}${item('upcoming','Предстоящие',cnt(t=>t.due&&t.due>tk))}${item('all','Все задачи',cnt(()=>true))}${item('done','Готово',0)}
+  return `<div class="side-h">Списки</div>${item('today','Сегодня',cnt(t=>tNow(t,tk)))}${item('cal','Календарь',0)}${item('all','Все задачи',cnt(()=>true))}${item('done','Готово',0)}
     <div class="side-h">Проекты <button class="side-add" data-act="projNew" aria-label="Новый проект">+</button></div>
     ${item('inbox','Без проекта',cnt(inInbox))}
     ${projTree().map(({p,kids})=>item('p:'+p.id,p.name,cnt(t=>t.project===p.id||kids.some(k=>k.id===t.project)),'',projColor(p.id))+kids.map(k=>item('p:'+k.id,k.name,cnt(t=>t.project===k.id),'sub')).join('')).join('')}
@@ -3495,13 +3679,13 @@ function projSide(v){
 }
 function viewTasks(){
   if(UI.page&&UI.page.kind==='task'){ const t=curTask(); if(t) return viewTaskPage(t); UI.page=null; }
+  if(UI.sub.tasks==='upcoming') UI.sub.tasks='cal'; // вкладку «Предстоящие» убрали — её место занял календарь
   const v=UI.sub.tasks||'today';
   if(v.startsWith('p:')&&!projById(v.slice(2))) UI.sub.tasks='inbox';
   if(UI.qaProj&&!projById(UI.qaProj)) UI.qaProj='';
   const inProj=v.startsWith('p:'), target=inProj?projName(v.slice(2)):UI.qaProj?projName(UI.qaProj):'Без проекта';
   const qa=`<section class="card"><div class="qa-row"><input class="inline-in" id="qaTitle" placeholder="Новая задача…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача"><button class="btn primary" data-act="taskQuick">Добавить</button></div>
     <div class="qa-chips qa-line">${[['today','Сегодня'],['tomorrow','Завтра'],['none','Без срока']].map(([x,l])=>`<button class="chip ${UI.qaDue===x?'on':''}" data-act="qaDue" data-v="${x}">${l}</button>`).join('')}<button class="chip" data-act="taskNew">Подробнее…</button></div>
-    ${UI.qaDue!=='none'?`<div class="qa-chips qa-line"><span class="qa-l">Когда</span>${[['','любое время']].concat(PARTS.map(([k])=>[k,PART_SHORT[k]])).map(([x,l])=>`<button class="chip ${(UI.qaPart||'')===x?'on':''}" data-act="qaPart" data-v="${x}">${l}</button>`).join('')}</div>`:''}
     ${!inProj&&S.projects.length?`<div class="qa-chips qa-line"><span class="qa-l">Проект</span>${projChips(UI.qaProj||'','qaProj')}</div>`:''}
     <p class="hint" style="margin:8px 0 0">Попадёт в «${esc(target)}»${inProj||S.projects.length?'':' — проекты можно завести в «☰ Проекты»'}.</p></section>`;
   const head=v==='inbox'?'Без проекта':v.startsWith('p:')?projName(v.slice(2)):({today:'Сегодня',upcoming:'Предстоящие',all:'Все задачи',done:'Готово',cal:'Календарь'})[v]||'';
@@ -3519,12 +3703,8 @@ function tasksBody(v){
     const dl=open.filter(t=>tToday(t,tk)&&onDay(t)&&t.deadline&&t.deadline>tk).sort((a,b)=>(+b.priority||0)-(+a.priority||0)||a.deadline.localeCompare(b.deadline));
     const inbox=open.filter(t=>!t.due&&!t.deadline&&inInbox(t)), anyPart=tod.some(t=>tPart(t));
     const todH=anyPart?PARTS.map(([k,l])=>tBlock(l,tod.filter(t=>tPart(t)===k))).join('')+tBlock('В любое время',tod.filter(t=>!tPart(t))):tBlock('Сегодня',tod);
-    return (over.length||tod.length?tBlock('<span class="neg">Просрочено</span>',over)+todH:dl.length?'':emptyCard('На сегодня всё чисто','Добавьте задачу выше или загляните в «Предстоящие».'))
+    return (over.length||tod.length?tBlock('<span class="neg">Просрочено</span>',over)+todH:dl.length?'':emptyCard('На сегодня всё чисто','Добавьте задачу выше или загляните в «Календарь».'))
       +tBlock('В работе — до крайнего срока',dl)+(inbox.length?tBlock('Без проекта и без срока',inbox):'')+tBlock('Сделано сегодня',doneT);
-  }
-  if(v==='upcoming'){
-    const by={}; open.filter(t=>t.due&&t.due>tk).sort(sortT).forEach(t=>{ const k=daysTo(t.due)<=14?t.due:'later'; (by[k]||(by[k]=[])).push(t); });
-    return Object.keys(by).sort((a,b)=>a==='later'?1:b==='later'?-1:a.localeCompare(b)).map(k=>tBlock(k==='later'?'Позже':dayLabel(k),by[k])).join('')||emptyCard('','Задач со сроком впереди нет.');
   }
   if(v==='all'){
     // «Без проекта» — сверху, чтобы были на виду; дальше проекты и подпроекты
@@ -3576,7 +3756,7 @@ function tcalView(){ if(!UI.tcalV){ let v=''; try{ v=localStorage.getItem(TCAL_V
 const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 const tMin=s=>{ const x=/^(\d{1,2}):(\d{2})/.exec(s||''); return x?Math.min(1439,(+x[1])*60+(+x[2])):null; };
 // время у записи календаря: у задачи — только в день выполнения (в день крайнего срока — без времени)
-const occMin=o=>o.gc?o.s:((o.ghost||o.k===o.t.due)?tMin(o.t.time):null);
+const occMin=o=>o.gc?o.s:((o.ghost||o.k===o.t.due)?tMin(o.t.time):o.k===o.t.deadline&&!o.done?tMin(o.t.dtime):null);
 const PART_ORD={morning:1,during:2,day:3,evening:4};
 function tcalItems(fromK,toK){
   const hid=new Set(tcalHidden()), all=taskOccs(fromK,toK);
@@ -3679,17 +3859,22 @@ function viewTaskPage(t){
       <div class="tkey"><label>Дата выполнения</label><div class="dwrap"><input type="date" data-tf="due" value="${esc(t.due||'')}" aria-label="Дата выполнения">${t.due?`<button class="xbtn" data-act="tClr" data-f="due" aria-label="Без даты">×</button>`:''}</div></div>
       <div class="tkey"><label>Время</label><input type="time" data-tf="time" value="${esc(t.time||'')}" aria-label="Время (для напоминания)"></div>
       <div class="tkey trem" style="grid-column:1/-1"><label class="chk"><input type="checkbox" data-act="tRemind" ${t.remind!==''&&t.remind!=null?'checked':''}><span>Напомнить</span></label>
-        ${t.remind!==''&&t.remind!=null?`${sel('remind',T_REMINDS,t.remind)}<span class="fsub">${[t.due?(t.time?'':'без времени — от 9:00 дня задачи'):'поставьте дату',NATIVE?(notifCfg().on?'':'уведомления выключены в настройках'):'придёт на телефон с приложением'].filter(Boolean).join(' · ')}</span>`:''}</div>
+        ${t.remind!==''&&t.remind!=null?`${sel('remind',T_REMINDS,t.remind)}<span class="fsub">${[t.due?(t.time?'':'без времени — от 9:00 дня задачи'):t.deadline?'от крайнего срока'+(t.dtime?'':', с 9:00'):'поставьте дату',NATIVE?(notifCfg().on?'':'уведомления выключены в настройках'):'придёт на телефон с приложением'].filter(Boolean).join(' · ')}</span>`:''}</div>
       <div class="tkey"><label>Крайний срок</label><div class="dwrap"><input type="date" data-tf="deadline" value="${esc(t.deadline||'')}" aria-label="Крайний срок">${t.deadline?`<button class="xbtn" data-act="tClr" data-f="deadline" aria-label="Без крайнего срока">×</button>`:''}</div></div>
-      <div class="tkey"><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
+      ${t.deadline?`<div class="tkey"><label>Срок — до скольких</label><input type="time" data-tf="dtime" value="${esc(t.dtime||'')}" aria-label="Время крайнего срока"></div>`:''}
+      <div class="tkey"${t.deadline?' style="grid-column:1/-1"':''}><label>Проект</label>${sel('project',projOpts(),t.project&&projById(t.project)?t.project:'')}</div>
       ${S.projects.length?`<div class="qa-chips qa-line" style="grid-column:1/-1;margin-top:0">${projChips(t.project&&projById(t.project)?t.project:'','tProj')}</div>`:''}
       <div><label>Повтор</label>${sel('repeat',REPEATS,t.repeat||'none')}</div>
       ${t.repeat==='days'?`<div class="days" style="grid-column:1/-1">${WD.map((w,d)=>`<button class="dbtn ${String(t.repeatDays||'')[d]==='1'?'on':''}" data-act="tRepDay" data-id="${t.id}" data-d="${d}" aria-pressed="${String(t.repeatDays||'')[d]==='1'}">${w}</button>`).join('')}</div>`:''}
-      <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
-      <div><label>Сколько раз выполнить</label><input type="number" min="1" max="12" step="1" inputmode="numeric" data-tf="times" value="${n}" aria-label="Сколько раз выполнить"></div>
-      <div><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
       <div style="grid-column:1/-1"><label>Приоритет</label><div class="prios" role="group" aria-label="Приоритет">${PRIOS.map(([v,l])=>`<button class="chip p${v} ${String(t.priority||'0')===v?'on':''}" data-act="tPrio" data-v="${v}" aria-pressed="${String(t.priority||'0')===v}">${v!=='0'?FLAG_SVG:''}${v==='0'?'Нет':l}</button>`).join('')}</div></div>
     </div>
+    ${(()=>{ const g=t.goal&&S.goals.find(x=>x.id===t.goal), sum=[t.part&&PART_SHORT[t.part],n>1?n+' '+plural(n,'раз','раза','раз'):'',g?'цель: '+g.name:''].filter(Boolean).join(' · ');
+      return UI.tMore?`<div class="tfields tmore" style="margin-top:10px">
+      <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
+      <div><label>Сколько раз выполнить</label><input type="number" min="1" max="12" step="1" inputmode="numeric" data-tf="times" value="${n}" aria-label="Сколько раз выполнить"></div>
+      <div style="grid-column:1/-1"><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
+      </div><button class="more" style="margin-top:6px;padding-left:0" data-act="tMore">Скрыть ▴</button>`
+      :`<button class="more" style="margin-top:8px;padding-left:0" data-act="tMore">Ещё параметры ▾${sum?` <span class="fsub">${esc(sum)}</span>`:''}</button>`; })()}
     <p class="hint" style="margin:8px 0 0">${t.deadline?'Задача будет в «Сегодня» каждый день'+(t.due&&t.due>todayK()?' с '+dDay(t.due):'')+' до '+dDay(t.deadline)+', потом — просрочена.':t.due?'После '+dDay(t.due)+' задача станет просроченной. Длинная или не срочная — поставьте крайний срок: до него она просто будет в списке.':'Без срока — задача лежит в своём проекте и не просрочивается.'}</p>
     ${n>1?`<p class="hint" style="margin:8px 0 0">В списке у задачи будет ${n} ${plural(n,'кружок','кружка','кружков')}: задача выполнится, когда отмечены все.${isNew?'':' Сейчас сделано '+Math.min(n,t.done?n:t.timesDone||0)+' из '+n+'.'}</p>`:''}
     ${t.repeat&&t.repeat!=='none'?`<p class="hint" style="margin:8px 0 0">После выполнения задача появится снова (${repeatText(t)})${t.due?', следующая — '+dayLabel(nextDue(t.due,t.repeat,t.repeatDays)).toLowerCase():''}.</p>`:''}</section>
@@ -3788,11 +3973,14 @@ function nextDeadline(t,nd){ if(!t.deadline) return ''; if(!t.due) return nextDu
 function toggleTask(id){
   const t=S.tasks.find(x=>x.id===id); if(!t) return;
   if(!t.done){
+    const was={done:t.done,doneAt:t.doneAt,timesDone:t.timesDone,checklist:clone(t.checklist||[])};
     t.done=true; t.doneAt=todayK(); t.timesDone=t.times||1;
     (t.checklist||[]).forEach(c=>{ if(c.k&&!c.done){ c.done=true; shopTick(c); } });
-    if(t.repeat&&t.repeat!=='none'){ const nd=nextDue(t.due,t.repeat,t.repeatDays), n=Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nd,deadline:nextDeadline(t,nd),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))});
-      S.tasks.push(n); toast('Готово. Следующая — '+dayLabel(n.due||n.deadline).toLowerCase()); }
-    else toast('Готово');
+    let n=null;
+    if(t.repeat&&t.repeat!=='none'){ const nd=nextDue(t.due,t.repeat,t.repeatDays); n=Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nd,deadline:nextDeadline(t,nd),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))});
+      S.tasks.push(n); }
+    // «Отменить» внизу экрана: задача снова открыта, следующий повтор убран
+    toast(n?'Готово. Следующая — '+dayLabel(n.due||n.deadline).toLowerCase():'Готово',{label:'Отменить',fn:()=>{ Object.assign(t,was); if(n) S.tasks=S.tasks.filter(x=>x!==n); persist('tasks'); render(); }});
     persist('tasks'); render(); cheer(allTasksDone()); return;
   } else { t.done=false; t.doneAt=''; t.timesDone=Math.max(0,(t.times||1)-1); }
   persist('tasks'); render();
@@ -3829,7 +4017,7 @@ function viewGoals(){
     return `<button class="list-row" data-act="goalOpen" data-id="${g.id}" style="display:block"><div class="row-between"><span class="fname"><b>${ico(g)}${esc(g.name)}</b> <span class="tag">${esc(g.area||'')}</span>${sc<5&&g.status!=='done'?` <span class="tag smart-miss">SMART ${sc}/5</span>`:''}</span><b class="num">${pct(p.pct)}</b></div>
       <div class="thermo" style="height:8px;margin:7px 0 5px"><i class="${g.status==='done'?'done':''}" style="width:${(p.pct*100).toFixed(1)}%"></i></div><div class="fsub">${p.text} · ${deadlineText(g)}</div></button>`; }).join('');
   return fin+`<section class="card"><div class="row-between"><h3>${tab==='done'?'Достигнутые':'Мои цели'}</h3>${tab==='done'?'':'<button class="btn small primary" data-act="add" data-kind="goal">+ Цель</button>'}</div>
-    ${cards||`<p class="hint" style="margin:8px 0 0">${tab==='done'?'Пока ничего — всё впереди.':'Поставьте первую цель по SMART: конкретно, измеримо, достижимо, значимо и со сроком. Потом разбейте её на шаги.'}</p>`}</section>`;
+    ${cards||`<p class="hint" style="margin:8px 0 0">${tab==='done'?'Пока ничего — всё впереди.':'Поставьте первую цель по SMART: конкретно, измеримо, достижимо, значимо и со сроком. Потом разбейте её на шаги.'}</p>`}</section>${tab==='done'?'':goalMonthCard(list)}`;
 }
 function smartCard(g,i){
   const P=smartParts(g), sc=P.filter(p=>p.txt).length;
@@ -4408,10 +4596,14 @@ function noteDate(iso,full){
 }
 const folderById=id=>id?S.noteFolders.find(f=>f.id===id):null;
 function booksFolder(){ let f=S.noteFolders.find(x=>/^книги$/i.test(String(x.name).trim())); if(!f){ f={id:uid(),name:'Книги'}; S.noteFolders.push(f); } return f; }
+// длинный список — первые LIST_CAP, дальше по кнопке (UI.listAll — до смены раздела)
+const LIST_CAP=50;
+const capList=list=>UI.listAll||list.length<=LIST_CAP+10?list:list.slice(0,LIST_CAP);
+const capMore=list=>UI.listAll||list.length<=LIST_CAP+10?'':`<button class="more" data-act="listAll">Показать все (${list.length}) ›</button>`;
 function noteRows(list,showFolder){
-  return list.map(n=>{ const tx=noteText(n.body), title=n.name||firstLine(tx)||'Без названия', prev=n.name?tx:tx.split('\n').filter(x=>x.trim()).slice(1).join('\n'), F=showFolder&&folderById(n.folder);
+  return capList(list).map(n=>{ const tx=noteText(n.body), title=n.name||firstLine(tx)||'Без названия', prev=n.name?tx:tx.split('\n').filter(x=>x.trim()).slice(1).join('\n'), F=showFolder&&folderById(n.folder);
     return `<div class="note-row"><button class="note-card" data-act="noteOpen" data-id="${n.id}"><div class="row-between"><b class="fname">${esc(title)}${F?` <span class="tag">${esc(F.name)}</span>`:''}</b><span class="fsub" style="flex:none">${noteDate(n.updated)}</span></div>${prev&&prev.trim()?`<div class="note-prev">${esc(prev.trim())}</div>`:''}</button>
-      <button class="pin ${n.pinned?'on':''}" data-act="notePin" data-id="${n.id}" aria-pressed="${n.pinned}" aria-label="${n.pinned?'Открепить':'Закрепить'}" title="${n.pinned?'Открепить':'Закрепить наверху'}">${PIN}</button></div>`; }).join('');
+      <button class="pin ${n.pinned?'on':''}" data-act="notePin" data-id="${n.id}" aria-pressed="${n.pinned}" aria-label="${n.pinned?'Открепить':'Закрепить'}" title="${n.pinned?'Открепить':'Закрепить наверху'}">${PIN}</button></div>`; }).join('')+capMore(list);
 }
 // корень: закреплённые из всех разделов + заметки без раздела; в разделе — только его заметки
 function noteList(){
@@ -5247,7 +5439,7 @@ function deleteEditor(){
   const F=FORMS[edit.kind], list=F.list(), rec=list[edit.i];
   if(!confirm(F.deleteText?F.deleteText(rec):'Удалить «'+(rec.name||'запись')+'»?')) return;
   const tr=trashed(F.keys.concat(F.extraKeys||[]),rec.name||F.title,F.title,()=>{ if(F.onDelete) F.onDelete(rec); const idx=F.list().indexOf(rec); if(idx>=0) F.list().splice(idx,1); });
-  closeSheet(); persist(...F.keys,...(F.extraKeys||[])); render(); if(tr) toast('Удалено — можно вернуть из корзины');
+  closeSheet(); persist(...F.keys,...(F.extraKeys||[])); render(); if(tr) toast('Удалено',{label:'Отменить',fn:()=>trashRestore(tr.id)});
 }
 function storageBox(){
   if(IS_GAS) return `<div class="field"><label>Где хранятся данные</label><div class="hint" style="margin:0">В Google Таблице, к которой подключён скрипт. Каждая правка сохраняется сама.</div></div>`;
@@ -5737,8 +5929,9 @@ document.addEventListener('change',e=>{
     t[f]=el.value; if(f==='name') t.name=el.value.trim();
     if(f==='repeat'&&t.repeat==='days'&&!String(t.repeatDays||'').includes('1')&&t.due){ const m='0000000'.split(''); m[wd(parseD(t.due))]='1'; t.repeatDays=m.join(''); }
     if((f==='repeat'||f==='due')&&alignTask(t)) toast('Срок перенесён на '+dayLabel(t.due).toLowerCase()+' — '+repeatText(t));
+    if(f==='deadline'&&!t.deadline) t.dtime='';
     if(f==='deadline'&&t.deadline&&t.due&&t.deadline<t.due) toast('Крайний срок раньше даты выполнения');
-    persist('tasks'); if(['repeat','priority','due','deadline','project','goal','remind','time'].includes(f)) setTimeout(render,0); return; }
+    persist('tasks'); if(['repeat','priority','due','deadline','project','goal','remind','time','dtime'].includes(f)) setTimeout(render,0); return; }
   if(el.dataset.cl){ const t=curTask(); if(!t) return; const c=t.checklist[+el.dataset.cl]; if(c){ c.text=el.value.trim()||c.text; persist('tasks'); } return; }
   if(el.dataset.factraw){ const v=el.value.trim(); if(v&&isNaN(evalExpr(v))){ toast('Не разобрал выражение'); return; } setFactRaw(v); return; }
   if(el.dataset.alloc){ S.settings.alloc[el.dataset.alloc]=el.value; persist('settings'); setTimeout(render,0); return; }
@@ -5825,7 +6018,7 @@ document.addEventListener('click',e=>{
   if(cli&&e.clientX-cli.getBoundingClientRect().left<26){ e.preventDefault(); if(cli.getAttribute('data-c')==='1') cli.removeAttribute('data-c'); else cli.setAttribute('data-c','1'); unstrike(cli); saveRich(cli.closest('[data-rich]')); return; }
   const ta=S&&e.target.closest&&e.target.closest('.tbl-add'); if(ta){ tblAdd(ta.classList.contains('row')?'row':'col'); return; }
   const b=e.target.closest('[data-act]'); if(!b||!S) return;
-  const a=b.dataset.act;
+  const a=b.dataset.act; NAV=NAV_ACTS.has(a); if(NAV) setTimeout(()=>{ NAV=false; },0);
   const go=()=>{ render(); window.scrollTo(0,0); };
   if(a==='section'){ dropEmptyNote(); if(b.dataset.id===UI.section) UI.noteFolder=null; UI.section=b.dataset.id; UI.detail=null; UI.habit=null; UI.page=null; saveUI(); go(); }
   else if(a==='tab'){ dropEmptyNote(); if(UI.section==='fin') UI.tab=b.dataset.id; else UI.sub[UI.section]=b.dataset.id; UI.detail=null; UI.page=null; saveUI(); go(); }
@@ -5890,6 +6083,7 @@ document.addEventListener('click',e=>{
   else if(a==='hview'){ UI.hview=b.dataset.v; saveUI(); render(); }
   else if(a==='habit'){ UI.habit=b.dataset.id; UI.hcal=null; go(); }
   else if(a==='hcal'){ UI.hcal+=+b.dataset.d; render(); }
+  else if(a==='mgM'){ UI.mgM=mgMonth()+(+b.dataset.d); render(); }
   else if(a==='hToggle'){ const h=b.dataset.h, d=b.dataset.d, hb=S.habits.find(x=>x.id===h);
     if(hb&&hb.type==='count'){ openHabitCount(hb,d); return; }
     const i=S.habitLog.findIndex(l=>l.habit===h&&l.date===d);
@@ -5939,7 +6133,17 @@ document.addEventListener('click',e=>{
   else if(a==='editId'&&b.dataset.kind==='food') openFood(b.dataset.id);
   else if(a==='editId'){ const F=FORMS[b.dataset.kind], i=F.list().findIndex(x=>x.id===b.dataset.id); if(i>=0) openEditor(b.dataset.kind,i); }
   // задачи
-  else if(a==='tClr'){ const t=curTask(); if(!t) return; t[b.dataset.f]=''; persist('tasks'); render(); }
+  else if(a==='tClr'){ const t=curTask(); if(!t) return; t[b.dataset.f]=''; if(b.dataset.f==='deadline') t.dtime=''; persist('tasks'); render(); }
+  else if(a==='tMore'){ UI.tMore=!UI.tMore; render(); }
+  else if(a==='listAll'){ UI.listAll=true; render(); }
+  else if(a==='sumFold'){ const l=Array.isArray(S.settings.sumFold)?S.settings.sumFold.slice():[], id=b.dataset.id, i=l.indexOf(id);
+    if(i<0) l.push(id); else l.splice(i,1); S.settings.sumFold=l; persist('settings'); render(); }
+  else if(a==='tabMore') openSheet(`<h2>Ещё в финансах</h2><div class="menu-list">${FIN_TABS.filter(x=>FIN_MORE.includes(x[0])).map(([id,t])=>`<button class="srow" data-act="tabGo" data-id="${id}"><span class="srow-ic">${id==='items'?'📋':'🎯'}</span><span><b>${t}</b><small>${id==='items'?'доходы и расходы плана':'на что копим'}</small></span></button>`).join('')}</div>`);
+  else if(a==='tabGo'){ closeSheet(); dropEmptyNote(); UI.tab=b.dataset.id; UI.detail=null; UI.page=null; saveUI(); go(); }
+  else if(a==='homeSetup') openHomeSetup();
+  else if(a==='homeBlk') homeSet(h=>{ const id=b.dataset.id; h.hidden=b.checked?h.hidden.filter(x=>x!==id):h.hidden.concat(id); });
+  else if(a==='homeMove') homeSet(h=>{ const i=h.order.indexOf(b.dataset.id), j=i+(+b.dataset.d); if(j<0||j>=h.order.length) return; [h.order[i],h.order[j]]=[h.order[j],h.order[i]]; });
+  else if(a==='homeReset') homeSet(h=>{ h.order=HOME_BLOCKS.map(x=>x[0]); h.hidden=[]; });
   else if(a==='qaDue'){ UI.qaDue=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='taskQuick'){ const inp=document.getElementById('qaTitle'), name=inp?inp.value.trim():''; if(!name){ if(inp) inp.focus(); return; }
     const v=UI.sub.tasks||'', proj=v.startsWith('p:')?v.slice(2):UI.qaProj&&projById(UI.qaProj)?UI.qaProj:'';
@@ -5999,7 +6203,8 @@ document.addEventListener('click',e=>{
   else if(a==='weekNav'){ UI.page={kind:'week',off:Math.min(0,(UI.page&&UI.page.off||0)+(+b.dataset.d))}; render(); }
   else if(a==='weekOpen'){ UI.section='more'; UI.page={kind:'week',off:+b.dataset.off||0}; UI.detail=null; render(); window.scrollTo(0,0); }
   else if(a==='weekHide'){ try{ localStorage.setItem(WEEK_SEEN,b.dataset.k); }catch(e){} render(); }
-  else if(a==='taskDel'){ const i=S.tasks.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить задачу?')) return; const t=S.tasks[i]; trashed(['tasks'],t.name,'Задача',()=>S.tasks.splice(i,1)); persist('tasks'); backFromTask(); go(); toast('Задача в корзине — её можно вернуть'); }
+  else if(a==='taskDel'){ const i=S.tasks.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить задачу?')) return; const t=S.tasks[i], tr=trashed(['tasks'],t.name,'Задача',()=>S.tasks.splice(i,1)); persist('tasks'); backFromTask(); go();
+    toast('Задача удалена',tr?{label:'Отменить',fn:()=>trashRestore(tr.id)}:null); }
   else if(a==='tView'){ UI.sub.tasks=b.dataset.v; UI.projOpen=false; UI.page=null; saveUI(); go(); }
   else if(a==='numPick') openNumPick(b.dataset.k,b.dataset.ph);
   else if(a==='numPickOk') numPickOk();
