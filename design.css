@@ -6,7 +6,7 @@
 
    1. Токены: фон, поверхности, текст, шрифт, скругления, тени, движение.
    2. Основа.  3. Компоненты: шапка, карточки, кнопки, метки, поля, нижнее меню, окна, уведомления, настройки.
-   4. Микроанимации. */
+   4. Микроанимации.  5. В духе Телеграма.  6. Мягче и плавнее (тени, отклик, переходы, жесты). */
 
 /* ─── шрифт: Nunito Sans (SIL Open Font License 1.1, Google Fonts), файлы — web/fonts ─── */
 @font-face{font-family:'Nunito Sans';font-style:normal;font-weight:400 800;font-display:swap;
@@ -251,3 +251,123 @@ main{padding-top:10px}
 .qa-line .pchip.on{background:var(--pc,var(--accent))}
 .qa-l{color:var(--muted)}
 .qa-l{position:sticky;left:0;z-index:1;align-self:stretch;display:flex;align-items:center;background:var(--surface);padding-right:8px;margin-right:0;box-shadow:8px 0 8px -2px var(--surface)}
+
+/* ─── 6. Мягче и плавнее: скругления крупнее, лёгкие тени, отклик на нажатие, переходы между экранами,
+   окна «на пружине» (закрываются движением вниз), шапка сжимается при прокрутке, нижнее меню матовое,
+   «потянуть вниз — обновить», серые контуры при загрузке. При «уменьшить движение» в системе — без анимаций. ─── */
+:root{
+  --ds-r-card:16px; --ds-r-ctl:12px; --ds-spring:cubic-bezier(.32,.72,0,1);
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 3px 12px rgba(16,24,40,.05);
+  --press:color-mix(in srgb,var(--text) 6%,transparent);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --shadow:0 1px 0 rgba(0,0,0,.28) } }
+:root[data-theme="dark"]{ --shadow:0 1px 0 rgba(0,0,0,.28) }
+html,body{overscroll-behavior-y:contain}
+body{-webkit-font-smoothing:antialiased}
+
+/* поверхности: мягкая тень вместо плоскости */
+.card,.tile,.quick button,.srow,.sgroup{box-shadow:var(--shadow)}
+.sheet .card,.sheet .tile,.sheet .srow,.sheet .sgroup{box-shadow:none}
+.tile{border-radius:var(--ds-r-card)}
+.tile .ic{border-radius:12px}
+
+/* отклик на нажатие: плитки и кнопки чуть «проседают», строки — подсветка */
+.tile,.quick button,.srow,.nav-btn,.icon-btn,.bottom button{transition:transform 160ms var(--ds-ease),background-color 160ms var(--ds-ease),color 160ms var(--ds-ease)}
+.tile:active,.quick button:active,.srow:active,.nav-btn:active,.icon-btn:active{transform:scale(.97)}
+.list-row,.soonrow,.hrow{transition:background-color 160ms var(--ds-ease);border-radius:10px}
+.list-row:active,.soonrow:active,.hrow:active{background:var(--press)}
+.btn{transition:transform 160ms var(--ds-ease),background-color 160ms var(--ds-ease),filter 160ms var(--ds-ease)}
+.btn:active{transform:scale(.96)}
+
+/* шапка: при прокрутке ниже и с тенью; липкие вкладки следуют за её высотой (--hdr) */
+.top{transition:padding 220ms var(--ds-spring),box-shadow 220ms var(--ds-ease)}
+.top h1{transition:font-size 220ms var(--ds-spring)}
+.top .sic,.top .icon-btn{transition:transform 220ms var(--ds-spring),width 220ms var(--ds-spring),height 220ms var(--ds-spring)}
+body.scrolled .top{padding-top:calc(4px + env(safe-area-inset-top));padding-bottom:4px;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+body.scrolled .top h1{font-size:17px}
+body.scrolled .top .sic{transform:scale(.86)}
+body.scrolled .top .icon-btn{width:34px;height:34px}
+.subnav{top:var(--hdr,calc(54px + env(safe-area-inset-top)))}
+.subnav .chip{transition:color 200ms var(--ds-ease)}
+.subnav .chip.on::after{animation:dsUline 240ms var(--ds-spring)}
+@keyframes dsUline{from{transform:scaleX(.3);opacity:.4}to{transform:none;opacity:1}}
+
+/* объединённые разделы: переключатель над вкладками (Тренировки | Питание, Книги | Кино) */
+.subnav.two{flex-direction:column;overflow:visible;padding:0}
+.subnav.two .tabrow{display:flex;overflow-x:auto;scrollbar-width:none;padding:0 8px}
+.subnav.two .tabrow::-webkit-scrollbar{display:none}
+.gtabs{display:flex;gap:4px;margin:6px 12px 2px;padding:3px;border-radius:var(--ds-r-pill);background:rgba(255,255,255,.14)}
+.gtabs button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;min-height:34px;border:0;border-radius:var(--ds-r-pill);
+  background:transparent;color:rgba(255,255,255,.85);font:inherit;font-size:14px;font-weight:600;transition:background-color 220ms var(--ds-spring),color 220ms var(--ds-ease)}
+.gtabs svg{width:17px;height:17px}
+.gtabs button.on{background:#fff;color:var(--hd-head);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+:root[data-theme="dark"] .gtabs{background:var(--surface-2)}
+:root[data-theme="dark"] .gtabs button{color:var(--text-2)}
+:root[data-theme="dark"] .gtabs button.on{background:var(--surface);color:var(--accent)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .gtabs{background:var(--surface-2)}
+  :root:not([data-theme="light"]) .gtabs button{color:var(--text-2)}
+  :root:not([data-theme="light"]) .gtabs button.on{background:var(--surface);color:var(--accent)}
+}
+.hline{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;padding:10px 14px;margin:0 0 12px;border-radius:var(--ds-r-card);background:var(--surface);box-shadow:var(--shadow);font-size:14px;color:var(--text-2)}
+.hline b{color:var(--text);font-size:16px}
+.pseg{margin:0 0 12px}
+
+/* нижнее меню: матовое, у выбранного — мягкая подложка под значком */
+.bottom{background:color-mix(in srgb,var(--surface) 82%,transparent);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px)}
+.bottom button svg{padding:3px 18px;border-radius:var(--ds-r-pill);transition:background-color 240ms var(--ds-spring),transform 240ms var(--ds-spring)}
+.bottom button.on svg{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.bottom button:active svg{transform:scale(.9)}
+
+/* окна снизу: выезжают «на пружине», ручка сверху — потянуть вниз, чтобы закрыть */
+.sheet{border-radius:20px 20px 0 0;transition:transform 260ms var(--ds-spring)}
+.sheet::before{content:'';display:block;width:38px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--muted) 45%,transparent);margin:-12px auto 12px}
+@keyframes dsSheetUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes dsFade{from{opacity:0}to{opacity:1}}
+.sheet:not([hidden]){animation:dsSheetUp 360ms var(--ds-spring)}
+.sheet-bg:not([hidden]){animation:dsFade 240ms var(--ds-ease)}
+
+/* переход между экранами: новый раздел или страница мягко проявляется */
+@keyframes dsViewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#view.v-in{animation:dsViewIn 280ms var(--ds-spring)}
+#view.tab-in-l,#view.tab-in-r{animation-duration:240ms;animation-timing-function:var(--ds-spring)}
+
+/* уведомление внизу */
+.toast{border-radius:14px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+
+/* значки в настройках — линейные, как в меню */
+.sgroup h4{display:flex;align-items:center;gap:8px}
+.sgroup h4 svg{width:19px;height:19px;flex:none}
+.srow-ic svg{width:21px;height:21px}
+.menu-list .srow-ic{color:#fff;background:var(--accent)}
+
+/* «Итог дня» и «Люди» */
+.dayc .ro{align-items:center;padding:4px 0}
+.dayc .ro .tl{text-decoration:none;color:var(--text);text-align:left;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dayc .ro .btn{min-height:34px;padding:4px 10px;display:inline-flex;align-items:center}
+.dayc .ro .btn svg{width:18px;height:18px}
+.gcard .kpis{margin-bottom:6px}
+
+/* потянуть вниз — обновить */
+#ptr{position:fixed;left:50%;top:var(--hdr,60px);z-index:25;width:40px;height:40px;margin-top:-36px;border-radius:50%;background:var(--solid);
+  box-shadow:0 2px 12px rgba(0,0,0,.18);display:grid;place-items:center;color:var(--muted);opacity:0;transform:translate(-50%,0);pointer-events:none;
+  transition:transform 280ms var(--ds-spring),opacity 200ms var(--ds-ease),color 160ms}
+#ptr.show{transition:color 160ms}
+#ptr span{display:grid;place-items:center}
+#ptr svg{width:22px;height:22px}
+#ptr.go,#ptr.spin{color:var(--accent)}
+#ptr.spin span{animation:dsSpin 800ms linear infinite}
+@keyframes dsSpin{to{transform:rotate(360deg)}}
+
+/* загрузка: серые контуры карточек с мягким переливом */
+.skel{display:grid;gap:14px;padding-top:14px}
+.skel i{display:block;border-radius:var(--ds-r-card);background:linear-gradient(90deg,var(--surface) 0%,var(--surface-2) 50%,var(--surface) 100%);background-size:200% 100%;animation:dsSkel 1.3s linear infinite}
+.skel .sk-h{height:30px;width:55%;border-radius:10px}
+.skel .sk-c{height:120px}
+.skel .sk-s{height:70px}
+@keyframes dsSkel{from{background-position:200% 0}to{background-position:-200% 0}}
+
+@media (prefers-reduced-motion:reduce){
+  .sheet:not([hidden]),.sheet-bg:not([hidden]),#view.v-in,.subnav .chip.on::after,.skel i,#ptr.spin span{animation:none}
+  .top,.top h1,.top .sic,.top .icon-btn,.tile,.quick button,.srow,.bottom button svg,.sheet{transition:none}
+}
