@@ -335,6 +335,15 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 .shead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}.shead h2{margin:0}
 .sgroup{background:var(--surface-2);border-radius:16px;padding:14px;margin:0}
 .sgroup h4{margin:0 0 10px;font-size:15px}
+.fnd-l{display:grid;gap:4px;margin-top:8px;max-height:300px;overflow:auto}
+.fnd-it{display:flex;gap:10px;align-items:center;text-align:left;padding:6px;border:0;border-radius:12px;background:var(--surface-2);color:inherit;font:inherit;cursor:pointer;min-width:0}
+.fnd-it img,.fnd-no{width:36px;height:52px;border-radius:6px;object-fit:cover;flex:none;background:color-mix(in srgb,var(--text) 8%,transparent)}
+.fnd-it .m{min-width:0;display:grid}.fnd-it b{font-weight:600;overflow:hidden;text-overflow:ellipsis}.fnd-it small{color:var(--muted);font-size:12px}
+.fnd-ok{display:flex;gap:10px;align-items:center;margin-top:8px}.fnd-ok img{width:30px;height:44px;border-radius:5px;object-fit:cover}
+.wc{display:flex;gap:10px;align-items:center;min-width:0}.wct{min-width:0;flex:1}
+.cvs{width:34px;height:50px;border-radius:6px;object-fit:cover;flex:none;background:var(--surface-2)}
+.mhero{display:flex;gap:12px;align-items:flex-start;margin:-6px 0 12px}.cvb{width:84px;height:122px;border-radius:10px;object-fit:cover;flex:none;background:var(--surface-2)}
+.isteps{margin:0 0 10px;padding-left:20px}.isteps li{margin:2px 0}
 .sgroup>.field+.field{margin-top:12px}
 .sgroup .field input:not([type=checkbox]),.sgroup .field select,.sgroup .field textarea,.sgroup .seg button.on{background:var(--surface)}
 .sgroup .seg{background:color-mix(in srgb,var(--text) 7%,transparent)}
@@ -1535,7 +1544,8 @@ const GS_SCHEMA = [
   { key: 'books', sheet: 'Книги', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Название', 's'], ['author', 'Автор', 's'], ['status', 'Полка (want/reading/done)', 's'],
     ['pages', 'Страниц', 'n'], ['page', 'Прочитано, стр.', 'n'], ['started', 'Начал', 'd'], ['finished', 'Закончил', 'd'],
-    ['rating', 'Оценка', 'n'], ['notes', 'Заметки', 's'], ['created', 'Добавлена', 'd']] },
+    ['rating', 'Оценка', 'n'], ['notes', 'Заметки', 's'], ['created', 'Добавлена', 'd'],
+    ['year', 'Год', 'n'], ['cover', 'Обложка (ссылка)', 's'], ['genre', 'Жанр', 's']] },
   { key: 'notes', sheet: 'Заметки', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Заголовок', 's'], ['body', 'Текст (с оформлением)', 's'], ['pinned', 'Закреплена', 'b'], ['updated', 'Изменена', 's'],
     ['text', 'Текст для чтения (служебное)', 's'], ['folder', 'ID раздела', 's'], ['folderName', 'Раздел', 's'], ['book', 'ID книги (цитаты)', 's']] },
@@ -1562,12 +1572,15 @@ const GS_SCHEMA = [
   { key: 'movies', sheet: 'Кино', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Название', 's'], ['kind', 'Тип (film/series)', 's'], ['status', 'Статус (want/watching/done)', 's'],
     ['season', 'Сезон', 'n'], ['episode', 'Серия', 'n'], ['year', 'Год', 'n'], ['where', 'Где смотреть', 's'], ['rating', 'Оценка', 'n'],
-    ['note', 'Заметка', 's'], ['started', 'Начал', 'd'], ['finished', 'Посмотрел', 'd'], ['created', 'Добавлен', 'd']] },
+    ['note', 'Заметка', 's'], ['started', 'Начал', 'd'], ['finished', 'Посмотрел', 'd'], ['created', 'Добавлен', 'd'],
+    ['cover', 'Постер (ссылка)', 's'], ['genre', 'Жанр', 's'], ['kp', 'Рейтинг Кинопоиска', 'n'], ['seasons', 'Сезонов всего', 'n']] },
   // корзина: удалённое лежит 30 дней; в «Данных» — сами записи (по разделам), чтобы вернуть
   { key: 'trash', sheet: 'Корзина', cols: [
     ['id', 'ID (не менять)', 's'], ['kind', 'Что', 's'], ['name', 'Название', 's'], ['deleted', 'Удалено', 'd'], ['data', 'Данные (служебное)', 'j']] },
   { key: 'expLog', sheet: 'История трат', cols: [
-    ['id', 'ID (не менять)', 's'], ['day', 'Дата', 'd'], ['time', 'Время', 's'], ['item', 'ID статьи', 's'], ['month', 'Месяц', 'm'], ['amount', 'Сумма', 'n']] }
+    ['id', 'ID (не менять)', 's'], ['day', 'Дата', 'd'], ['time', 'Время', 's'], ['item', 'ID статьи', 's'], ['month', 'Месяц', 'm'], ['amount', 'Сумма', 'n']] },
+  // с часов и телефона (Health Connect): шаги и сон за день
+  { key: 'healthDays', pk: ['date'], sheet: 'Здоровье — дни', cols: [['date', 'Дата', 'd'], ['steps', 'Шаги', 'n'], ['sleep', 'Сон, мин', 'n']] }
 ];
 const GS_SETTINGS_SHEET = 'Настройки';
 const GS_SETTINGS = [
@@ -1765,7 +1778,7 @@ function normalize(d){
     foodLog:d.foodLog||[], waterLog:d.waterLog||[], weightLog:d.weightLog||[],
     exercises:d.exercises||[], routines:d.routines||[], workouts:d.workouts||[], trainActive:d.trainActive||null,
     projects:d.projects||[], fundSpend:d.fundSpend||[], payments:d.payments||[], payLog:d.payLog||[],
-    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[], trash:d.trash||[], expLog:d.expLog||[]};
+    noteFolders:d.noteFolders||[], recipes:d.recipes||[], pantry:d.pantry||[], movies:d.movies||[], trash:d.trash||[], expLog:d.expLog||[], healthDays:d.healthDays||[]};
   let migrated=false;
   if(o.version<2){
     migrated=true;
@@ -1898,6 +1911,7 @@ function normalize(d){
   const tOld=dkey(addDays(TODAY(),-TRASH_DAYS));
   o.trash=o.trash.filter(e=>e&&e.id).map(e=>Object.assign(e,{data:jsonOr(e.data)})).filter(e=>e.data&&String(e.deleted||'')>=tOld);
   // история трат: последние ~14 месяцев
+  o.healthDays=o.healthDays.filter(x=>x&&x.date&&x.date>=dkey(addDays(TODAY(),-800)));
   const eOld=dkey(addDays(TODAY(),-430)); o.expLog=o.expLog.filter(e=>e&&e.item&&String(e.day||'')>=eOld);
   return [o,migrated];
 }
@@ -2164,7 +2178,7 @@ function pullRemote(){
       const B=baseGet(), p=payload('obj'); B.srv=srv;
       // что normalize убрал (старая корзина и т.п.) — в таблице ещё есть: при следующем сохранении удалится
       GS_SCHEMA.forEach(t=>{ const b=baseOf(t,p[t.key]), have=new Set(b.map(x=>x[0])); raw[t.key].forEach(k=>{ if(!have.has(k)){ have.add(k); b.push([k,'']); } }); B.t[t.key]=b; }); baseKeep();
-      setSync('ok','Загружено из Google Таблицы'); if(!same) render(); if(mig) persist(); applyInbox(); setTimeout(archiveOld,3000); }
+      setSync('ok','Загружено из Google Таблицы'); if(!same) render(); if(mig) persist(); applyInbox(); setTimeout(archiveOld,3000); setTimeout(integAuto,4000); }
     else { if(!S) S=normalize(DEFAULT_DATA)[0]; render(); persist(); toast('Таблица была пустой — отправил в неё данные с этого устройства'); }
   }, err=>{
     if(!S){ canSave=false; S=normalize(DEFAULT_DATA)[0]; render();
@@ -3134,7 +3148,8 @@ function viewInvest(){
   const growth=`<span class="${cls}">${inv?(gain>=0?'+':'−')+pctD(Math.abs(gain)/inv):'—'}</span>`;
   const gsub=`<span class="${cls}">${gain>=0?'+':'−'}${fmt(Math.abs(gain))} ₽</span>${Math.round(day)?` · за день <span class="${day>0?'pos':'neg'}">${day>0?'+':'−'}${fmt(Math.abs(day))} ₽</span>`:''}`;
   const P=yieldBox(open);
-  return `${qBar()}<div class="kpis">${kpi('Стоит сейчас',val,'внесено '+fmt(inv)+' ₽')}${kpiT('Прирост портфеля',growth,gsub)}${kpi('Пришло дохода',rec,'купоны, проценты, дивиденды')}${P}${kpi('Ожидаемый доход',mon,'в месяц: купоны, дивиденды, ставки')}</div>
+  setTimeout(tiAuto,500);
+  return `${qBar()}${tiCard()}<div class="kpis">${kpi('Стоит сейчас',val,'внесено '+fmt(inv)+' ₽')}${kpiT('Прирост портфеля',growth,gsub)}${kpi('Пришло дохода',rec,'купоны, проценты, дивиденды')}${P}${kpi('Ожидаемый доход',mon,'в месяц: купоны, дивиденды, ставки')}</div>
 
   <button class="list-row" data-act="bondsOpen" style="margin-bottom:12px"><div class="m"><div class="fname"><b>Подбор облигаций</b></div><div class="fsub">Все облигации Мосбиржи: доходность к погашению, купон, оферта, НКД — с фильтрами</div></div>${CHEV}</button>
   ${freeHtml()}
@@ -4081,19 +4096,19 @@ function viewBooks(){
   const list=S.books.filter(b=>b.status===tab);
   let body;
   if(tab==='reading') body=list.map(bookCard).join('')||emptyCard('Сейчас ничего не читаете','Возьмите книгу из «Хочу прочитать» или добавьте новую.');
-  else if(tab==='want') body=`<section class="card">${list.map(b=>`<div class="trow"><button class="tmain" data-act="bookOpen" data-id="${b.id}"><div class="fname">${esc(b.name)}</div><div class="fsub">${esc(b.author||'')}${b.pages?(b.author?' · ':'')+b.pages+' стр.':''}</div></button><button class="btn small" data-act="bookStatus" data-id="${b.id}" data-v="reading">Начать</button></div>`).join('')||'<p class="hint" style="margin:0">Список пуст — добавьте книги, которые хотите прочитать.</p>'}</section>`;
+  else if(tab==='want') body=`<section class="card">${list.map(b=>`<div class="trow"><button class="tmain" data-act="bookOpen" data-id="${b.id}">${withCov(b,`<div class="fname">${esc(b.name)}</div><div class="fsub">${esc(b.author||'')}${b.pages?(b.author?' · ':'')+b.pages+' стр.':''}</div>`)}</button><button class="btn small" data-act="bookStatus" data-id="${b.id}" data-v="reading">Начать</button></div>`).join('')||'<p class="hint" style="margin:0">Список пуст — добавьте книги, которые хотите прочитать.</p>'}</section>`;
   else {
     const per=[...Array(12)].map((_,m)=>doneY.filter(b=>+b.finished.slice(5,7)===m+1).length);
     CH.books={vals:per,tips:MN.map(m=>m+' '+y),axis:MS.slice(),kind:'bar',sparse:true,fv:v=>String(Math.round(v)),ftip:v=>v+' '+plural(v,'книга','книги','книг')};
     const sorted=list.slice().sort((a,b)=>(b.finished||'').localeCompare(a.finished||''));
     body=`<section class="card"><h3>Прочитано в ${y} году по месяцам</h3><div class="chart" data-chart="books"></div></section>
-    <section class="card">${sorted.map(b=>`<button class="list-row" data-act="bookOpen" data-id="${b.id}"><div class="m"><div class="fname">${esc(b.name)}</div><div class="fsub">${esc(b.author||'')}${b.finished?(b.author?' · ':'')+dRu(b.finished):''}</div></div><div class="a">${stars(b.rating)}</div></button>`).join('')||'<p class="hint" style="margin:0">Здесь появятся прочитанные книги.</p>'}</section>`;
+    <section class="card">${sorted.map(b=>`<button class="list-row" data-act="bookOpen" data-id="${b.id}"><div class="m">${withCov(b,`<div class="fname">${esc(b.name)}</div><div class="fsub">${esc(b.author||'')}${b.finished?(b.author?' · ':'')+dRu(b.finished):''}</div>`)}</div><div class="a">${stars(b.rating)}</div></button>`).join('')||'<p class="hint" style="margin:0">Здесь появятся прочитанные книги.</p>'}</section>`;
   }
   return goalCard+`<div class="actions" style="margin:0 0 12px"><button class="btn primary small" data-act="add" data-kind="book">+ Книга</button></div>`+body;
 }
 function bookCard(b){
   const i=S.books.indexOf(b), pages=numOr(b.pages,0), page=numOr(b.page,0), p=pages?Math.min(1,page/pages):null;
-  return `<section class="card"><button class="namebtn" data-act="bookOpen" data-id="${b.id}"><div class="row-between"><span class="fname"><b>${esc(b.name)}</b></span>${p!=null?`<b class="num">${pct(p)}</b>`:''}</div><div class="fsub">${esc(b.author||'')}${b.started?(b.author?' · ':'')+'с '+dRu(b.started):''}</div></button>
+  return `<section class="card"><button class="namebtn" data-act="bookOpen" data-id="${b.id}">${withCov(b,`<div class="row-between"><span class="fname"><b>${esc(b.name)}</b></span>${p!=null?`<b class="num">${pct(p)}</b>`:''}</div><div class="fsub">${esc(b.author||'')}${b.started?(b.author?' · ':'')+'с '+dRu(b.started):''}</div>`)}</button>
     ${p!=null?`<div class="thermo"><i style="width:${(p*100).toFixed(1)}%"></i></div>`:''}
     <div class="row-between" style="margin-top:8px"><div class="finput"><span class="fsub">стр.</span><input class="num" style="width:76px" data-path="books.${i}.page" data-type="n" data-full="1" inputmode="numeric" value="${esc(b.page??'')}" aria-label="Текущая страница"><span class="fsub">${pages?'из '+pages:''}</span></div>
     <button class="btn small" data-act="bookStatus" data-id="${b.id}" data-v="done">Прочитал</button></div></section>`;
@@ -4101,7 +4116,7 @@ function bookCard(b){
 function viewBookPage(b){
   const i=S.books.indexOf(b), pages=numOr(b.pages,0), page=numOr(b.page,0);
   return `${pageBack('Книги')}<div class="detail-title"><h2>${esc(b.name)}</h2><button class="btn small" data-act="edit" data-kind="book" data-i="${i}">Изменить</button></div>
-  <p class="hint" style="margin-top:-6px">${esc(b.author||'автор не указан')}${pages?' · '+pages+' стр.':''}</p>
+  <div class="mhero">${covImg(b,'cvb')}<p class="hint" style="margin:0">${esc(b.author||'автор не указан')}${pages?' · '+pages+' стр.':''}${b.year?' · '+esc(b.year):''}${b.genre?'<br>'+esc(b.genre):''}</p></div>
   <div class="seg" style="margin-bottom:12px">${BSTAT.map(([v,l])=>`<button class="${b.status===v?'on':''}" data-act="bookStatus" data-id="${b.id}" data-v="${v}">${l}</button>`).join('')}</div>
   ${b.status!=='want'&&pages?`<section class="card"><div class="row-between"><h3>Прогресс</h3><b class="num">${pct(Math.min(1,page/pages))}</b></div><div class="thermo"><i style="width:${Math.min(100,page/pages*100).toFixed(1)}%"></i></div>
     <div class="finput"><span class="fsub">стр.</span><input class="num" style="width:76px" data-path="books.${i}.page" data-type="n" data-full="1" inputmode="numeric" value="${esc(b.page??'')}" aria-label="Текущая страница"><span class="fsub">из ${pages}</span></div></section>`:''}
@@ -4149,7 +4164,7 @@ function setMovieStatus(m,v){
 const mTag=m=>`<span class="tag mk-${m.kind==='series'?'ser':'film'}">${m.kind==='series'?'Сериал':'Фильм'}</span>`;
 // в «Хочу посмотреть»: какой сезон (пусто — весь сериал)
 const mSeason=m=>numOr(m.season,0)?numOr(m.season,0)+' сезон':'весь сериал';
-const mSeasonSel=m=>{ const n=Math.max(20,numOr(m.season,0)); return `<select class="mseason" data-mseason="${m.id}" aria-label="Какой сезон"><option value="">Весь сериал</option>${Array.from({length:n},(_,k)=>`<option value="${k+1}" ${numOr(m.season,0)===k+1?'selected':''}>${k+1} сезон</option>`).join('')}</select>`; };
+const mSeasonSel=m=>{ const n=numOr(m.seasons,0)>0?Math.max(numOr(m.seasons,0),numOr(m.season,0)):Math.max(20,numOr(m.season,0)); return `<select class="mseason" data-mseason="${m.id}" aria-label="Какой сезон"><option value="">Весь сериал</option>${Array.from({length:n},(_,k)=>`<option value="${k+1}" ${numOr(m.season,0)===k+1?'selected':''}>${k+1} сезон</option>`).join('')}</select>`; };
 // фильмы и сериалы — двумя списками рядом (на телефоне — один под другим)
 const mCols=(list,one,emptyF,emptyS)=>{ const f=list.filter(m=>m.kind!=='series'), sr=list.filter(m=>m.kind==='series');
   const col=(cls,t,l,e)=>`<div class="mcol ${cls}"><div class="mhead"><span class="mdot"></span>${t}<span class="fsub num">${l.length||''}</span></div>${l.length?one(l):`<p class="hint" style="margin:0 0 12px">${e}</p>`}</div>`;
@@ -4161,8 +4176,8 @@ function epCtl(m){
 }
 function movieCard(m){
   const ser=m.kind==='series';
-  return `<section class="card"><button class="namebtn" data-act="movieOpen" data-id="${m.id}"><div class="row-between"><span class="fname"><b>${esc(m.name)}</b> ${mTag(m)}</span></div>
-    <div class="fsub">${ser?'остановился: <b>'+epText(m)+'</b>':''}${mSub(m)?(ser?' · ':'')+mSub(m):''}${m.started?(ser||mSub(m)?' · ':'')+'с '+dRu(m.started):''}</div></button>
+  return `<section class="card"><button class="namebtn" data-act="movieOpen" data-id="${m.id}">${withCov(m,`<div class="row-between"><span class="fname"><b>${esc(m.name)}</b> ${mTag(m)}</span></div>
+    <div class="fsub">${ser?'остановился: <b>'+epText(m)+'</b>':''}${mSub(m)?(ser?' · ':'')+mSub(m):''}${m.started?(ser||mSub(m)?' · ':'')+'с '+dRu(m.started):''}</div>`)}</button>
     ${ser?epCtl(m):''}
     <div class="actions" style="margin-top:10px">${ser?`<button class="btn small primary" data-act="movieEp" data-id="${m.id}" data-d="1">+1 серия</button><button class="btn small" data-act="movieNextS" data-id="${m.id}">Следующий сезон</button>`:''}<span class="sp"></span><button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="done">Досмотрел</button></div></section>`;
 }
@@ -4173,19 +4188,19 @@ function viewMovies(){
   let body;
   if(tab==='watching') body=list.length?mCols(list,l=>l.map(movieCard).join(''),'Фильмов сейчас нет','Сериалов сейчас нет'):emptyCard('Сейчас ничего не смотрите','Возьмите что-нибудь из «Хочу посмотреть» или добавьте новое. У сериала здесь будут сезон и серия, на которых остановились.');
   else if(tab==='want'){ const sorted=list.slice().sort((a,b)=>String(b.created).localeCompare(String(a.created)));
-    const row=m=>`<div class="trow"><button class="tmain" data-act="movieOpen" data-id="${m.id}"><div class="fname">${esc(m.name)}</div>${mSub(m)?`<div class="fsub">${mSub(m)}</div>`:''}</button>${m.kind==='series'?`${mSeasonSel(m)}<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="watching">Начать</button>`:`<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="done">Посмотрел</button>`}</div>`;
+    const row=m=>`<div class="trow"><button class="tmain" data-act="movieOpen" data-id="${m.id}">${withCov(m,`<div class="fname">${esc(m.name)}</div>${mSub(m)?`<div class="fsub">${mSub(m)}</div>`:''}`)}</button>${m.kind==='series'?`${mSeasonSel(m)}<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="watching">Начать</button>`:`<button class="btn small" data-act="movieStatus" data-id="${m.id}" data-v="done">Посмотрел</button>`}</div>`;
     body=sorted.length?mCols(sorted,l=>`<section class="card">${l.map(row).join('')}</section>`,'Фильмов в списке нет','Сериалов в списке нет')
       :'<section class="card"><p class="hint" style="margin:0">Сюда — всё, что посоветовали или захотелось посмотреть. У сериала можно выбрать сезон.</p></section>'; }
   else { const sorted=list.slice().sort((a,b)=>String(b.finished).localeCompare(String(a.finished))), nY=list.filter(m=>m.finished&&+m.finished.slice(0,4)===y);
     body=`<p class="hint" style="margin:0 0 10px">В ${y} году: ${nY.filter(m=>m.kind==='film').length} ${plural(nY.filter(m=>m.kind==='film').length,'фильм','фильма','фильмов')}, ${nY.filter(m=>m.kind==='series').length} ${plural(nY.filter(m=>m.kind==='series').length,'сериал','сериала','сериалов')}</p>
-    <section class="card">${sorted.map(m=>`<button class="list-row" data-act="movieOpen" data-id="${m.id}"><div class="m"><div class="fname">${esc(m.name)} ${mTag(m)}</div><div class="fsub">${[m.finished?dRu(m.finished):'',mSub(m)].filter(Boolean).join(' · ')}</div></div><div class="a">${stars(m.rating)}</div></button>`).join('')
+    <section class="card">${sorted.map(m=>`<button class="list-row" data-act="movieOpen" data-id="${m.id}"><div class="m">${withCov(m,`<div class="fname">${esc(m.name)} ${mTag(m)}</div><div class="fsub">${[m.finished?dRu(m.finished):'',mSub(m)].filter(Boolean).join(' · ')}</div>`)}</div><div class="a">${stars(m.rating)}</div></button>`).join('')
       ||'<p class="hint" style="margin:0">Здесь появится всё, что посмотрели.</p>'}</section>`; }
   return add+body;
 }
 function viewMoviePage(m){
   const i=S.movies.indexOf(m), ser=m.kind==='series';
   return `${pageBack('Кино')}<div class="detail-title"><h2>${esc(m.name)}</h2><button class="btn small" data-act="edit" data-kind="movie" data-i="${i}">Изменить</button></div>
-  <p class="hint" style="margin-top:-6px">${ser?'Сериал':'Фильм'}${mSub(m)?' · '+mSub(m):''}</p>
+  <div class="mhero">${covImg(m,'cvb')}<p class="hint" style="margin:0">${ser?'Сериал':'Фильм'}${numOr(m.seasons,0)?', '+numOr(m.seasons,0)+' '+plural(numOr(m.seasons,0),'сезон','сезона','сезонов'):''}${mSub(m)?' · '+mSub(m):''}${m.genre?'<br>'+esc(m.genre):''}${numOr(m.kp,0)?'<br>Кинопоиск: ★ '+String(m.kp).replace('.',','):''}</p></div>
   <div class="seg" style="margin-bottom:12px">${MSTAT.map(([v,l])=>`<button class="${m.status===v?'on':''}" data-act="movieStatus" data-id="${m.id}" data-v="${v}">${l}</button>`).join('')}</div>
   ${ser&&m.status==='want'?`<section class="card"><div class="row-between"><h3>Какой сезон хочу посмотреть</h3>${mSeasonSel(m)}</div><p class="hint" style="margin:6px 0 0">${numOr(m.season,0)?'Нажмёте «Смотрю» — начнётся с '+mSeason(m)+'а.':'Не выбран — значит, сериал целиком, с первого сезона.'}</p></section>`:''}
   ${ser&&m.status!=='want'?`<section class="card"><div class="row-between"><h3>Где остановился</h3><b class="num">${epText(m)}</b></div>${epCtl(m)}
@@ -5051,7 +5066,7 @@ function viewTrainHome(){
   let streak=0; for(let i=0;i<520;i++){ const has=ws.some(w=>inWeek(w,addDays(mon,-7*i))); if(has) streak++; else if(i>0) break; }
   const weeks=[...Array(10)].map((_,k)=>addDays(mon,-7*(9-k)));
   CH.tweeks={vals:weeks.map(s=>ws.filter(w=>inWeek(w,s)).length),tips:weeks.map(s=>'Неделя с '+s.getDate()+' '+MG[s.getMonth()]),axis:weeks.map((s,k)=>(9-k)%3===0?s.getDate()+'.'+String(s.getMonth()+1).padStart(2,'0'):''),kind:'bar',sparse:true,fv:v=>String(Math.round(v)),ftip:v=>v+' '+plural(v,'тренировка','тренировки','тренировок')};
-  return `<div class="kpis">${kpiT('На этой неделе',String(week.length),plural(week.length,'тренировка','тренировки','тренировок'))}${kpiT('В этом месяце',String(month.length),'')}
+  return `${hcCard()}<div class="kpis">${kpiT('На этой неделе',String(week.length),plural(week.length,'тренировка','тренировки','тренировок'))}${kpiT('В этом месяце',String(month.length),'')}
     ${kpiT('Время за неделю',mmss(week.reduce((a,w)=>a+numOr(w.duration,0),0)),'')}${kpiT('Серия недель',String(streak),'подряд хотя бы одна')}</div>
   <section class="card"><h3>Начать тренировку${QH}</h3><p class="hint qtip" hidden>По программе — подставятся прошлые результаты. Или пустую — упражнения добавите по ходу.</p>
     ${S.routines.map(r=>{ const lw=lastRoutineWorkout(r.id); return `<div class="trow"><button class="tmain" data-act="routineOpen" data-id="${r.id}"><div class="fname"><b>${esc(r.name)}</b></div><div class="fsub">${r.items.length} упр. · ~${routineMin(r)} мин${lw?' · прошлый раз '+dayLabel(lw.date).toLowerCase():' · ещё не делали'}</div></button><button class="btn small primary" data-act="wStart" data-id="${r.id}">Начать</button></div>`; }).join('')}
@@ -5388,11 +5403,11 @@ const FORMS={
     note:'SMART: цель конкретная (S), измеримая (M), достижимая (A), значимая для вас (R) и со сроком (T). Незаполненные пункты будут видны на странице цели. Прогресс считается по числу, а если его нет — по шагам или задачам.',
     onDelete:g=>{ S.goalSteps=S.goalSteps.filter(s=>s.goal!==g.id); S.tasks.forEach(t=>{ if(t.goal===g.id) t.goal=''; }); UI.page=null; },
     extraKeys:['goalSteps','tasks'],after:(g,isNew)=>{ if(isNew){ UI.page={kind:'goal',id:g.id}; } }},
-  book:{title:'Книга',list:()=>S.books,keys:['books'],
+  book:{title:'Книга',list:()=>S.books,keys:['books'],find:'book',
     blank:()=>({id:uid(),name:'',author:'',pages:null,page:null,status:UI.sub.books||'want',started:'',finished:'',rating:0,notes:'',created:todayK()}),
     fields:[['name','Название','text'],['author','Автор','text'],['pages','Страниц','num'],['status','Полка','select',BSTAT],['started','Начал читать','date'],['finished','Закончил','date']],
     onDelete:()=>{ UI.page=null; },after:b=>{ setBookStatus(b,b.status); }},
-  movie:{title:'Фильм или сериал',list:()=>S.movies,keys:['movies'],
+  movie:{title:'Фильм или сериал',list:()=>S.movies,keys:['movies'],find:'movie',
     blank:()=>({id:uid(),name:'',kind:'film',status:UI.sub.movies||'want',season:null,episode:null,year:null,where:'',rating:null,note:'',started:'',finished:'',created:todayK()}),
     fields:[['name','Название','text'],['kind','Что это','select',MKIND],['status','Статус','select',MSTAT],['year','Год выхода','num'],
       ['where','Где смотреть','text',null,{ph:'Кинопоиск, Okko, кинотеатр…'}],
@@ -5425,7 +5440,7 @@ let edit=null;
 function openSheet(html){ const s=document.getElementById('sheet'); s.innerHTML=html; s.hidden=false; document.getElementById('sheetBg').hidden=false; }
 function closeSheet(){ document.getElementById('sheet').hidden=true; document.getElementById('sheetBg').hidden=true; edit=null; }
 function openEditor(kind,i,preset){
-  const F=FORMS[kind], rec=i==null?Object.assign(F.blank(),preset||{}):F.list()[i]; edit={kind,i};
+  const F=FORMS[kind], rec=i==null?Object.assign(F.blank(),preset||{}):F.list()[i]; edit={kind,i}; FND.seq++;
   const fld=f=>{ const h=fld0(f), fl=f[4]; if(!fl||!fl.showIf||!h) return h; const [k,v]=fl.showIf; return `<div data-showif="${k}=${v}" ${String(rec[k])===v?'':'hidden'}>${h}</div>`; };
   const fld0=([k,l,t,opts,fl])=>{ const v=rec[k]??'';
     if(fl&&fl.newOnly&&i!=null) return '';
@@ -5445,6 +5460,7 @@ function openEditor(kind,i,preset){
   openSheet(`<h2>${i==null?'Новая запись: ':''}${F.title}</h2><form class="form" id="edForm" onsubmit="return false">${F.fields.map(fld).join('')}</form>
     ${F.note?`<p class="hint" style="margin-top:10px">${F.note}</p>`:''}
     <div class="actions">${i!=null?'<button class="btn danger" data-act="edDelete">Удалить</button>':''}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="edSave">Сохранить</button></div>`);
+  if(F.find) findAttach(F.find);
   const first=document.querySelector('#edForm [name=name]'); if(first&&i==null) setTimeout(()=>first.focus(),50);
 }
 function saveEditor(){
@@ -5468,7 +5484,7 @@ function saveEditor(){
   if(edit.kind==='invPos'&&vals.start&&vals.end&&vals.end<vals.start){ toast('Дата закрытия раньше даты открытия'); return; }
   const initial=vals.initial; delete vals.initial;
   const rec=edit.i==null?F.blank():list[edit.i];
-  Object.assign(rec,vals);
+  Object.assign(rec,vals); if(edit.extra) Object.assign(rec,edit.extra);
   if(edit.i==null) list.push(rec);
   if(edit.kind==='invPos'&&edit.i==null&&initial) S.invContribs.push({id:uid(),pos:rec.id,date:rec.start||dkey(TODAY()),amount:initial,note:'первое внесение'});
   const isNew=edit.i==null;
@@ -5541,7 +5557,7 @@ function secBox(){
 }
 const secOn=id=>!(S&&S.settings.hidden||[]).includes(id);
 // настройки группами: у каждой — заголовок с линейным значком (SG_IC: прежний эмодзи → значок); содержимое и действия прежние
-const SG_IC={'☁️':'cloud','📅':'cal','🎨':'palette','🧩':'grid','🔔':'bell','🔒':'lock','💾':'save','🗂':'box','📱':'phone'};
+const SG_IC={'🔗':'refresh','☁️':'cloud','📅':'cal','🎨':'palette','🧩':'grid','🔔':'bell','🔒':'lock','💾':'save','🗂':'box','📱':'phone'};
 function openSettings(){
   const N=bodyNorm(), g=(t,h)=>{ if(!h) return ''; const [ic,...w]=t.split(' '); return `<section class="sgroup"><h4>${icon(SG_IC[ic]||'grid')}${w.join(' ')}</h4>${h}</section>`; };
   openSheet(`<div class="shead"><h2>Настройки</h2><button class="icon-btn sx" data-act="sheetClose" aria-label="Закрыть">✕</button></div>
@@ -5549,6 +5565,7 @@ function openSettings(){
     <div class="form">
     ${g('☁️ Данные и вход',storageBox())}
     ${g('📅 Google Календарь',gcalBox())}
+    ${g('🔗 Подключения',integBox())}
     ${g('🎨 Оформление',`<div class="field"><label>Тема</label><div class="seg">${[['','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([v,l])=>`<button class="${(document.documentElement.dataset.theme||'')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>${lookBox()}`)}
     ${g('🧩 Разделы',secBox())}
     ${g('🔔 Уведомления',nativeBox())}
@@ -6111,6 +6128,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]'); if(!b||!S) return;
   const a=b.dataset.act; NAV=NAV_ACTS.has(a); if(NAV) setTimeout(()=>{ NAV=false; },0);
   const go=()=>{ render(); window.scrollTo(0,0); };
+  if(INTEG_ACTS[a]){ INTEG_ACTS[a](b); return; }
   if(a==='section'){ dropEmptyNote(); const sid=GROUPS[b.dataset.id]?grpPick(b.dataset.id):b.dataset.id; if(sid===UI.section) UI.noteFolder=null; UI.section=sid; UI.detail=null; UI.habit=null; UI.page=null; saveUI(); go(); }
   else if(a==='tab'){ dropEmptyNote(); const id=b.dataset.id; if(UI.section==='fin'||UI.section==='pay'){ if(id==='pay') UI.section='pay'; else { UI.section='fin'; UI.tab=id; } } else UI.sub[UI.section]=id; UI.detail=null; UI.page=null; saveUI(); go(); }
   else if(a==='back'){
@@ -6446,7 +6464,7 @@ document.addEventListener('click',e=>{
   else if(a==='rMove'||a==='rDel'){ const r=S.routines.find(x=>x.id===UI.page.id), k=+b.dataset.k; if(!r) return;
     if(a==='rDel') r.items.splice(k,1); else if(k>0) [r.items[k-1],r.items[k]]=[r.items[k],r.items[k-1]]; persist('routines'); render(); }
   else if(a==='workoutOpen'){ UI.page={kind:'workout',id:b.dataset.id}; go(); }
-  else if(a==='wDel'){ const i=S.workouts.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить тренировку из истории?')) return; const w=S.workouts[i]; trashed(['workouts'],(w.name||'Тренировка')+', '+dRu(w.date),'Тренировка',()=>S.workouts.splice(i,1)); persist('workouts'); UI.page=null; go(); }
+  else if(a==='wDel'){ const i=S.workouts.findIndex(x=>x.id===b.dataset.id); if(i<0||!confirm('Удалить тренировку из истории?')) return; if(/^hc-/.test(b.dataset.id)){ const c=hcCfg(); c.del=(c.del||[]).concat(b.dataset.id).slice(-300); lsSet(HC_KEY,c); } const w=S.workouts[i]; trashed(['workouts'],(w.name||'Тренировка')+', '+dRu(w.date),'Тренировка',()=>S.workouts.splice(i,1)); persist('workouts'); UI.page=null; go(); }
   else if(a==='export'){ document.getElementById('jsonBox').value=JSON.stringify(S,null,1); }
   else if(a==='copy'){ const t=document.getElementById('jsonBox'); if(!t.value) t.value=JSON.stringify(S,null,1); t.select(); try{ navigator.clipboard.writeText(t.value).then(()=>toast('Скопировано'),()=>{ document.execCommand('copy'); toast('Скопировано'); }); }catch(err){ document.execCommand('copy'); toast('Скопировано'); } }
   else if(a==='import'){ let d; try{ d=JSON.parse(document.getElementById('jsonBox').value); }catch(err){ toast('Это не JSON'); return; }
@@ -6471,11 +6489,347 @@ document.addEventListener('click',e=>{
     S=Object.assign(normalize(DEFAULT_DATA)[0],keep); closeSheet(); persist(); render(); toast('Данные из Excel восстановлены'); }
   else if(a==='theme'){ const v=b.dataset.v; if(v) document.documentElement.dataset.theme=v; else delete document.documentElement.dataset.theme; try{ localStorage.setItem('moyplan.theme',v); }catch(err){} designMeta(); openSettings(); }
 });
+/* ======== Подключения: поиск книг и фильмов, Health Connect (часы), Т-Инвестиции ======== */
+const lsGet=(k,d)=>{ try{ const v=JSON.parse(localStorage.getItem(k)||'null'); return v&&typeof v==='object'?v:d; }catch(e){ return d; } };
+const lsSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
+// перерисовать, не мешая вводу и открытому окну
+function quietRender(){ if(!S) return; const ae=document.activeElement, typing=ae&&$view.contains(ae)&&(/INPUT|TEXTAREA|SELECT/.test(ae.tagName)||ae.isContentEditable);
+  if(typing||!document.getElementById('sheet').hidden) softRender(); else render(); }
+
+/* ---- запрос к сайту без CORS (ЛитРес): в Android — сам телефон, со скриптом — через скрипт ---- */
+const HTTP_WAIT={};
+window.__http=(id,code,body)=>{ const f=HTTP_WAIT[id]; if(f){ delete HTTP_WAIT[id]; f(code,body); } };
+function proxGet(url){
+  if(NATIVE&&typeof NATIVE.httpGet==='function') return new Promise((res,rej)=>{ const id=uid(), t=setTimeout(()=>{ delete HTTP_WAIT[id]; rej(new Error('нет ответа')); },25000);
+    HTTP_WAIT[id]=(c,b)=>{ clearTimeout(t); if(c>=200&&c<400) res(b); else rej(new Error('ошибка '+c)); }; NATIVE.httpGet(id,url); });
+  if(viaScript()) return server('fetchPage',url);
+  return fetch(url).then(r=>{ if(!r.ok) throw new Error('ошибка '+r.status); return r.text(); });
+}
+
+/* ---- поиск книг: ЛитРес (русские книги, нужен телефон или скрипт) + Open Library ---- */
+const LR='https://api.litres.ru/foundation/api/';
+async function findBooks(q){
+  const lr=proxGet(LR+'search?types=text_book&limit=6&q='+encodeURIComponent(q)).then(t=>{ const j=typeof t==='string'?JSON.parse(t):t;
+    return ((j&&j.payload&&j.payload.data)||[]).map(x=>x.instance).filter(b=>b&&b.title).map(b=>({src:'ЛитРес',lr:b.id,name:b.title,
+      author:(b.persons||[]).filter(p=>p.role==='author').map(p=>p.full_name).slice(0,2).join(', '),
+      year:+String(b.date_written_at||'').slice(0,4)||null,pages:b.symbols_count?Math.max(1,Math.round(b.symbols_count/1420)):null,
+      cover:b.cover_url?'https://cdn.litres.ru/pub/c/cover_200/'+b.id+'.jpg':''})); }).catch(()=>[]);
+  const ol=fetch('https://openlibrary.org/search.json?limit=6&fields=title,author_name,first_publish_year,number_of_pages_median,cover_i&q='+encodeURIComponent(q))
+    .then(r=>r.json()).then(j=>(j.docs||[]).filter(d=>d.title).map(d=>({src:'Open Library',name:d.title,author:(d.author_name||[]).slice(0,2).join(', '),
+      year:d.first_publish_year||null,pages:d.number_of_pages_median||null,cover:d.cover_i?'https://covers.openlibrary.org/b/id/'+d.cover_i+'-M.jpg':''}))).catch(()=>[]);
+  const [a,b]=await Promise.all([lr,ol]), seen=new Set(), out=[];
+  for(const x of a.concat(b)){ const k=pkey(x.name); if(seen.has(k)) continue; seen.add(k); out.push(x); }
+  return out.slice(0,8);
+}
+// у книги с ЛитРес — точное число страниц и жанр
+async function bookMore(x){
+  if(!x.lr) return {};
+  try{ const t=await proxGet(LR+'arts/'+x.lr), j=typeof t==='string'?JSON.parse(t):t, p=(j&&j.payload&&j.payload.data)||{}, ai=p.additional_info||{};
+    const g=(p.genres||[]).map(g=>g.name).filter(Boolean)[0]||'';
+    return Object.assign({},+ai.current_pages_or_seconds>0?{pages:+ai.current_pages_or_seconds}:{},g?{genre:capF(g)}:{}); }catch(e){ return {}; }
+}
+
+/* ---- поиск фильмов: poiskkino.dev (бывший kinopoisk.dev), бесплатный ключ на устройстве ---- */
+const KP_KEY='moyplan.kp.v1', KP='https://api.poiskkino.dev/v1.4/';
+const kpKey=()=>String(lsGet(KP_KEY,{}).key||'');
+const KP_SER=new Set(['tv-series','animated-series','anime','mini-series','tv-show']);
+async function kpGet(path,key){
+  const r=await fetch(KP+path,{headers:{'X-API-KEY':key||kpKey(),'Accept':'application/json'}});
+  if(r.status===401||r.status===403) throw new Error('ключ поиска фильмов не подходит');
+  if(r.status===429) throw new Error('на сегодня поиск исчерпан — завтра заработает снова');
+  if(!r.ok) throw new Error('ошибка '+r.status); return r.json();
+}
+async function findMovies(q){
+  const j=await kpGet('movie/search?page=1&limit=8&query='+encodeURIComponent(q));
+  return (j.docs||[]).map(m=>({src:'Кинопоиск',kpId:m.id,name:m.name||m.alternativeName||m.enName||'',orig:m.name&&m.alternativeName?m.alternativeName:'',
+    kind:(m.isSeries||KP_SER.has(m.type))?'series':'film',year:m.year||null,kp:m.rating&&+m.rating.kp?Math.round(m.rating.kp*10)/10:null,
+    genre:(m.genres||[]).slice(0,2).map(g=>g.name).filter(Boolean).join(', '),cover:(m.poster&&(m.poster.previewUrl||m.poster.url))||''})).filter(m=>m.name);
+}
+async function movieMore(x){
+  if(x.kind!=='series'||!x.kpId) return {};
+  try{ const m=await kpGet('movie/'+x.kpId), n=Math.max(0,...(m.seasonsInfo||[]).map(s=>+s.number||0)); return n>0?{seasons:n}:{}; }catch(e){ return {}; }
+}
+
+/* ---- поиск в окне «Книга» / «Фильм»: пишете название — ниже варианты, нажатие заполняет поля ---- */
+let FND={t:0,seq:0,res:[]};
+function findAttach(kind){
+  const nm=document.querySelector('#edForm [name=name]'); if(!nm) return;
+  const box=document.createElement('div'); box.className='fnd'; box.id='fnd'; nm.closest('.field').appendChild(box);
+  const idle=()=>{ box.innerHTML=kind==='movie'&&!kpKey()?`<p class="hint" style="margin:6px 0 0">Год, жанр, рейтинг и постер могут подставляться сами — нужен бесплатный ключ. <button type="button" class="more" style="padding:0" data-act="kpSetup">Как подключить</button></p>`
+    :`<p class="hint" style="margin:6px 0 0">Начните писать название — ${kind==='book'?'автор, страницы и обложка':'год, жанр и постер'} подставятся сами.</p>`; };
+  idle();
+  nm.addEventListener('input',()=>{ clearTimeout(FND.t); const q=nm.value.trim(); if(q.length<2||(kind==='movie'&&!kpKey())){ FND.seq++; idle(); return; }
+    FND.t=setTimeout(async()=>{ const my=++FND.seq; box.innerHTML='<p class="hint" style="margin:6px 0 0">Ищу…</p>';
+      let res=[], err=''; try{ res=await (kind==='book'?findBooks(q):findMovies(q)); }catch(e){ err=errText(e); }
+      if(my!==FND.seq||!document.getElementById('fnd')) return; FND.res=res; FND.kind=kind;
+      box.innerHTML=err?`<p class="hint neg" style="margin:6px 0 0">Поиск: ${esc(err)}</p>`:res.length?`<div class="fnd-l">${res.map((x,k)=>`<button type="button" class="fnd-it" data-act="fndPick" data-k="${k}">${x.cover?`<img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'<span class="fnd-no"></span>'}<span class="m"><b>${esc(x.name)}</b><small>${esc([x.author||x.orig,x.year,x.kind==='series'?'сериал':'',x.kp?'★ '+String(x.kp).replace('.',','):'',x.genre].filter(Boolean).join(' · '))}</small></span></button>`).join('')}</div>`
+        :'<p class="hint" style="margin:6px 0 0">Ничего не нашлось — можно заполнить вручную.</p>'; },450); });
+}
+async function fndPick(k){
+  const x=FND.res[k], F=document.getElementById('edForm'); if(!x||!F||!edit) return; FND.seq++;
+  const set=(n,v)=>{ const el=F.querySelector(`[name="${n}"]`); if(el&&v!=null&&v!==''){ el.value=v; el.dispatchEvent(new Event('change',{bubbles:true})); } };
+  set('name',x.name);
+  if(FND.kind==='book'){ set('author',x.author); set('pages',x.pages); edit.extra={cover:x.cover||'',year:x.year||null,genre:x.genre||''}; }
+  else { set('kind',x.kind); set('year',x.year); edit.extra={cover:x.cover||'',genre:x.genre||'',kp:x.kp,seasons:null};
+    const sw=F.querySelectorAll('[data-showif]'); sw.forEach(d=>{ const [kk,v]=d.dataset.showif.split('='); const el=F.querySelector(`[name="${kk}"]`); if(el) d.hidden=el.value!==v; }); }
+  const box=document.getElementById('fnd'); if(box) box.innerHTML=`<div class="fnd-ok">${x.cover?`<img src="${esc(x.cover)}" alt="" referrerpolicy="no-referrer">`:''}<span class="hint" style="margin:0">Подставлено: ${esc(x.src)}. Проверьте поля и сохраните.</span></div>`;
+  const ex=edit, more=await (FND.kind==='book'?bookMore(x):movieMore(x));
+  if(edit!==ex||!document.getElementById('edForm')) return;
+  if(more.pages) set('pages',more.pages);
+  Object.assign(edit.extra,more.genre?{genre:more.genre}:{},more.seasons?{seasons:more.seasons}:{});
+}
+function kpSetup(){
+  openSheet(`<div class="shead"><h2>Поиск фильмов</h2><button class="icon-btn sx" data-act="sheetClose" aria-label="Закрыть">✕</button></div>
+    <p class="hint">Год, жанр, рейтинг Кинопоиска, постер и число сезонов подставляются из базы poiskkino.dev (бывший kinopoisk.dev). Нужен бесплатный ключ — 200 поисков в день, хватит с запасом.</p>
+    <ol class="hint isteps"><li>Откройте в Телеграме бота <b>@poiskkinodev_bot</b> и получите ключ.</li><li>Вставьте ключ сюда.</li></ol>
+    <div class="field"><label>Ключ</label><input id="kpKeyIn" autocomplete="off" spellcheck="false" value="${esc(kpKey())}" placeholder="XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX"></div>
+    <p class="hint">Ключ хранится только на этом устройстве.</p>
+    <div class="actions">${kpKey()?'<button class="btn danger" data-act="kpOff">Убрать ключ</button>':''}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="kpSave">Сохранить</button></div>`);
+}
+async function kpSave(){
+  const k=(document.getElementById('kpKeyIn').value||'').trim(); if(k.length<10){ toast('Ключ слишком короткий'); return; }
+  toast('Проверяю ключ…'); try{ await kpGet('movie/search?page=1&limit=1&query='+encodeURIComponent('Матрица'),k); }catch(e){ toast(errText(e)); return; }
+  lsSet(KP_KEY,{key:k}); closeSheet(); toast('Поиск фильмов подключён');
+}
+const covImg=(x,cls)=>x&&x.cover&&/^https:\/\//.test(x.cover)?`<img class="${cls}" src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'';
+// строка списка с обложкой слева (без обложки — как раньше)
+const withCov=(x,inner)=>{ const im=covImg(x,'cvs'); return im?`<div class="wc">${im}<div class="wct">${inner}</div></div>`:inner; };
+
+/* ---- Health Connect: шаги, сон, вес, тренировки с часов (Samsung Health → Health Connect) ---- */
+const HC_KEY='moyplan.hc.v1';
+const hcCfg=()=>Object.assign({on:false,last:0,del:[],walk:false},lsGet(HC_KEY,{}));
+const hcStat=()=>{ if(!NATIVE||typeof NATIVE.hcStatus!=='function') return 'app'; try{ return String(NATIVE.hcStatus()); }catch(e){ return 'app'; } };
+const HC_EX={2:'Бадминтон',5:'Баскетбол',8:'Велосипед',9:'Велотренажёр',11:'Бокс',13:'Калистеника',16:'Танцы',25:'Эллипс',26:'Групповое занятие',32:'Гольф',34:'Гимнастика',
+  36:'Интервальная тренировка',37:'Поход',38:'Хоккей',39:'Коньки',44:'Единоборства',48:'Пилатес',51:'Скалолазание',53:'Гребля',54:'Гребной тренажёр',56:'Бег',57:'Бег на дорожке',
+  61:'Лыжи',62:'Сноуборд',64:'Футбол',66:'Сквош',68:'Подъём по лестнице',69:'Степпер',70:'Силовая тренировка',71:'Растяжка',73:'Плавание',74:'Плавание в бассейне',
+  75:'Настольный теннис',76:'Теннис',78:'Волейбол',79:'Ходьба',81:'Тяжёлая атлетика',83:'Йога'};
+let hcBusy=false, hcWait=null, hcErr='', hcAsking=0;
+window.__hc=json=>{ const f=hcWait; hcWait=null; if(f) f(json); };
+function hcRead(days){
+  return new Promise((res,rej)=>{ const t=setTimeout(()=>{ hcWait=null; rej(new Error('Health Connect не ответил')); },30000);
+    hcWait=j=>{ clearTimeout(t); let d=null; try{ d=JSON.parse(j); }catch(e){} if(!d||d.error) rej(new Error(d&&d.error==='need'?'нет разрешений':'нет данных')); else res(d); };
+    try{ NATIVE.hcRead(days); }catch(e){ clearTimeout(t); hcWait=null; rej(e); } });
+}
+// сон — к дню пробуждения; без стадий «бодрствование» (1), «вне кровати» (3), «бодрствование в кровати» (7)
+function hcApply(d){
+  const keys=new Set(), cfg=hcCfg(), del=new Set(cfg.del||[]), day=ms=>dkey(new Date(ms)), H={};
+  S.healthDays.forEach(x=>{ H[x.date]=x; });
+  const put=(dt,k,v)=>{ let x=H[dt]; if(!x){ x=H[dt]={date:dt,steps:null,sleep:null}; S.healthDays.push(x); keys.add('healthDays'); } if(x[k]!==v){ x[k]=v; keys.add('healthDays'); } };
+  (d.steps||[]).forEach(([dt,n])=>{ if(n>0) put(dt,'steps',Math.round(n)); });
+  if(Array.isArray(d.sleep)){ const sl={};
+    d.sleep.forEach(s=>{ const st=(s.st||[]).filter(x=>![1,3,7].includes(x[0])), a=st.reduce((m,x)=>m+(x[2]-x[1]),0)/6e4, min=a>0?a:(s.e-s.s)/6e4;
+      if(min>0){ const k=day(s.e); sl[k]=(sl[k]||0)+min; } });
+    Object.keys(sl).forEach(k=>put(k,'sleep',Math.round(sl[k]))); }
+  if(Array.isArray(d.weight)){ const w={}; d.weight.slice().sort((a,b)=>a[0]-b[0]).forEach(([ms,kg])=>{ if(kg>0) w[day(ms)]=Math.round(kg*10)/10; });
+    Object.keys(w).forEach(k=>{ if(!S.weightLog.some(x=>x.date===k)){ S.weightLog.push({date:k,kg:w[k]}); keys.add('weightLog'); } }); }
+  const hn=new Set();
+  if(Array.isArray(d.ex)) d.ex.slice().sort((a,b)=>a.s-b.s).forEach(x=>{ const id='hc-'+String(x.id||'').replace(/[^\w-]/g,'').slice(0,40), dur=Math.round((x.e-x.s)/1000);
+    if(!x.id||del.has(id)||dur<300||(x.t===79&&!cfg.walk)||S.workouts.some(w=>w.id===id)) return;
+    // уже записана в приложении (началась в пределах получаса) — вторую не заводим
+    if(S.workouts.some(w=>numOr(w.startTs,0)&&Math.abs(w.startTs-x.s)<30*60e3)) return;
+    const w={id,date:day(x.s),name:HC_EX[x.t]||String(x.n||'').trim()||'Тренировка',duration:dur,summary:'с часов',note:'',routine:'',startTs:x.s,items:[],prs:[]};
+    S.workouts.push(w); keys.add('workouts'); autoHabit('train',w.date,trainAmt(w)).forEach(n=>hn.add(n)); });
+  if(keys.size) persist(...keys);
+  if(hn.size) setTimeout(()=>toast('Отмечено в привычках: '+[...hn].join(', ')),300);
+  return keys.size;
+}
+async function hcSync(force){
+  const c=hcCfg(); if(!c.on||hcBusy||!S||!NATIVE) return; const st=hcStat();
+  if(st!=='ok'&&st!=='part'){ hcErr=st==='need'?'Нет разрешений — нажмите «Разрешить»':''; if(force) toast('Health Connect: нет разрешений'); return; }
+  if(!force&&Date.now()-c.last<20*60e3) return;
+  hcBusy=true; hcErr='';
+  try{ const d=await hcRead(c.last?10:30), n=hcApply(d); c.last=Date.now(); lsSet(HC_KEY,c);
+    if(force) toast(n?'Данные с часов обновлены':'Новых данных нет'); if(n||force) quietRender(); }
+  catch(e){ hcErr=errText(e); if(force) toast('Health Connect: '+hcErr); }
+  hcBusy=false;
+}
+const HC_WHY={app:'Нужна новая версия приложения для телефона.',old:'Health Connect встроен в Android 14 и новее — на этом телефоне его нет.',none:'Health Connect не найден на телефоне.'};
+function hcConnect(){
+  const st=hcStat(); if(HC_WHY[st]){ toast(HC_WHY[st]); return; }
+  const c=hcCfg(); c.on=true; lsSet(HC_KEY,c);
+  if(st==='ok'){ hcSync(true); if(!document.getElementById('sheet').hidden) openSettings(); return; }
+  try{ NATIVE.hcAsk(); }catch(e){}
+  // окно разрешений — отдельный экран; ждём, пока вернётесь
+  const t0=Date.now(); clearInterval(hcAsking);
+  hcAsking=setInterval(()=>{ const s=hcStat(); if(s==='ok'||s==='part'||Date.now()-t0>90e3){ clearInterval(hcAsking); hcAsking=0; if(s==='ok'||s==='part'){ hcSync(true); if(!document.getElementById('sheet').hidden) openSettings(); else quietRender(); } } },1500);
+}
+const hmDur=min=>{ min=Math.round(min); return Math.floor(min/60)+' ч'+(min%60?' '+String(min%60).padStart(2,'0')+' мин':''); };
+function hcCard(){
+  const c=hcCfg(), st=NATIVE?hcStat():'web';
+  if(!S.healthDays.length&&!(c.on&&NATIVE)){ if(!NATIVE||HC_WHY[st]) return '';
+    return `<div style="margin-bottom:12px">${firstStep('train','Шаги, сон и тренировки с часов','Galaxy Watch передаёт их в Samsung Health, а оттуда — в Health Connect. Приложение будет брать их оттуда само.',`<button class="btn small primary" data-act="hcOn" style="margin-top:6px">Подключить</button>`)}</div>`; }
+  const H={}; S.healthDays.forEach(x=>{ H[x.date]=x; });
+  const days=[...Array(7)].map((_,k)=>dkey(addDays(TODAY(),k-6))), tk=todayK(), t=H[tk]||{};
+  const sd=days.slice(0,6).filter(k=>numOr((H[k]||{}).steps,0)>0), avg=sd.length?sd.reduce((a,k)=>a+H[k].steps,0)/sd.length:0;
+  const sl=numOr(t.sleep,0)||numOr((H[dkey(addDays(TODAY(),-1))]||{}).sleep,0), slT=numOr(t.sleep,0)?'прошлой ночью':sl?'позапрошлой ночью':'';
+  const sle=days.filter(k=>numOr((H[k]||{}).sleep,0)>0), slAvg=sle.length?sle.reduce((a,k)=>a+H[k].sleep,0)/sle.length:0;
+  CH.hsteps={vals:days.map(k=>numOr((H[k]||{}).steps,0)),tips:days.map(k=>dRu(k).slice(0,5)),axis:days.map(k=>WD[wd(parseD(k))]),kind:'bar',sparse:true,fv:v=>fmt(v),ftip:v=>fmt(v)+' '+plural(Math.round(v),'шаг','шага','шагов')};
+  const need=NATIVE&&c.on&&st==='need';
+  return `<section class="card"><div class="row-between"><h3>С часов${QH}</h3>${NATIVE&&c.on?(need?'<button class="btn small primary" data-act="hcOn">Разрешить</button>':`<button class="btn small" data-act="hcSync" ${hcBusy?'disabled':''}>Обновить</button>`):''}</div>
+    <p class="hint qtip" hidden>Из Health Connect (Samsung Health, Galaxy Watch): шаги, сон, вес и тренировки. Тренировки с часов попадают в историю и отмечают привычку, вес — в «Питание». Обновляется само, когда открываете приложение.</p>
+    <div class="kpis">${kpiT('Шаги сегодня',t.steps?fmt(t.steps):'—',avg?'в среднем '+fmt(avg)+' в день':'')}${kpiT('Сон',sl?hmDur(sl):'—',[slT,slAvg&&sle.length>1?'в среднем '+hmDur(slAvg):''].filter(Boolean).join(' · '))}</div>
+    <div class="chart" data-chart="hsteps"></div>${hcErr?`<p class="hint neg" style="margin:6px 0 0">${esc(hcErr)}</p>`:''}</section>`;
+}
+function hcBox(){
+  if(!NATIVE) return ''; const c=hcCfg(), st=hcStat();
+  const txt=HC_WHY[st]||(!c.on?'Шаги, сон, вес и тренировки с Galaxy Watch (через Samsung Health → Health Connect) — в «Здоровье».'
+    :st==='need'?'Подключено, но разрешения не выданы.':'Подключено'+(c.last?' · '+qWhen(c.last):'')+(st==='part'?' · разрешены не все данные':''));
+  return `<div class="field"><label>Часы и Health Connect</label><div class="hint" style="margin:0">${esc(txt)}</div>
+    ${HC_WHY[st]?'':`<div class="actions" style="margin-top:6px">${!c.on||st==='need'?'<button class="btn small primary" data-act="hcOn">'+(c.on?'Разрешить':'Подключить')+'</button>':'<button class="btn small" data-act="hcSync">Обновить</button>'}<button class="btn small" data-act="hcOpen">Открыть Health Connect</button>${c.on?'<span class="sp"></span><button class="btn small danger" data-act="hcOff">Отключить</button>':''}</div>
+    ${c.on?`<label class="chk" style="margin-top:6px"><input type="checkbox" data-hccfg="walk" ${c.walk?'checked':''}><span>Прогулки (ходьба) — тоже тренировки</span></label>`:''}
+    <p class="hint" style="margin:6px 0 0">Если данных нет: в Samsung Health → Настройки → Health Connect включите передачу шагов, сна, веса и упражнений.</p>`}</div>`;
+}
+
+/* ---- Т-Инвестиции: токен «только чтение» на устройстве; бумаги, сделки, купоны и дивиденды → «Инвестиции» ---- */
+const TI_KEY='moyplan.tinv.v1', TI_FIGI='moyplan.tinv.figi.v1', TI_API='https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1.';
+const tiCfg=()=>Object.assign({token:'',last:0,err:''},lsGet(TI_KEY,{}));
+const isTi=p=>String(p&&p.id||'').startsWith('ti-');
+const tiMv=x=>x?(+x.units||0)+(+x.nano||0)/1e9:0;
+const TI_BUY=new Set(['OPERATION_TYPE_BUY','OPERATION_TYPE_BUY_CARD','OPERATION_TYPE_BUY_MARGIN','OPERATION_TYPE_DELIVERY_BUY']);
+const TI_SELL=new Set(['OPERATION_TYPE_SELL','OPERATION_TYPE_SELL_CARD','OPERATION_TYPE_SELL_MARGIN','OPERATION_TYPE_DELIVERY_SELL']);
+const TI_IN=new Set(['OPERATION_TYPE_INPUT_SECURITIES']), TI_OUT=new Set(['OPERATION_TYPE_OUTPUT_SECURITIES']);
+const TI_REPAY=new Set(['OPERATION_TYPE_BOND_REPAYMENT','OPERATION_TYPE_BOND_REPAYMENT_FULL']);
+const TI_INC=new Set(['OPERATION_TYPE_COUPON','OPERATION_TYPE_DIVIDEND','OPERATION_TYPE_DIV_EXT','OPERATION_TYPE_BOND_TAX','OPERATION_TYPE_DIVIDEND_TAX',
+  'OPERATION_TYPE_BOND_TAX_PROGRESSIVE','OPERATION_TYPE_DIVIDEND_TAX_PROGRESSIVE']);
+const TI_NOTE={OPERATION_TYPE_BUY:'покупка',OPERATION_TYPE_SELL:'продажа',OPERATION_TYPE_BOND_REPAYMENT:'погашение части',OPERATION_TYPE_BOND_REPAYMENT_FULL:'погашение',
+  OPERATION_TYPE_INPUT_SECURITIES:'перевод бумаг на счёт',OPERATION_TYPE_OUTPUT_SECURITIES:'вывод бумаг'};
+let tiBusy=false;
+async function tiCall(svc,body,token){
+  let r; try{ r=await fetch(TI_API+svc,{method:'POST',headers:{'Authorization':'Bearer '+(token||tiCfg().token),'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body||{})}); }
+  catch(e){ throw new Error('нет связи с Т-Инвестициями'); }
+  const t=await r.text(); let j=null; try{ j=JSON.parse(t); }catch(e){}
+  if(r.status===401||r.status===403) throw new Error('токен не подходит или отозван');
+  if(r.status===429) throw new Error('слишком много запросов — попробуйте через минуту');
+  if(!r.ok) throw new Error((j&&(j.description||j.message))||('ошибка '+r.status));
+  return j||{};
+}
+// сначала всё загружаем, потом разом применяем к данным (пока ждём ответы, данные могли обновиться из таблицы)
+async function tiFetch(){
+  const acc=((await tiCall('UsersService/GetAccounts',{})).accounts||[]).filter(a=>a.status==='ACCOUNT_STATUS_OPEN'&&a.accessLevel!=='ACCOUNT_ACCESS_LEVEL_NO_ACCESS');
+  if(!acc.length) throw new Error('открытых счетов не найдено');
+  const cache=lsGet(TI_FIGI,{}), now=new Date().toISOString(), out=[];
+  for(const a of acc){
+    const pf=await tiCall('OperationsService/GetPortfolio',{accountId:a.id,currency:'RUB'});
+    const ops=(await tiCall('OperationsService/GetOperations',{accountId:a.id,from:a.openedDate||'2010-01-01T00:00:00Z',to:now,state:'OPERATION_STATE_EXECUTED'})).operations||[];
+    const figis=new Set(); (pf.positions||[]).forEach(p=>{ if(p.figi&&p.instrumentType!=='currency') figis.add(p.figi); }); ops.forEach(o=>{ if(o.figi&&(TI_BUY.has(o.operationType)||TI_SELL.has(o.operationType)||TI_IN.has(o.operationType)||TI_INC.has(o.operationType)||TI_REPAY.has(o.operationType))) figis.add(o.figi); });
+    for(const f of figis) if(!cache[f]){ try{ const x=(await tiCall('InstrumentsService/GetInstrumentBy',{idType:'INSTRUMENT_ID_TYPE_FIGI',id:f})).instrument||{};
+      cache[f]={t:x.ticker||'',c:x.classCode||'',n:x.name||x.ticker||f,y:x.instrumentType||''}; }catch(e){ cache[f]={t:'',c:'',n:f,y:''}; } }
+    out.push({a,pf,ops});
+  }
+  lsSet(TI_FIGI,cache);
+  return {list:out,cache,fx:await loadFx().catch(()=>({}))};
+}
+function tiApply({list,cache,fx}){
+  const tk=todayK(), curMk=tk.slice(0,7), types={}; let nPos=0;
+  const toRub=m=>{ const cur=String(m&&m.currency||'rub').toUpperCase(), v=tiMv(m); return RUBS.has(cur)?v:v*(fx[cur]||0); };
+  const tiGroup=(id,name,kind)=>{ let g=S.invGroups.find(x=>x.id===id); if(!g){ g={id,name,kind}; S.invGroups.push(g); } return g; };
+  const tiPos=id=>{ let p=S.invPositions.find(x=>x.id===id); if(!p){ p=Object.assign(FORMS.invPos.blank(),{id}); S.invPositions.push(p); } return p; };
+  list.forEach(({a})=>{ types[a.type]=(types[a.type]||0)+1; });
+  for(const {a,pf,ops} of list){
+    const ak=String(a.id).slice(-6), aLab='Т-Инвестиции'+(a.type==='ACCOUNT_TYPE_TINKOFF_IIS'?' ИИС':a.type==='ACCOUNT_TYPE_INVEST_BOX'?' копилка':'')+(types[a.type]>1&&a.name?' «'+a.name+'»':'');
+    const by={}, E=f=>by[f]||(by[f]={ops:[],pf:null});
+    ops.forEach(o=>{ if(o.figi) E(o.figi).ops.push(o); });
+    (pf.positions||[]).forEach(p=>{ if(p.figi&&p.instrumentType!=='currency') E(p.figi).pf=p; });
+    for(const figi in by){
+      const e=by[figi], ins=cache[figi]||{}; if(ins.y==='currency') continue;
+      const rel=e.ops.some(o=>TI_BUY.has(o.operationType)||TI_SELL.has(o.operationType)||TI_IN.has(o.operationType)||TI_REPAY.has(o.operationType)||TI_INC.has(o.operationType));
+      if(!e.pf&&!rel) continue;
+      const kind=ins.y==='bond'?'Облигации':ins.y==='share'?'Акции':ins.y==='etf'?'Фонды':'Другое';
+      const g=tiGroup('ti-'+ak+'-'+({'Облигации':'b','Акции':'s','Фонды':'f'}[kind]||'o'),aLab+' · '+kind.toLowerCase(),kind);
+      const pid='ti-'+ak+'-'+figi, p=tiPos(pid), mx=/^TQ/.test(ins.c||'')&&!!ins.t, nm=ins.n||ins.t||figi;
+      if(mx&&p.secid!==ins.t) p.q=null;
+      Object.assign(p,{group:g.id,name:nm,secid:mx?ins.t:'',board:mx?ins.c:'',market:mx?(ins.y==='bond'?'bonds':'shares'):'',flow:false});
+      const cs=[]; let qty=0, first='', last='', lastPr=0;
+      e.ops.slice().sort((x,y)=>String(x.date).localeCompare(String(y.date))).forEach(o=>{
+        const t=o.operationType, d=dkey(new Date(o.date)), n=Math.max(0,(+o.quantity||0)-(+o.quantityRest||0)), pay=toRub(o.payment), pr=toRub(o.price);
+        let q; if(TI_BUY.has(t)||TI_IN.has(t)) q=n; else if(TI_SELL.has(t)||TI_OUT.has(t)) q=-n; else if(TI_REPAY.has(t)) q=t.endsWith('FULL')?-n:0; else return;
+        const amount=(TI_IN.has(t)||TI_OUT.has(t))&&!pay?r2(q*pr):r2(-pay);
+        cs.push({id:'ti-'+o.id,pos:pid,posName:nm,date:d,amount,note:TI_NOTE[t]||'',qty:q,price:pr?r2(pr):null}); qty+=q; if(pr) lastPr=pr; if(!first) first=d; last=d; });
+      // сверка с портфелем: перевод от другого брокера, сплит и т.п.
+      const pq=e.pf?tiMv(e.pf.quantity):0, diff=Math.round((pq-qty)*1e6)/1e6;
+      if(diff){ const avg=e.pf?toRub(e.pf.averagePositionPrice):lastPr; cs.push({id:pid+'-adj',pos:pid,posName:nm,date:first||tk,amount:r2(diff*avg),note:'сверка с брокером',qty:diff,price:avg?r2(avg):null}); }
+      S.invContribs=S.invContribs.filter(x=>x.pos!==pid||!String(x.id).startsWith('ti-')).concat(cs);
+      p.start=first||p.start||tk; p.end=e.pf&&pq?'':(last||tk);
+      if(e.pf){ p.value=r2(pq*toRub(e.pf.currentPrice)); p.valueDate=tk; } else { p.value=0; p.valueDate=p.end; }
+      // доход по месяцам — как у брокера (купоны и дивиденды за вычетом налога); у облигации месяц купона без выплаты — 0
+      const inc={}; e.ops.forEach(o=>{ if(!TI_INC.has(o.operationType)) return; const m=dkey(new Date(o.date)).slice(0,7); inc[m]=(inc[m]||0)+toRub(o.payment); });
+      if(mx&&ins.y==='bond'&&first&&p.q&&Array.isArray(p.q.cpn)) p.q.cpn.forEach(([dt])=>{ const m=String(dt).slice(0,7); if(dt>first&&m<curMk&&!(m in inc)) inc[m]=0; });
+      S.invFacts=S.invFacts.filter(f=>f.pos!==pid).concat(Object.keys(inc).sort().map(m=>({pos:pid,posName:nm,month:m,value:String(r2(inc[m])).replace('.',','),sum:r2(inc[m])})));
+      if(e.pf&&pq) nPos++;
+    }
+    // свободные деньги на счёте — отдельной позицией (стоимость = остаток, поэтому прироста не даёт)
+    const cash=r2(tiMv(pf.totalAmountCurrencies)), cid='ti-'+ak+'-cash';
+    if(cash>=1||S.invPositions.some(x=>x.id===cid)){
+      const g=tiGroup('ti-'+ak+'-o',aLab+' · деньги','Другое'), p=tiPos(cid);
+      Object.assign(p,{group:g.id,name:'Свободные деньги',secid:'',board:'',market:'',value:cash,valueDate:tk,flow:false,end:''}); if(!p.start) p.start=a.openedDate?dkey(new Date(a.openedDate)):tk;
+      S.invContribs=S.invContribs.filter(x=>x.pos!==cid).concat(cash?[{id:cid+'-adj',pos:cid,posName:'Свободные деньги',date:tk,amount:cash,note:'остаток на счёте',qty:null,price:null}]:[]); }
+  }
+  persist('invGroups','invPositions','invContribs','invFacts');
+  return nPos;
+}
+async function tiSync(manual){
+  const c=tiCfg(); if(!c.token||tiBusy||!S) return; tiBusy=true; tiUpd();
+  try{ const data=await tiFetch(), n=tiApply(data); c.last=Date.now(); c.err=''; lsSet(TI_KEY,c);
+    if(manual) toast('Т-Инвестиции: '+n+' '+plural(n,'бумага','бумаги','бумаг')+' в портфеле');
+    qTried=0; refreshQuotes(false); }
+  catch(e){ c.err=errText(e); lsSet(TI_KEY,c); if(manual) toast('Т-Инвестиции: '+c.err); }
+  tiBusy=false; if(UI.section==='fin') quietRender(); else tiUpd();
+}
+function tiUpd(){ const el=$view.querySelector('[data-live="ti"]'); if(!el) return; const t=document.createElement('div'); t.innerHTML=tiCard(); if(t.firstElementChild) el.innerHTML=t.firstElementChild.innerHTML; }
+function tiCard(){
+  const c=tiCfg(), mine=S.invPositions.filter(isTi);
+  if(!c.token&&!mine.length) return `<button class="list-row" data-act="tiOpen" style="margin-bottom:12px"><div class="m"><div class="fname"><b>Подключить Т-Инвестиции</b></div><div class="fsub">Бумаги, покупки, купоны и дивиденды подтянутся сами — по токену «только чтение»</div></div>${CHEV}</button>`;
+  const ids=new Set(mine.filter(p=>p.secid&&!(p.end&&p.end<todayK())).map(p=>p.secid)), dup=S.invPositions.filter(p=>!isTi(p)&&p.secid&&ids.has(p.secid)&&!(p.end&&p.end<todayK()));
+  const st=tiBusy?'Загружаю…':c.err?`<span class="neg">${esc(c.err)}</span>`:c.last?qWhen(c.last):c.token?'ещё не загружено':'обновляется на устройстве, где введён токен';
+  return `<section class="card" data-live="ti"><div class="row-between"><div style="min-width:0"><b>Т-Инвестиции</b><div class="fsub">${st}</div></div>
+    <div class="btns">${c.token?`<button class="btn small" data-act="tiSync" ${tiBusy?'disabled':''}>Обновить</button><button class="btn small" data-act="tiOpen" aria-label="Настройки Т-Инвестиций">⋯</button>`:'<button class="btn small" data-act="tiOpen">Подключить здесь</button>'}</div></div>
+    ${dup.length?`<p class="hint" style="margin:8px 0 0">Эти бумаги есть и среди внесённых вручную: <b>${[...new Set(dup.map(p=>p.secid))].map(esc).join(', ')}</b>. Если это те же, что в Т-Инвестициях, — удалите ручные позиции, чтобы не считать дважды. Если они у другого брокера (Сбер, Альфа) — оставьте.</p>`:''}</section>`;
+}
+function tiOpen(){
+  const c=tiCfg();
+  openSheet(`<div class="shead"><h2>Т-Инвестиции</h2><button class="icon-btn sx" data-act="sheetClose" aria-label="Закрыть">✕</button></div>
+    <p class="hint">Приложение само загрузит бумаги по всем счетам, покупки и продажи, купоны и дивиденды (за вычетом налога) и остаток денег. Цены — с Мосбиржи, как у остальных бумаг. Обновляется само при открытии, не чаще раза в 6 часов.</p>
+    <ol class="hint isteps"><li>На сайте или в приложении Т-Инвестиций откройте <b>Настройки → Токены T-Invest API</b>.</li><li>Создайте токен с доступом <b>«Только чтение»</b> ко всем счетам.</li><li>Скопируйте его и вставьте сюда.</li></ol>
+    <div class="field"><label>Токен</label><input id="tiTok" autocomplete="off" spellcheck="false" placeholder="${c.token?'токен сохранён — вставьте новый, чтобы заменить':'t.…'}"></div>
+    <p class="hint">Токен хранится только на этом устройстве — в таблицу и на сайт он не попадает. С токеном «только чтение» нельзя ничего купить, продать или вывести. Если им долго не пользоваться, он перестанет действовать — тогда выпустите новый.</p>
+    <p class="hint">Бумаги лягут в группы «Т-Инвестиции · облигации», «· акции», «· фонды». Править их вручную не нужно: при обновлении всё приводится к данным брокера.</p>
+    <div class="actions">${c.token?'<button class="btn danger" data-act="tiOff">Отключить</button>':''}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="tiSave">${c.token?'Сохранить':'Подключить'}</button></div>`);
+}
+async function tiSave(){
+  const tok=(document.getElementById('tiTok').value||'').trim().replace(/^Bearer\s+/i,'');
+  if(!tok){ if(tiCfg().token){ closeSheet(); return; } toast('Вставьте токен'); return; }
+  if(tok.length<30){ toast('Токен слишком короткий — скопируйте его целиком'); return; }
+  toast('Проверяю токен…');
+  try{ const a=(await tiCall('UsersService/GetAccounts',{},tok)).accounts||[]; if(!a.length) throw new Error('у токена нет доступа ни к одному счёту'); }
+  catch(e){ toast('Т-Инвестиции: '+errText(e)); return; }
+  lsSet(TI_KEY,{token:tok,last:0,err:''}); closeSheet(); tiSync(true);
+}
+let tiTried=0;
+function tiAuto(){ const c=tiCfg(); if(!c.token||tiBusy||Date.now()-c.last<6*36e5||Date.now()-tiTried<15*60e3) return; tiTried=Date.now(); tiSync(false); }
+function integAuto(){ if(!S) return; hcSync(false); tiAuto(); }
+function integBox(){
+  const c=tiCfg();
+  return `${hcBox()}<div class="field"><label>Т-Инвестиции</label><div class="hint" style="margin:0">${c.token?'Подключено'+(c.last?' · '+qWhen(c.last):''):'Бумаги, сделки, купоны и дивиденды — в «Инвестиции» сами.'}</div>
+    <div class="actions" style="margin-top:6px"><button class="btn small ${c.token?'':'primary'}" data-act="tiOpen">${c.token?'Настроить':'Подключить'}</button></div></div>
+    <div class="field"><label>Поиск фильмов</label><div class="hint" style="margin:0">${kpKey()?'Ключ сохранён — год, жанр, рейтинг и постер подставляются сами.':'Чтобы при добавлении фильма подставлялись год, жанр и постер.'}</div>
+    <div class="actions" style="margin-top:6px"><button class="btn small" data-act="kpSetup">${kpKey()?'Изменить ключ':'Подключить'}</button></div></div>`;
+}
+const INTEG_ACTS={
+  fndPick:b=>fndPick(+b.dataset.k), kpSetup:()=>kpSetup(), kpSave:()=>kpSave(),
+  kpOff:()=>{ try{ localStorage.removeItem(KP_KEY); }catch(e){} closeSheet(); toast('Ключ убран'); },
+  hcOn:()=>hcConnect(), hcSync:()=>hcSync(true), hcOpen:()=>{ try{ NATIVE.hcOpen(); }catch(e){} },
+  hcOff:()=>{ const c=hcCfg(); c.on=false; lsSet(HC_KEY,c); toast('Health Connect отключён — записанные данные остались'); openSettings(); },
+  tiOpen:()=>tiOpen(), tiSave:()=>tiSave(), tiSync:()=>tiSync(true),
+  tiOff:()=>{ if(!confirm('Отключить Т-Инвестиции на этом устройстве? Загруженные бумаги останутся, но обновляться перестанут.')) return; lsSet(TI_KEY,{token:'',last:0,err:''}); closeSheet(); toast('Т-Инвестиции отключены'); quietRender(); }
+};
+document.addEventListener('change',e=>{ const el=e.target; if(!el||!el.dataset||!el.dataset.hccfg) return; const c=hcCfg(); c[el.dataset.hccfg]=el.checked; lsSet(HC_KEY,c); });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&S) setTimeout(()=>hcSync(false),1500); });
 try{ const t=localStorage.getItem('moyplan.theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
 designMeta();
 lookApply();
 
 boot();
+setTimeout(()=>{ if(!REMOTE) integAuto(); },5000);
 if(!NATIVE&&'serviceWorker' in navigator&&/^(https:|http:\/\/localhost)/.test(location.href)) navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(NATIVE&&notifCfg().on) try{ NATIVE.askNotify(); }catch(e){}
 if(NATIVE){ if('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); setTimeout(()=>checkApk(),4000); }
