@@ -6654,13 +6654,21 @@ function hcApply(d){
   if(hn.size) setTimeout(()=>toast('Отмечено в привычках: '+[...hn].join(', ')),300);
   return keys.size;
 }
+// что пришло из Health Connect при последнем обновлении (видно в настройках) — чтобы понять, где теряются данные
+let hcInfo='';
+function hcSum(d){
+  const L=a=>Array.isArray(a)?a.length:0, st=(d.steps||[]).filter(x=>x[1]>0).length;
+  const p=['шаги — '+st+' '+plural(st,'день','дня','дней'),'сон — '+L(d.sleep),'вес — '+L(d.weight),'тренировки — '+L(d.ex)];
+  const no=(d.no||[]).map(String).filter(Boolean);
+  return 'пришло: '+p.join(', ')+(no.length?'. Ошибки: '+no.join('; '):'');
+}
 async function hcSync(force){
   const c=hcCfg(); if(!c.on||hcBusy||!S||!NATIVE) return; const st=hcStat();
   if(st!=='ok'&&st!=='part'){ hcErr=st==='need'?'Нет разрешений — нажмите «Разрешить»':''; if(force) toast('Health Connect: нет разрешений'); return; }
   if(!force&&Date.now()-c.last<20*60e3) return;
   hcBusy=true; hcErr='';
   try{ const d=await hcRead(c.last?10:30), n=hcApply(d); c.last=Date.now(); lsSet(HC_KEY,c);
-    if(force) toast(n?'Данные с часов обновлены':'Новых данных нет'); if(n||force) quietRender(); }
+    hcInfo=hcSum(d); if(force) toast(n?'Данные с часов обновлены':'Новых данных нет — '+hcInfo); if(n||force) quietRender(); }
   catch(e){ hcErr=errText(e); if(force) toast('Health Connect: '+hcErr); }
   hcBusy=false;
 }
@@ -6698,6 +6706,7 @@ function hcBox(){
   return `<div class="field"><label>Часы и Health Connect</label><div class="hint" style="margin:0">${esc(txt)}</div>
     ${HC_WHY[st]?'':`<div class="actions" style="margin-top:6px">${!c.on||st==='need'?'<button class="btn small primary" data-act="hcOn">'+(c.on?'Разрешить':'Подключить')+'</button>':'<button class="btn small" data-act="hcSync">Обновить</button>'}<button class="btn small" data-act="hcOpen">Открыть Health Connect</button>${c.on?'<span class="sp"></span><button class="btn small danger" data-act="hcOff">Отключить</button>':''}</div>
     ${c.on?`<label class="chk" style="margin-top:6px"><input type="checkbox" data-hccfg="walk" ${c.walk?'checked':''}><span>Прогулки (ходьба) — тоже тренировки</span></label>`:''}
+    ${c.on&&hcInfo?`<p class="hint" style="margin:6px 0 0">Последнее обновление — ${esc(hcInfo)}</p>`:''}
     <p class="hint" style="margin:6px 0 0">Если данных нет: в Samsung Health → Настройки → Health Connect включите передачу шагов, сна, веса и упражнений.</p>`}</div>`;
 }
 
