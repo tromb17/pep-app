@@ -335,6 +335,11 @@ table.bal{border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:1
 .shead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}.shead h2{margin:0}
 .sgroup{background:var(--surface-2);border-radius:16px;padding:14px;margin:0}
 .sgroup h4{margin:0 0 10px;font-size:15px}
+.trow.tfocus{background:color-mix(in srgb,var(--accent) 9%,transparent);border-radius:12px;box-shadow:inset 3px 0 0 var(--accent)}
+.ftag{display:inline-block;font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:6px;padding:1px 6px;vertical-align:1px}
+.focus-card{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 45%,transparent)}
+.tdim{opacity:.45;transition:opacity .2s}.tdim:hover,.tdim:focus-within{opacity:1}
+.chip.fchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .fnd-l{display:grid;gap:4px;margin-top:8px;max-height:300px;overflow:auto}
 .fnd-it{display:flex;gap:10px;align-items:center;text-align:left;padding:6px;border:0;border-radius:12px;background:var(--surface-2);color:inherit;font:inherit;cursor:pointer;min-width:0}
 .fnd-it img,.fnd-no{width:36px;height:52px;border-radius:6px;object-fit:cover;flex:none;background:color-mix(in srgb,var(--text) 8%,transparent)}
@@ -1521,7 +1526,7 @@ const GS_SCHEMA = [
     ['project', 'ID проекта', 's'], ['projectName', 'Проект', 's'], ['repeatDays', 'Дни повтора пн…вс', 's'], ['checklist', 'Чек-лист (служебное)', 'j'],
     ['times', 'Сколько раз', 'n'], ['timesDone', 'Сделано раз', 'n'],
     ['part', 'Когда (morning/during/day/evening)', 's'], ['time', 'Время (чч:мм)', 's'], ['deadline', 'Крайний срок', 'd'],
-    ['gcal', 'Событие Google Календаря (служебное)', 's'], ['remind', 'Напомнить за, мин (пусто — нет)', 's'], ['dtime', 'Крайний срок — время (чч:мм)', 's']] },
+    ['gcal', 'Событие Google Календаря (служебное)', 's'], ['remind', 'Напомнить за, мин (пусто — нет)', 's'], ['dtime', 'Крайний срок — время (чч:мм)', 's'], ['focus', 'Фокус', 'b']] },
   { key: 'projects', sheet: 'Проекты', cols: [
     ['id', 'ID (не менять)', 's'], ['name', 'Проект', 's'], ['parent', 'ID родительского проекта', 's'], ['created', 'Создан', 'd'],
     ['color', 'Цвет (1–7, пусто — сам)', 's'], ['pin', 'Важный', 'b']] },
@@ -2112,8 +2117,8 @@ let NSYNC='', NS_S=null;
 function nativeSync(soft){ if(!NATIVE||!S) return; const k=DATA_VER+'|'+todayK(); if(soft===true&&NS_S===S&&NSYNC===k) return; NSYNC=k; NS_S=S; clearTimeout(nativeT); nativeT=setTimeout(()=>{ try{
   NATIVE.schedule(JSON.stringify(notifPlan()));
   const wk=dkey(addDays(TODAY(),7));
-  NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&(x.deadline||x.due&&x.due<=wk)).map(x=>({id:x.id,name:x.name,due:x.due,deadline:x.deadline||'',time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none'})),
-    projects:S.projects.filter(p=>p.pin).concat(S.projects.filter(p=>!p.pin)).map(p=>({id:p.id,name:p.name,parent:p.parent||''})),
+  NATIVE.setWidget(JSON.stringify({today:todayK(),tasks:S.tasks.filter(x=>!x.done&&(x.deadline||x.due&&x.due<=wk)).map(x=>({id:x.id,name:x.name,due:x.due,deadline:x.deadline||'',time:x.time||'',project:x.project||'',priority:+x.priority||0,times:x.times||1,timesDone:x.timesDone||0,repeat:x.repeat||'none',focus:isFocus(x)})),
+    projects:S.projects.filter(p=>p.pin).concat(S.projects.filter(p=>!p.pin)).map(p=>({id:p.id,name:p.name,parent:p.parent||'',color:p.color||'',c:projHex(p.id)})),
     habits:S.habits.map(h=>({id:h.id,name:(h.icon?h.icon+' ':'')+h.name,type:h.type==='count'?'count':'check',target:numOr(h.target,1),unit:h.unit||'',days:h.days||'1111111',created:h.created||''})),
     hday:todayK(),hlog:Object.fromEntries(S.habitLog.filter(l=>l.date===todayK()).map(l=>[l.habit,numOr(l.value,1)])),
     exp:expItems().map(it=>{ const L=limitOf(it,todayK().slice(0,7)); return {id:it.id,name:it.name,plan:numOr(it.amount,0),subs:itemSubs(it),limit:L?L.lim:0,spent:L?L.spent:0}; }),emonth:todayK().slice(0,7)}));
@@ -3437,7 +3442,7 @@ function viewHome(){
   html+=weekHomeCard()+loginCard();
   // задачи: просроченные и на сегодня
   const onDay=t=>repOk(today,t.repeat,t.repeatDays);
-  const open=S.tasks.filter(t=>tNow(t,tk)).sort((a,b)=>(tOver(a,tk)?0:1)-(tOver(b,tk)?0:1)||(a.deadline&&a.deadline>tk?1:0)-(b.deadline&&b.deadline>tk?1:0)||sortT(a,b));
+  const open=S.tasks.filter(t=>tNow(t,tk)||isFocus(t)).sort((a,b)=>(isFocus(b)?1:0)-(isFocus(a)?1:0)||(tOver(a,tk)?0:1)-(tOver(b,tk)?0:1)||(a.deadline&&a.deadline>tk?1:0)-(b.deadline&&b.deadline>tk?1:0)||sortT(a,b));
   const doneN=S.tasks.filter(t=>t.done&&t.doneAt===tk).length, LIM=6;
   const add=`<div class="qa-row" style="margin:2px 0 4px"><input class="inline-in" id="homeTask" placeholder="Новая задача на сегодня…" enterkeyhint="done" autocomplete="off" aria-label="Новая задача"><button class="btn primary" data-act="homeTask" aria-label="Добавить задачу">+</button></div>`;
   const sh=open.slice(0,LIM), nOver=sh.filter(t=>tOver(t,tk)).length;
@@ -3640,7 +3645,9 @@ const prioTag=p=>`<span class="prio p${p}" title="Приоритет: ${PRIOS[p]
 // когда делать: порядок групп на «Сегодня»; задачи «несколько раз в день» без отметки — в «В течение дня»
 const PARTS=[['morning','В первой половине дня'],['during','В течение дня'],['day','Днём'],['evening','Во второй половине дня']];
 const PART_SHORT={morning:'1-я половина',during:'в течение дня',day:'днём',evening:'2-я половина'};
-const tPart=t=>PARTS.some(x=>x[0]===t.part)?t.part:((t.times||1)>1?'during':'');
+// время задачи само задаёт часть дня: до 12 — первая половина, 12–17 — днём, с 17 — вторая половина
+const partOf=tm=>{ const m=/^(\d{1,2}):/.exec(tm||''); if(!m) return ''; const h=+m[1]; return h<12?'morning':h<17?'day':'evening'; };
+const tPart=t=>PARTS.some(x=>x[0]===t.part)?t.part:partOf(t.time)||((t.times||1)>1?'during':'');
 const REPEATS=[['none','Не повторять'],['daily','Каждый день'],['every2','Через день'],['weekdays','По будням'],['days','По дням недели'],['weekly','Каждую неделю'],['monthly','Каждый месяц']];
 function nextDue(k,rep,days){
   let d=parseD(k||todayK());
@@ -3701,15 +3708,21 @@ function taskRow(t,hideProj){
   const left=n>1&&!t.done
     ?`<button class="tcheck tring p${pr}" style="--p:${(dn/n*360).toFixed(0)}deg" data-act="taskTick" data-id="${t.id}" aria-label="Отметить ещё раз: ${esc(t.name)}, сделано ${dn} из ${n}"></button>`
     :`<button class="tcheck p${pr}" data-act="taskToggle" data-id="${t.id}" aria-pressed="${!!t.done}" aria-label="${t.done?'Вернуть':'Выполнить'}: ${esc(t.name)}">${t.done?'✓':''}</button>`;
-  return `<div class="trow ${t.done?'done':''}" data-tid="${t.id}">${left}
-    <div class="tcol"><button class="tmain" data-act="taskOpen" data-id="${t.id}"><div class="fname">${esc(t.name||'Без названия')}${pr&&!t.done?` ${prioTag(pr)}`:''}</div>${parts.length?`<div class="fsub">${parts.join(' · ')}</div>`:''}</button>${multi}
+  return `<div class="trow ${t.done?'done':''} ${isFocus(t)?'tfocus':''}" data-tid="${t.id}">${left}
+    <div class="tcol"><button class="tmain" data-act="taskOpen" data-id="${t.id}"><div class="fname">${isFocus(t)?'<span class="ftag">◎ Фокус</span> ':''}${esc(t.name||'Без названия')}${pr&&!t.done?` ${prioTag(pr)}`:''}</div>${parts.length?`<div class="fsub">${parts.join(' · ')}</div>`:''}</button>${multi}
     ${exp?`<div class="tcl">${cl.map((c,i)=>`<button class="tcl-i ${c.done?'done':''}" data-act="clRowToggle" data-id="${t.id}" data-i="${i}" aria-pressed="${!!c.done}"><span class="tcheck sm">${c.done?'✓':''}</span><span class="tcl-t">${esc(c.text)}</span></button>`).join('')}${UI.tclAdd===t.id
       ?`<div class="tcl-add"><input class="inline-in" id="tclNew" placeholder="Новый пункт" autocomplete="off" enterkeyhint="done" aria-label="Новый пункт чек-листа"><button class="btn small primary" data-act="tclAdd" data-id="${t.id}" aria-label="Добавить пункт">+</button></div>`
       :''}<div class="tcl-foot">${UI.tclAdd===t.id?'':`<button class="more tcl-open" data-act="tclPlus" data-id="${t.id}">+ пункт</button>`}<button class="more tcl-open" data-act="taskOpen" data-full="1" data-id="${t.id}">Открыть задачу ›</button></div></div>`:''}</div>${grip}</div>`;
 }
 // по дате, в один день — по времени (без времени — после), потом без проекта выше, потом приоритет
 // сначала приоритет (высокий сверху, без приоритета — после всех приоритетных), потом дата, время (без времени — после), «без проекта»
-const sortT=(a,b)=>(+b.priority||0)-(+a.priority||0)||(a.due||a.deadline||'9999').localeCompare(b.due||b.deadline||'9999')||(a.time||'99:99').localeCompare(b.time||'99:99')||(inInbox(a)?0:1)-(inInbox(b)?0:1);
+const isFocus=t=>!!(t&&t.focus&&!t.done);
+const FOCUS_DIM='moyplan.focusdim.v1';
+const focusDim=()=>{ try{ return localStorage.getItem(FOCUS_DIM)!=='0'; }catch(e){ return true; } };
+function setFocus(t,on){ if(!t||t.done) return; t.focus=!!on; persist('tasks'); render(); buzz(false); toast(on?'В фокусе: '+(t.name||'задача'):'Убрано из фокуса'); }
+// цвет проекта числом (#rrggbb) — для виджета
+const projHex=id=>{ try{ const v=getComputedStyle(document.documentElement).getPropertyValue(projColor(id)).trim(); return /^#[0-9a-f]{6}$/i.test(v)?v:''; }catch(e){ return ''; } };
+const sortT=(a,b)=>(isFocus(b)?1:0)-(isFocus(a)?1:0)||(+b.priority||0)-(+a.priority||0)||(a.due||a.deadline||'9999').localeCompare(b.due||b.deadline||'9999')||(a.time||'99:99').localeCompare(b.time||'99:99')||(inInbox(a)?0:1)-(inInbox(b)?0:1);
 function tBlock(title,list,hideProj,extra,drop){ return list.length||extra?`<section class="card"${drop!=null?` data-tdrop="${esc(drop)}"`:''}><div class="ghead">${title}<span class="sum fsub">${list.length||''}</span></div>${capList(list).map(t=>taskRow(t,hideProj)).join('')}${capMore(list)}${extra||''}</section>`:''; }
 function projSide(v){
   const tk=todayK(), cnt=f=>S.tasks.filter(t=>!t.done&&f(t)).length;
@@ -3741,13 +3754,17 @@ function tasksBody(v){
   if(v==='today'){
     // повторяющиеся задачи не показываем в нерабочие для них дни (у «по будням» — в выходные)
     const onDay=t=>repOk(TODAY(),t.repeat,t.repeatDays);
-    const over=open.filter(t=>tOver(t,tk)&&onDay(t)).sort(sortT), doneT=S.tasks.filter(t=>t.done&&t.doneAt===tk);
-    const tod=open.filter(t=>tToday(t,tk)&&onDay(t)&&(!t.deadline||t.deadline===tk)).sort(sortT);
-    const dl=open.filter(t=>tToday(t,tk)&&onDay(t)&&t.deadline&&t.deadline>tk).sort((a,b)=>(+b.priority||0)-(+a.priority||0)||a.deadline.localeCompare(b.deadline));
-    const inbox=open.filter(t=>!t.due&&!t.deadline&&inInbox(t)), anyPart=tod.some(t=>tPart(t));
+    const foc=open.filter(isFocus).sort(sortT), nf=t=>!isFocus(t);
+    const over=open.filter(t=>nf(t)&&tOver(t,tk)&&onDay(t)).sort(sortT), doneT=S.tasks.filter(t=>t.done&&t.doneAt===tk);
+    const tod=open.filter(t=>nf(t)&&tToday(t,tk)&&onDay(t)&&(!t.deadline||t.deadline===tk)).sort(sortT);
+    const dl=open.filter(t=>nf(t)&&tToday(t,tk)&&onDay(t)&&t.deadline&&t.deadline>tk).sort((a,b)=>(+b.priority||0)-(+a.priority||0)||a.deadline.localeCompare(b.deadline));
+    const inbox=open.filter(t=>nf(t)&&!t.due&&!t.deadline&&inInbox(t)), anyPart=tod.some(t=>tPart(t));
     const todH=anyPart?PARTS.map(([k,l])=>tBlock(l,tod.filter(t=>tPart(t)===k))).join('')+tBlock('В любое время',tod.filter(t=>!tPart(t))):tBlock('Сегодня',tod);
-    return (over.length||tod.length?tBlock('<span class="neg">Просрочено</span>',over)+todH:dl.length?'':emptyCard('На сегодня всё чисто','Добавьте задачу выше или загляните в «Календарь».'))
+    const rest=(over.length||tod.length?tBlock('<span class="neg">Просрочено</span>',over)+todH:dl.length||foc.length?'':emptyCard('На сегодня всё чисто','Добавьте задачу выше или загляните в «Календарь».'))
       +tBlock('В работе — до крайнего срока',dl)+(inbox.length?tBlock('Без проекта и без срока',inbox):'')+tBlock('Сделано сегодня',doneT);
+    if(!foc.length) return rest;
+    const dim=focusDim();
+    return `<section class="card focus-card"><div class="ghead">◎ Фокус<span class="sum"><button class="more" style="padding:0" data-act="focusDim">${dim?'Показать остальные ярко':'Приглушить остальные'}</button></span></div>${foc.map(t=>taskRow(t)).join('')}</section><div class="${dim?'tdim':''}">${rest}</div>`;
   }
   if(v==='all'){
     // «Без проекта» — сверху, чтобы были на виду; дальше проекты и подпроекты
@@ -3909,11 +3926,12 @@ function viewTaskPage(t){
       ${S.projects.length?`<div class="qa-chips qa-line" style="grid-column:1/-1;margin-top:0">${projChips(t.project&&projById(t.project)?t.project:'','tProj')}</div>`:''}
       <div><label>Повтор</label>${sel('repeat',REPEATS,t.repeat||'none')}</div>
       ${t.repeat==='days'?`<div class="days" style="grid-column:1/-1">${WD.map((w,d)=>`<button class="dbtn ${String(t.repeatDays||'')[d]==='1'?'on':''}" data-act="tRepDay" data-id="${t.id}" data-d="${d}" aria-pressed="${String(t.repeatDays||'')[d]==='1'}">${w}</button>`).join('')}</div>`:''}
+      ${isNew||t.done?'':`<div style="grid-column:1/-1"><button class="chip fchip ${isFocus(t)?'on':''}" data-act="tFocus" aria-pressed="${isFocus(t)}">◎ ${isFocus(t)?'В фокусе — убрать':'В фокус'}</button><span class="fsub" style="margin-left:8px">${isFocus(t)?'наверху «Сегодня», на главной и в виджете':'поднять наверх и выделить'}</span></div>`}
       <div style="grid-column:1/-1"><label>Приоритет</label><div class="prios" role="group" aria-label="Приоритет">${PRIOS.map(([v,l])=>`<button class="chip p${v} ${String(t.priority||'0')===v?'on':''}" data-act="tPrio" data-v="${v}" aria-pressed="${String(t.priority||'0')===v}">${v!=='0'?FLAG_SVG:''}${v==='0'?'Нет':l}</button>`).join('')}</div></div>
     </div>
     ${(()=>{ const g=t.goal&&S.goals.find(x=>x.id===t.goal), sum=[t.part&&PART_SHORT[t.part],n>1?n+' '+plural(n,'раз','раза','раз'):'',g?'цель: '+g.name:''].filter(Boolean).join(' · ');
       return UI.tMore?`<div class="tfields tmore" style="margin-top:10px">
-      <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||'')}</div>
+      <div><label>Когда в течение дня</label>${sel('part',[['','В любое время']].concat(PARTS),t.part||partOf(t.time)||'')}${t.time&&!t.part?'<span class="fsub">по времени '+esc(t.time)+'</span>':''}</div>
       <div><label>Сколько раз выполнить</label><input type="number" min="1" max="12" step="1" inputmode="numeric" data-tf="times" value="${n}" aria-label="Сколько раз выполнить"></div>
       <div style="grid-column:1/-1"><label>Цель</label>${sel('goal',[['','— без цели —']].concat(S.goals.filter(g=>g.status!=='done'||g.id===t.goal).map(g=>[g.id,g.name])),t.goal||'')}</div>
       </div><button class="more" style="margin-top:6px;padding-left:0" data-act="tMore">Скрыть ▴</button>`
@@ -4017,10 +4035,10 @@ function toggleTask(id){
   const t=S.tasks.find(x=>x.id===id); if(!t) return;
   if(!t.done){
     const was={done:t.done,doneAt:t.doneAt,timesDone:t.timesDone,checklist:clone(t.checklist||[])};
-    t.done=true; t.doneAt=todayK(); t.timesDone=t.times||1;
+    was.focus=t.focus; t.done=true; t.doneAt=todayK(); t.timesDone=t.times||1; t.focus=false;
     (t.checklist||[]).forEach(c=>{ if(c.k&&!c.done){ c.done=true; shopTick(c); } });
     let n=null;
-    if(t.repeat&&t.repeat!=='none'){ const nd=nextDue(t.due,t.repeat,t.repeatDays); n=Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,due:nd,deadline:nextDeadline(t,nd),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))});
+    if(t.repeat&&t.repeat!=='none'){ const nd=nextDue(t.due,t.repeat,t.repeatDays); n=Object.assign({},t,{id:uid(),done:false,doneAt:'',timesDone:0,focus:false,due:nd,deadline:nextDeadline(t,nd),created:todayK(),checklist:(t.checklist||[]).map(c=>({id:uid(),text:c.text,done:false}))});
       S.tasks.push(n); }
     // «Отменить» внизу экрана: задача снова открыта, следующий повтор убран
     toast(n?'Готово. Следующая — '+dayLabel(n.due||n.deadline).toLowerCase():'Готово',{label:'Отменить',fn:()=>{ Object.assign(t,was); if(n) S.tasks=S.tasks.filter(x=>x!==n); persist('tasks'); render(); }});
@@ -5909,10 +5927,10 @@ document.addEventListener('contextmenu',e=>{
   const d=delTarget(e.target); if(!d) return;
   e.preventDefault(); hideCtx();
   const m=document.createElement('div'); m.className='ctx'; m.id='ctx'; m.setAttribute('role','menu');
-  m.innerHTML=`<div class="ctx-h">${esc(d.sp.name)}</div><button type="button" role="menuitem" data-cx="open">Открыть</button>${openTask(d.sp)?'<button type="button" role="menuitem" data-cx="later">На следующий день</button>':''}<button type="button" role="menuitem" class="danger" data-cx="del">Удалить</button>`;
+  m.innerHTML=`<div class="ctx-h">${esc(d.sp.name)}</div><button type="button" role="menuitem" data-cx="open">Открыть</button>${openTask(d.sp)?'<button type="button" role="menuitem" data-cx="focus">'+(isFocus(d.sp.rec)?'Убрать из фокуса':'◎ В фокус')+'</button><button type="button" role="menuitem" data-cx="later">На следующий день</button>':''}<button type="button" role="menuitem" class="danger" data-cx="del">Удалить</button>`;
   document.body.appendChild(m); const r=m.getBoundingClientRect();
   m.style.left=Math.max(8,Math.min(e.clientX,innerWidth-r.width-8))+'px'; m.style.top=Math.max(8,Math.min(e.clientY,innerHeight-r.height-8))+'px';
-  m.addEventListener('click',ev=>{ const c=ev.target.closest('[data-cx]'); if(!c) return; ev.stopPropagation(); hideCtx(); if(c.dataset.cx==='open') d.btn.click(); else if(c.dataset.cx==='later') postponeTask(d.sp.rec); else delRecord(d.sp); });
+  m.addEventListener('click',ev=>{ const c=ev.target.closest('[data-cx]'); if(!c) return; ev.stopPropagation(); hideCtx(); if(c.dataset.cx==='open') d.btn.click(); else if(c.dataset.cx==='later') postponeTask(d.sp.rec); else if(c.dataset.cx==='focus') setFocus(d.sp.rec,!isFocus(d.sp.rec)); else delRecord(d.sp); });
   const del=m.querySelector('[data-cx="del"]'); if(del) del.focus();
 });
 document.addEventListener('pointerdown',e=>{ if(!(e.target.closest&&e.target.closest('#ctx'))) hideCtx(); },true);
@@ -6035,6 +6053,7 @@ document.addEventListener('change',e=>{
   if(el.dataset.tf){ const t=curTask(); if(!t) return; const f=el.dataset.tf;
     if(f==='times'){ const v=Math.max(1,Math.min(12,Math.round(+el.value||1))); t.times=v; t.timesDone=Math.min(v,t.timesDone||0); if(!t.done&&t.timesDone>=v&&v>1) t.timesDone=v-1; persist('tasks'); setTimeout(render,0); return; }
     t[f]=el.value; if(f==='name') t.name=el.value.trim();
+    if(f==='time'&&t.time) t.part=partOf(t.time);
     if(f==='repeat'&&t.repeat==='days'&&!String(t.repeatDays||'').includes('1')&&t.due){ const m='0000000'.split(''); m[wd(parseD(t.due))]='1'; t.repeatDays=m.join(''); }
     if((f==='repeat'||f==='due')&&alignTask(t)) toast('Срок перенесён на '+dayLabel(t.due).toLowerCase()+' — '+repeatText(t));
     if(f==='deadline'&&!t.deadline) t.dtime='';
@@ -6288,6 +6307,8 @@ document.addEventListener('click',e=>{
   else if(a==='qaProj'){ UI.qaProj=b.dataset.v; render(); const q=document.getElementById('qaTitle'); if(q) q.focus(); }
   else if(a==='histToggle'){ UI.histOpen=!UI.histOpen; render(); }
   else if(a==='loginLater'){ try{ localStorage.setItem(LOGIN_ASK,b.dataset.v==='never'?'never':dkey(addDays(TODAY(),7))); }catch(err){} render(); }
+  else if(a==='tFocus'){ const t=curTask(); if(t) setFocus(t,!isFocus(t)); }
+  else if(a==='focusDim'){ try{ localStorage.setItem(FOCUS_DIM,focusDim()?'0':'1'); }catch(e){} render(); }
   else if(a==='tPrio'){ const t=curTask(); if(!t) return; t.priority=b.dataset.v; persist('tasks'); render(); }
   else if(a==='tProj'){ const t=curTask(); if(!t) return; t.project=b.dataset.v; persist('tasks'); render(); }
   else if(a==='tcalHide'){ const h=new Set(tcalHidden()), v=b.dataset.v; if(h.has(v)) h.delete(v); else h.add(v); try{ localStorage.setItem(TCAL_HIDE,JSON.stringify([...h])); }catch(e){} render(); }
