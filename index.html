@@ -7005,7 +7005,7 @@ function tiOpen(){
   const c=tiCfg();
   openSheet(`<div class="shead"><h2>Т-Инвестиции</h2><button class="icon-btn sx" data-act="sheetClose" aria-label="Закрыть">✕</button></div>
     <p class="hint">Приложение само загрузит бумаги по всем счетам, покупки и продажи, купоны и дивиденды (за вычетом налога) и остаток денег. Цены — с Мосбиржи, как у остальных бумаг. Обновляется само при открытии, не чаще раза в 6 часов.</p>
-    <ol class="hint isteps"><li>На сайте или в приложении Т-Инвестиций откройте <b>Настройки → Токены T-Invest API</b>.</li><li>Создайте токен с доступом <b>«Только чтение»</b> ко всем счетам.</li><li>Скопируйте его и вставьте сюда.</li></ol>
+    <ol class="hint isteps"><li>Токен выпускается только на сайте Т-Банка — в приложении на телефоне этого пункта нет. Нажмите <button class="btn small" data-act="tiSite">Открыть страницу токенов</button>, войдите и найдите блок <b>«Токены T-Invest API»</b> → «Создать токен».</li><li>Создайте токен с доступом <b>«Только чтение»</b> ко всем счетам.</li><li>Скопируйте его и вставьте сюда.</li></ol>
     <div class="field"><label>Токен</label><input id="tiTok" autocomplete="off" spellcheck="false" placeholder="${c.token?'токен сохранён — вставьте новый, чтобы заменить':'t.…'}"></div>
     <p class="hint">Токен хранится только на этом устройстве — в таблицу и на сайт он не попадает. С токеном «только чтение» нельзя ничего купить, продать или вывести. Если им долго не пользоваться, он перестанет действовать — тогда выпустите новый.</p>
     <p class="hint">Бумаги лягут в группы «Т-Инвестиции · облигации», «· акции», «· фонды». Править их вручную не нужно: при обновлении всё приводится к данным брокера.</p>
@@ -7035,7 +7035,7 @@ const INTEG_ACTS={
   kpOff:()=>{ try{ localStorage.removeItem(KP_KEY); }catch(e){} closeSheet(); toast('Ключ убран'); },
   hcOn:()=>hcConnect(), hcSync:()=>hcSync(true), hcOpen:()=>{ try{ NATIVE.hcOpen(); }catch(e){} },
   hcOff:()=>{ const c=hcCfg(); c.on=false; lsSet(HC_KEY,c); toast('Health Connect отключён — записанные данные остались'); openSettings(); },
-  tiOpen:()=>tiOpen(), tiSave:()=>tiSave(), tiSync:()=>tiSync(true),
+  tiOpen:()=>tiOpen(), tiSite:()=>{ const u='https://www.tbank.ru/invest/settings/'; if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }, tiSave:()=>tiSave(), tiSync:()=>tiSync(true),
   tiOff:()=>{ if(!confirm('Отключить Т-Инвестиции на этом устройстве? Загруженные бумаги останутся, но обновляться перестанут.')) return; lsSet(TI_KEY,{token:'',last:0,err:''}); closeSheet(); toast('Т-Инвестиции отключены'); quietRender(); }
 };
 document.addEventListener('change',e=>{ const el=e.target; if(!el||!el.dataset||!el.dataset.hccfg) return; const c=hcCfg(); c[el.dataset.hccfg]=el.checked; lsSet(HC_KEY,c); });
