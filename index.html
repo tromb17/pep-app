@@ -173,6 +173,7 @@ input.bad{outline:2px solid var(--critical)!important}
 .status.bad{color:var(--neg-text);background:var(--neg-bg)}
 .status.idle{color:var(--text-2);background:var(--surface-2)}
 .tag{display:inline-block;font-size:11.5px;font-weight:600;color:var(--text-2);background:var(--surface-2);border-radius:6px;padding:1px 6px;vertical-align:1px}
+.ktag[style]{background:color-mix(in srgb,var(--c) 15%,transparent);color:color-mix(in srgb,var(--c) 80%,var(--text))}
 .tag.f{color:var(--accent);background:var(--accent-soft)}
 
 /* перетаскивание статей */
@@ -1239,6 +1240,8 @@ const TYPE_PLURAL={'Доход':'Доходы','Разовый доход':'Ра
 const KINDS=['Вклад','Облигации','Акции','Фонды','ПДС','Другое'];
 const NOEX=r=>!r.secid, SHARE=r=>!!r.secid&&r.market!=='bonds';
 const PDS_RATIOS=[['','нет (это не ПДС)'],['1','1:1 — доход до 80 тыс. ₽ в месяц'],['2','1:2 — доход 80–150 тыс. ₽ в месяц'],['4','1:4 — доход больше 150 тыс. ₽ в месяц']];
+const KIND_C={'Вклад':'--t1','Облигации':'--t7','Акции':'--t3','Фонды':'--t4','ПДС':'--t5','Другое':''};
+const kindTag=k=>`<span class="tag ktag"${KIND_C[k]?` style="--c:var(${KIND_C[k]})"`:''}>${esc(k||'')}</span>`;
 const KIND_INCOME={'Вклад':'Проценты','Облигации':'Купоны','Акции':'Дивиденды','Фонды':'Выплаты','ПДС':'Доход','Другое':'Доход'};
 const defaultAlloc=()=>{ const n=new Date(); return {start:mKey(n.getFullYear()*12+n.getMonth()+1),funds:[
   {id:'inv',name:'Инвестиции',pct:10,src:[],once:false,kind:'save'},{id:'wants',name:'Хотелки',pct:5,src:[],once:false,kind:'spend'},{id:'gifts',name:'Подарки',pct:2.5,src:[],once:false,kind:'spend',gifts:true}]}; };
@@ -3070,7 +3073,7 @@ function viewSecPos(r){
   const backLbl=UI.detail.back==='long'?'Инвестиции':(G?G.g.name:'Инвестиции');
   let html=`<button class="back" data-act="back">‹ ${esc(backLbl)}</button>
   <div class="detail-title"><h2>${esc(p.name||p.secid)}</h2><button class="btn small" data-act="edit" data-kind="invPos" data-i="${pi}">Изменить</button></div>
-  <p class="hint" style="margin-top:-6px">${esc(p.secid)}${G?' · '+esc(G.g.name):''}${p.long?' <span class="tag">долгосрочная</span>':''}</p>
+  <p class="hint" style="margin-top:-6px">${esc(p.secid)}${G?' · '+esc(G.g.name)+' '+kindTag(G.g.kind):''}${p.long?' <span class="tag">долгосрочная</span>':''}</p>
   ${qBar()}
   <div class="kpis">${kpi('Стоит сейчас',r.valueNow,hasP?fmtQ(r.qty)+' шт. × '+fmtP(q.price):'цена не загружена')}
     ${kpiT('Результат',`<span class="${rc}">${r.result>=0?'+':'−'}${fmt(Math.abs(r.result))} ₽</span>`,(r.invested?`<span class="${rc}">${r.result>=0?'+':'−'}${pctD(Math.abs(r.result)/r.invested)}</span> · `:'')+'внесено '+fmt(r.invested)+' ₽')}
@@ -3177,7 +3180,7 @@ function viewInvest(){
   ${divHtml(open.filter(r=>r.valueNow>0))}
   <section class="card"><div class="row-between"><h3>Группы${QH}</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invGroup">+ Группа</button></div></div>
     <p class="hint qtip" hidden>Внутри группы — позиции. У каждой позиции: пополнения, стоимость сейчас и доход по месяцам.</p>
-    ${C.groups.length?C.groups.map(g=>`<button class="list-row" data-act="invOpen" data-id="${g.g.id}"><div class="m"><div class="fname"><b>${esc(g.g.name)}</b> <span class="tag">${esc(g.g.kind)}</span></div>
+    ${C.groups.length?C.groups.map(g=>`<button class="list-row" data-act="invOpen" data-id="${g.g.id}"><div class="m"><div class="fname"><b>${esc(g.g.name)}</b> ${kindTag(g.g.kind)}</div>
       <div class="fsub num">${g.pos.length} поз. · внесено ${fmt(g.invested)} · стоит ${fmt(g.value)}</div></div>
       <div class="a num">${resHtml(g.value-g.invested,g.invested,true)}</div>${CHEV}</button>`).join(''):'<p class="hint">Пока пусто.</p>'}</section>
   ${wishHtml()}
@@ -3194,7 +3197,7 @@ function viewInvDetail(G){
   const g=G.g, gi=S.invGroups.indexOf(g), m=selMonth(), j=C.months.indexOf(m), lab=KIND_INCOME[g.kind]||'Доход';
   const monTot=G.pos.reduce((s,r)=>s+r.used[j],0);
   return `<button class="back" data-act="back">‹ Инвестиции</button>
-  <div class="detail-title"><h2>${esc(g.name)} <span class="tag">${esc(g.kind)}</span></h2><button class="btn small" data-act="edit" data-kind="invGroup" data-i="${gi}">Изменить</button></div>
+  <div class="detail-title"><h2>${esc(g.name)} ${kindTag(g.kind)}</h2><button class="btn small" data-act="edit" data-kind="invGroup" data-i="${gi}">Изменить</button></div>
   <div class="kpis" data-live="invk">${kpi('Внесено',G.invested)}${kpi('Стоит сейчас',G.value,resHtml(G.value-G.invested,G.invested))}${kpi('Пришло всего',G.pos.reduce((s,r)=>s+r.earned,0),lab.toLowerCase())}${yieldBox(G.pos.filter(r=>!r.closed))||kpi('Ожидается в месяц',G.mon,'по ставкам')}</div>
   <section class="card"><div class="row-between"><h3>Позиции${QH}</h3><div class="btns"><button class="btn small primary" data-act="secAdd">+ С биржи</button><button class="btn small" data-act="add" data-kind="invPos">+ Вручную</button></div></div>
     <p class="hint qtip" hidden>Нажмите на позицию: пополнения, стоимость сейчас, доход по месяцам.</p>
@@ -3215,7 +3218,7 @@ function viewPos(r){
   const valSub=r.closed?'позиция закрыта':r.valueManual?(p.valueDate?'на '+dRu(p.valueDate):'вписано вами'):(r.reinv&&rate?'оценка по ставке'+(r.stateGot?' + доплата':''):'оценка = внесено');
   let html=`<button class="back" data-act="back">‹ ${esc(backLbl)}</button>
   <div class="detail-title"><h2>${esc(p.name||'Без названия')}</h2><button class="btn small" data-act="edit" data-kind="invPos" data-i="${pi}">Изменить</button></div>
-  <p class="hint" style="margin-top:-6px">${G?esc(G.g.name):''}${rate?' · '+String(p.rate).replace('.',',')+'% годовых':''}${p.start?' · с '+dRu(p.start):''}${p.end?' до '+dRu(p.end):''}
+  <p class="hint" style="margin-top:-6px">${G?esc(G.g.name)+' '+kindTag(G.g.kind):''}${rate?' · '+String(p.rate).replace('.',',')+'% годовых':''}${p.start?' · с '+dRu(p.start):''}${p.end?' до '+dRu(p.end):''}
     ${p.long?' <span class="tag">долгосрочная</span>':''}${p.reinvest?' <span class="tag">капитализация</span>':''}${p.flow?' <span class="tag">из бюджета</span>':''}${r.closed?' <span class="tag">закрыта</span>':''}</p>
   <div class="kpis" data-live="posk">${kpi('Внесено',r.invested,r.contribs.filter(x=>x.m<=C.curM).length+' пополн.')}${kpi('Стоит сейчас',r.valueNow,valSub)}
     ${kpiT('Результат',resHtml(r.result,r.invested),'стоимость − внесено')}${kpi('Доход получен',r.received,lab.toLowerCase())}${yieldBox([r])}</div>
@@ -3281,7 +3284,7 @@ function longCard(){
     <div class="kpis" style="margin:2px 0 8px">${kpi('Внесено',inv)}${kpi('Стоит сейчас',val,resHtml(val-inv,inv))}${kpi('Будет к погашению',endT,'по всем позициям')}${kpi('Доход за весь срок',inc,'ожидаемый')}</div>
     ${L.map(r=>{ const p=r.p, G=C.groups.find(g=>g.g.id===p.group);
       return `<button class="list-row" data-act="posOpen" data-id="${p.id}" data-back="long" style="display:block">
-        <div class="row-between"><span class="fname" style="min-width:0"><b>${esc(p.name||'Без названия')}</b>${G?' <span class="tag">'+esc(G.g.kind)+'</span>':''}</span><span class="num" style="white-space:nowrap">${resHtml(r.result,r.invested)}</span></div>
+        <div class="row-between"><span class="fname" style="min-width:0"><b>${esc(p.name||'Без названия')}</b>${G?' '+kindTag(G.g.kind):''}</span><span class="num" style="white-space:nowrap">${resHtml(r.result,r.invested)}</span></div>
         ${r.progress!=null?`<div class="thermo" style="height:8px;margin:7px 0 5px"><i style="width:${(r.progress*100).toFixed(1)}%"></i></div>`:''}
         <div class="fsub num">внесено ${fmt(r.invested)} · стоит ${fmt(r.valueNow)} · ${contribText(p)}</div>
         <div class="fsub num">${p.end?'погашение '+dRu(p.end)+' · '+(r.monthsLeft>0?'через '+durText(r.monthsLeft):'срок наступил'):'дата погашения не указана'}${r.proj?' · к погашению ≈ '+rub(r.proj.total)+', доход ≈ '+rub(r.proj.income):''}</div></button>`; }).join('')}</section>
@@ -6933,60 +6936,99 @@ async function tiFetch(){
     out.push({a,pf,ops});
   }
   lsSet(TI_FIGI,cache);
-  return {list:out,cache,fx:await loadFx().catch(()=>({}))};
+  // ожидаемые дивиденды по акциям и фондам в портфеле — на год вперёд
+  const divs={}, from=new Date(Date.now()-45*864e5).toISOString(), to=new Date(Date.now()+400*864e5).toISOString();
+  const held=new Set(); out.forEach(({pf})=>(pf.positions||[]).forEach(p=>{ const y=(cache[p.figi]||{}).y; if(p.figi&&(y==='share'||y==='etf')&&tiMv(p.quantity)>0) held.add(p.figi); }));
+  for(const f of held){ try{ divs[f]=(await tiCall('InstrumentsService/GetDividends',{figi:f,from,to})).dividends||[]; }catch(e){} }
+  return {list:out,cache,divs,fx:await loadFx().catch(()=>({}))};
 }
-function tiApply({list,cache,fx}){
-  const tk=todayK(), curMk=tk.slice(0,7), types={}; let nPos=0;
+// ИИС и счета «Долгосрочные инвестиции» — отдельно от обычных брокерских
+const tiLong=a=>a.type==='ACCOUNT_TYPE_TINKOFF_IIS'||/иис|долгосроч/i.test(a.name||'');
+const TI_KIND={bond:['Облигации','b'],share:['Акции','s'],etf:['Фонды','f']}, TI_ORD='bsfoc';
+const tiNorm=s=>String(s||'').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9]+/g,'');
+function tiApply({list,cache,fx,divs},skip){
+  const tk=todayK(), curMk=tk.slice(0,7), keepG=new Set(), keepP=new Set(); let nPos=0;
   const toRub=m=>{ const cur=String(m&&m.currency||'rub').toUpperCase(), v=tiMv(m); return RUBS.has(cur)?v:v*(fx[cur]||0); };
-  const tiGroup=(id,name,kind)=>{ let g=S.invGroups.find(x=>x.id===id); if(!g){ g={id,name,kind}; S.invGroups.push(g); } return g; };
-  const tiPos=id=>{ let p=S.invPositions.find(x=>x.id===id); if(!p){ p=Object.assign(FORMS.invPos.blank(),{id}); S.invPositions.push(p); } return p; };
-  list.forEach(({a})=>{ types[a.type]=(types[a.type]||0)+1; });
+  const tiGroup=(id,name,kind)=>{ keepG.add(id); let g=S.invGroups.find(x=>x.id===id); if(!g){ g={id,name,kind}; S.invGroups.push(g); } else Object.assign(g,{name,kind}); return g; };
+  const tiPos=id=>{ keepP.add(id); let p=S.invPositions.find(x=>x.id===id); if(!p){ p=Object.assign(FORMS.invPos.blank(),{id}); S.invPositions.push(p); } return p; };
+  // одна бумага на нескольких счетах одного вида — одна позиция
+  const B={};
   for(const {a,pf,ops} of list){
-    const ak=String(a.id).slice(-6), aLab='Т-Инвестиции'+(a.type==='ACCOUNT_TYPE_TINKOFF_IIS'?' ИИС':a.type==='ACCOUNT_TYPE_INVEST_BOX'?' копилка':'')+(types[a.type]>1&&a.name?' «'+a.name+'»':'');
-    const by={}, E=f=>by[f]||(by[f]={ops:[],pf:null});
+    const bk=tiLong(a)?'iis':'br', b=B[bk]||(B[bk]={by:{},cash:0,opened:''}), E=f=>b.by[f]||(b.by[f]={ops:[],pf:[]});
     ops.forEach(o=>{ if(o.figi) E(o.figi).ops.push(o); });
-    (pf.positions||[]).forEach(p=>{ if(p.figi&&p.instrumentType!=='currency') E(p.figi).pf=p; });
-    for(const figi in by){
-      const e=by[figi], ins=cache[figi]||{}; if(ins.y==='currency') continue;
-      const rel=e.ops.some(o=>TI_BUY.has(o.operationType)||TI_SELL.has(o.operationType)||TI_IN.has(o.operationType)||TI_REPAY.has(o.operationType)||TI_INC.has(o.operationType));
-      if(!e.pf&&!rel) continue;
-      const kind=ins.y==='bond'?'Облигации':ins.y==='share'?'Акции':ins.y==='etf'?'Фонды':'Другое';
-      const g=tiGroup('ti-'+ak+'-'+({'Облигации':'b','Акции':'s','Фонды':'f'}[kind]||'o'),aLab+' · '+kind.toLowerCase(),kind);
-      const pid='ti-'+ak+'-'+figi, p=tiPos(pid), mx=/^TQ/.test(ins.c||'')&&!!ins.t, nm=ins.n||ins.t||figi;
+    (pf.positions||[]).forEach(p=>{ if(p.figi&&p.instrumentType!=='currency') E(p.figi).pf.push(p); });
+    b.cash+=tiMv(pf.totalAmountCurrencies); const od=a.openedDate?dkey(new Date(a.openedDate)):''; if(od&&(!b.opened||od<b.opened)) b.opened=od;
+  }
+  for(const bk in B){
+    const b=B[bk], base='Т-Инвестиции'+(bk==='iis'?' ИИС':'');
+    for(const figi in b.by){
+      const e=b.by[figi], ins=cache[figi]||{}; if(ins.y==='currency') continue;
+      const pq=e.pf.reduce((s,x)=>s+tiMv(x.quantity),0); if(!(pq>0)) continue; // закрытые позиции не показываем
+      const [kind,code]=TI_KIND[ins.y]||['Другое','o'];
+      const g=tiGroup('ti-'+bk+'-'+code,base,kind);
+      const pid='ti-'+bk+'-'+figi, p=tiPos(pid), mx=/^TQ/.test(ins.c||'')&&!!ins.t, nm=ins.n||ins.t||figi;
       if(mx&&p.secid!==ins.t) p.q=null;
-      Object.assign(p,{group:g.id,name:nm,secid:mx?ins.t:'',board:mx?ins.c:'',market:mx?(ins.y==='bond'?'bonds':'shares'):'',flow:false});
-      const cs=[]; let qty=0, first='', last='', lastPr=0;
+      Object.assign(p,{group:g.id,name:nm,secid:mx?ins.t:'',board:mx?ins.c:'',market:mx?(ins.y==='bond'?'bonds':'shares'):'',flow:false,end:''});
+      const cs=[]; let qty=0, first='';
       e.ops.slice().sort((x,y)=>String(x.date).localeCompare(String(y.date))).forEach(o=>{
         const t=o.operationType, d=dkey(new Date(o.date)), n=Math.max(0,(+o.quantity||0)-(+o.quantityRest||0)), pay=toRub(o.payment), pr=toRub(o.price);
         let q; if(TI_BUY.has(t)||TI_IN.has(t)) q=n; else if(TI_SELL.has(t)||TI_OUT.has(t)) q=-n; else if(TI_REPAY.has(t)) q=t.endsWith('FULL')?-n:0; else return;
         const amount=(TI_IN.has(t)||TI_OUT.has(t))&&!pay?r2(q*pr):r2(-pay);
-        cs.push({id:'ti-'+o.id,pos:pid,posName:nm,date:d,amount,note:TI_NOTE[t]||'',qty:q,price:pr?r2(pr):null}); qty+=q; if(pr) lastPr=pr; if(!first) first=d; last=d; });
+        cs.push({id:'ti-'+o.id,pos:pid,posName:nm,date:d,amount,note:TI_NOTE[t]||'',qty:q,price:pr?r2(pr):null}); qty+=q; if(!first) first=d; });
       // сверка с портфелем: перевод от другого брокера, сплит и т.п.
-      const pq=e.pf?tiMv(e.pf.quantity):0, diff=Math.round((pq-qty)*1e6)/1e6;
-      if(diff){ const avg=e.pf?toRub(e.pf.averagePositionPrice):lastPr; cs.push({id:pid+'-adj',pos:pid,posName:nm,date:first||tk,amount:r2(diff*avg),note:'сверка с брокером',qty:diff,price:avg?r2(avg):null}); }
+      const diff=Math.round((pq-qty)*1e6)/1e6, avgW=e.pf.reduce((s,x)=>s+tiMv(x.quantity)*toRub(x.averagePositionPrice),0)/pq;
+      if(diff){ cs.push({id:pid+'-adj',pos:pid,posName:nm,date:first||tk,amount:r2(diff*avgW),note:'сверка с брокером',qty:diff,price:avgW?r2(avgW):null}); }
       S.invContribs=S.invContribs.filter(x=>x.pos!==pid||!String(x.id).startsWith('ti-')).concat(cs);
-      p.start=first||p.start||tk; p.end=e.pf&&pq?'':(last||tk);
-      if(e.pf){ p.value=r2(pq*toRub(e.pf.currentPrice)); p.valueDate=tk; } else { p.value=0; p.valueDate=p.end; }
+      p.start=first||p.start||tk; p.value=r2(pq*toRub(e.pf[0].currentPrice)); p.valueDate=tk;
       // доход по месяцам — как у брокера (купоны и дивиденды за вычетом налога); у облигации месяц купона без выплаты — 0
       const inc={}; e.ops.forEach(o=>{ if(!TI_INC.has(o.operationType)) return; const m=dkey(new Date(o.date)).slice(0,7); inc[m]=(inc[m]||0)+toRub(o.payment); });
       if(mx&&ins.y==='bond'&&first&&p.q&&Array.isArray(p.q.cpn)) p.q.cpn.forEach(([dt])=>{ const m=String(dt).slice(0,7); if(dt>first&&m<curMk&&!(m in inc)) inc[m]=0; });
       S.invFacts=S.invFacts.filter(f=>f.pos!==pid).concat(Object.keys(inc).sort().map(m=>({pos:pid,posName:nm,month:m,value:String(r2(inc[m])).replace('.',','),sum:r2(inc[m])})));
-      if(e.pf&&pq) nPos++;
+      // ближайший объявленный дивиденд — в «Ожидаемый дивиденд»
+      if(divs&&divs[figi]){ const nx=divs[figi].map(x=>({d:dkey(new Date(x.paymentDate||x.recordDate||0)),v:toRub(x.dividendNet)})).filter(x=>x.v>0&&x.d>=tk).sort((x,y)=>x.d.localeCompare(y.d))[0];
+        if(nx){ p.divPs=r2(nx.v); p.divDate=nx.d; } else if(p.divDate&&p.divDate<tk){ p.divPs=null; p.divDate=''; } }
+      nPos++;
     }
-    // свободные деньги на счёте — отдельной позицией (стоимость = остаток, поэтому прироста не даёт)
-    const cash=r2(tiMv(pf.totalAmountCurrencies)), cid='ti-'+ak+'-cash';
-    if(cash>=1||S.invPositions.some(x=>x.id===cid)){
-      const g=tiGroup('ti-'+ak+'-o',aLab+' · деньги','Другое'), p=tiPos(cid);
-      Object.assign(p,{group:g.id,name:'Свободные деньги',secid:'',board:'',market:'',value:cash,valueDate:tk,flow:false,end:''}); if(!p.start) p.start=a.openedDate?dkey(new Date(a.openedDate)):tk;
-      S.invContribs=S.invContribs.filter(x=>x.pos!==cid).concat(cash?[{id:cid+'-adj',pos:cid,posName:'Свободные деньги',date:tk,amount:cash,note:'остаток на счёте',qty:null,price:null}]:[]); }
+    // свободные деньги — отдельной позицией (стоимость = остаток, поэтому прироста не даёт)
+    const cash=r2(b.cash), cid='ti-'+bk+'-cash';
+    if(cash>=1){
+      const g=tiGroup('ti-'+bk+'-c',base,'Другое'), p=tiPos(cid);
+      Object.assign(p,{group:g.id,name:'Свободные деньги',secid:'',board:'',market:'',value:cash,valueDate:tk,flow:false,end:''}); if(!p.start) p.start=b.opened||tk;
+      S.invContribs=S.invContribs.filter(x=>x.pos!==cid).concat([{id:cid+'-adj',pos:cid,posName:'Свободные деньги',date:tk,amount:cash,note:'остаток на счёте',qty:null,price:null}]); }
   }
+  // всё прежнее из Т-Инвестиций, чего сейчас нет (закрытые позиции, пустые счета, старая раскладка по счетам) — убираем
+  const goneP=new Set(S.invPositions.filter(p=>isTi(p)&&!keepP.has(p.id)).map(p=>p.id));
+  S.invPositions=S.invPositions.filter(p=>!goneP.has(p.id)); S.invContribs=S.invContribs.filter(c=>!goneP.has(c.pos)); S.invFacts=S.invFacts.filter(f=>!goneP.has(f.pos));
+  const used=new Set(S.invPositions.map(p=>p.group));
+  S.invGroups=S.invGroups.filter(g=>!String(g.id).startsWith('ti-')||keepG.has(g.id)||used.has(g.id));
+  // группы Т-Инвестиций — первыми: обычный счёт, потом ИИС; облигации, акции, фонды, другое, деньги
+  const oK=g=>{ const m=/^ti-(br|iis)-(\w)$/.exec(g.id); return m?(m[1]==='iis'?10:0)+TI_ORD.indexOf(m[2]):99; };
+  S.invGroups=S.invGroups.filter(g=>oK(g)<99).sort((x,y)=>oK(x)-oK(y)).concat(S.invGroups.filter(g=>oK(g)===99));
+  // те же бумаги, внесённые вручную, — в корзину (один раз: вернули из корзины — больше не трогаем)
+  const have=new Set(); S.invPositions.filter(isTi).forEach(p=>{ if(p.secid) have.add('s:'+p.secid.toUpperCase()); if(p.name&&p.name!=='Свободные деньги') have.add('n:'+tiNorm(p.name)); });
+  const dup=S.invPositions.filter(p=>!isTi(p)&&!(skip||[]).includes(p.id)&&!(p.end&&p.end<tk)&&((p.secid&&have.has('s:'+String(p.secid).toUpperCase()))||(p.name&&have.has('n:'+tiNorm(p.name)))));
+  dup.forEach(p=>tiDrop(p));
   persist('invGroups','invPositions','invContribs','invFacts');
-  return nPos;
+  return {n:nPos,dup:dup.map(p=>p.id)};
+}
+// ручная позиция — в корзину вместе с пополнениями и доходом; опустевшая группа — тоже
+function tiDrop(p){
+  trashed(['invPositions','invContribs','invFacts','invGroups'],p.name||'позиция','Позиция',()=>{
+    S.invPositions=S.invPositions.filter(x=>x!==p); S.invContribs=S.invContribs.filter(c=>c.pos!==p.id); S.invFacts=S.invFacts.filter(f=>f.pos!==p.id);
+    if(!S.invPositions.some(x=>x.group===p.group)) S.invGroups=S.invGroups.filter(g=>g.id!==p.group); });
+}
+// «Оставить только Т-Инвестиции»: всё внесённое вручную — в корзину (30 дней можно вернуть)
+function tiOnly(){
+  const L=S.invPositions.filter(p=>!isTi(p)); if(!L.length){ toast('Других позиций нет'); return; }
+  if(!confirm('Убрать в корзину '+L.length+' '+plural(L.length,'позицию','позиции','позиций')+', внесённых вручную? Останутся только Т-Инвестиции. Из корзины можно вернуть 30 дней.')) return;
+  L.forEach(tiDrop); S.invGroups=S.invGroups.filter(g=>String(g.id).startsWith('ti-')||S.invPositions.some(p=>p.group===g.id));
+  persist('invGroups','invPositions','invContribs','invFacts'); render(); toast('Остались только Т-Инвестиции · вернуть — в корзине');
 }
 async function tiSync(manual){
   const c=tiCfg(); if(!c.token||tiBusy||!S) return; tiBusy=true; tiUpd();
-  try{ const data=await tiFetch(), n=tiApply(data); c.last=Date.now(); c.err=''; lsSet(TI_KEY,c);
-    if(manual) toast('Т-Инвестиции: '+n+' '+plural(n,'бумага','бумаги','бумаг')+' в портфеле');
+  try{ const data=await tiFetch(), r=tiApply(data,c.dd), n=r.n; c.last=Date.now(); c.err=''; c.dd=[...new Set((c.dd||[]).concat(r.dup))]; lsSet(TI_KEY,c);
+    if(r.dup.length) toast('Убрал повторы, внесённые вручную: '+r.dup.length+' · вернуть — в корзине');
+    else if(manual) toast('Т-Инвестиции: '+n+' '+plural(n,'бумага','бумаги','бумаг')+' в портфеле');
     qTried=0; refreshQuotes(false); }
   catch(e){ c.err=errText(e); lsSet(TI_KEY,c); if(manual) toast('Т-Инвестиции: '+c.err); }
   tiBusy=false; if(UI.section==='fin') quietRender(); else tiUpd();
@@ -6995,11 +7037,11 @@ function tiUpd(){ const el=$view.querySelector('[data-live="ti"]'); if(!el) retu
 function tiCard(){
   const c=tiCfg(), mine=S.invPositions.filter(isTi);
   if(!c.token&&!mine.length) return `<button class="list-row" data-act="tiOpen" style="margin-bottom:12px"><div class="m"><div class="fname"><b>Подключить Т-Инвестиции</b></div><div class="fsub">Бумаги, покупки, купоны и дивиденды подтянутся сами — по токену «только чтение»</div></div>${CHEV}</button>`;
-  const ids=new Set(mine.filter(p=>p.secid&&!(p.end&&p.end<todayK())).map(p=>p.secid)), dup=S.invPositions.filter(p=>!isTi(p)&&p.secid&&ids.has(p.secid)&&!(p.end&&p.end<todayK()));
+  const other=mine.length?S.invPositions.filter(p=>!isTi(p)).length:0;
   const st=tiBusy?'Загружаю…':c.err?`<span class="neg">${esc(c.err)}</span>`:c.last?qWhen(c.last):c.token?'ещё не загружено':'обновляется на устройстве, где введён токен';
   return `<section class="card" data-live="ti"><div class="row-between"><div style="min-width:0"><b>Т-Инвестиции</b><div class="fsub">${st}</div></div>
     <div class="btns">${c.token?`<button class="btn small" data-act="tiSync" ${tiBusy?'disabled':''}>Обновить</button><button class="btn small" data-act="tiOpen" aria-label="Настройки Т-Инвестиций">⋯</button>`:'<button class="btn small" data-act="tiOpen">Подключить здесь</button>'}</div></div>
-    ${dup.length?`<p class="hint" style="margin:8px 0 0">Эти бумаги есть и среди внесённых вручную: <b>${[...new Set(dup.map(p=>p.secid))].map(esc).join(', ')}</b>. Если это те же, что в Т-Инвестициях, — удалите ручные позиции, чтобы не считать дважды. Если они у другого брокера (Сбер, Альфа) — оставьте.</p>`:''}</section>`;
+    ${other?`<div class="row-between" style="margin-top:8px"><span class="fsub">Внесено вручную: ${other} ${plural(other,'позиция','позиции','позиций')}</span><button class="btn small" data-act="tiOnly">Оставить только Т-Инвестиции</button></div>`:''}</section>`;
 }
 function tiOpen(){
   const c=tiCfg();
@@ -7008,7 +7050,7 @@ function tiOpen(){
     <ol class="hint isteps"><li>Токен выпускается только на сайте Т-Банка — в приложении на телефоне этого пункта нет. Нажмите <button class="btn small" data-act="tiSite">Открыть страницу токенов</button>, войдите и найдите блок <b>«Токены T-Invest API»</b> → «Создать токен».</li><li>Создайте токен с доступом <b>«Только чтение»</b> ко всем счетам.</li><li>Скопируйте его и вставьте сюда.</li></ol>
     <div class="field"><label>Токен</label><input id="tiTok" autocomplete="off" spellcheck="false" placeholder="${c.token?'токен сохранён — вставьте новый, чтобы заменить':'t.…'}"></div>
     <p class="hint">Токен хранится только на этом устройстве — в таблицу и на сайт он не попадает. С токеном «только чтение» нельзя ничего купить, продать или вывести. Если им долго не пользоваться, он перестанет действовать — тогда выпустите новый.</p>
-    <p class="hint">Бумаги лягут в группы «Т-Инвестиции · облигации», «· акции», «· фонды». Править их вручную не нужно: при обновлении всё приводится к данным брокера.</p>
+    <p class="hint">Бумаги со всех счетов собираются по видам: «Т-Инвестиции» — облигации, акции, фонды; ИИС и счета «Долгосрочные инвестиции» — отдельно, «Т-Инвестиции ИИС». Закрытые позиции и пустые счета не показываются. Те же бумаги, внесённые вручную, уходят в корзину, чтобы не считать дважды. Править вручную не нужно: при обновлении всё приводится к данным брокера.</p>
     <div class="actions">${c.token?'<button class="btn danger" data-act="tiOff">Отключить</button>':''}<span class="sp"></span><button class="btn" data-act="sheetClose">Отмена</button><button class="btn primary" data-act="tiSave">${c.token?'Сохранить':'Подключить'}</button></div>`);
 }
 async function tiSave(){
@@ -7035,7 +7077,7 @@ const INTEG_ACTS={
   kpOff:()=>{ try{ localStorage.removeItem(KP_KEY); }catch(e){} closeSheet(); toast('Ключ убран'); },
   hcOn:()=>hcConnect(), hcSync:()=>hcSync(true), hcOpen:()=>{ try{ NATIVE.hcOpen(); }catch(e){} },
   hcOff:()=>{ const c=hcCfg(); c.on=false; lsSet(HC_KEY,c); toast('Health Connect отключён — записанные данные остались'); openSettings(); },
-  tiOpen:()=>tiOpen(), tiSite:()=>{ const u='https://www.tbank.ru/invest/settings/'; if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }, tiSave:()=>tiSave(), tiSync:()=>tiSync(true),
+  tiOpen:()=>tiOpen(), tiOnly:()=>tiOnly(), tiSite:()=>{ const u='https://www.tbank.ru/invest/settings/'; if(NATIVE) NATIVE.openUrl(u); else window.open(u,'_blank','noopener'); }, tiSave:()=>tiSave(), tiSync:()=>tiSync(true),
   tiOff:()=>{ if(!confirm('Отключить Т-Инвестиции на этом устройстве? Загруженные бумаги останутся, но обновляться перестанут.')) return; lsSet(TI_KEY,{token:'',last:0,err:''}); closeSheet(); toast('Т-Инвестиции отключены'); quietRender(); }
 };
 document.addEventListener('change',e=>{ const el=e.target; if(!el||!el.dataset||!el.dataset.hccfg) return; const c=hcCfg(); c[el.dataset.hccfg]=el.checked; lsSet(HC_KEY,c); });
